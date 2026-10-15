@@ -11,3 +11,7 @@ Pre-flight: Task 5 produces run snapshots consumed by rendering/UI tasks; render
 Task 1: Ruling: WORLD_SIZE = 16 world units — matches the approved prototype scale while remaining a single tunable constant — wrong tuning would affect feel, not topology semantics.
 Task 1: RED verified in GitHub Actions run 38814449349: setup-node and npm install succeeded; npm test failed before implementation.
 Task 1: complete (tests + typecheck: GitHub Actions run 38814556126 → success; head b50d4e5).
+Task 2: Ruling: OrientationState stores yaw/pitch plus a derived quaternion and literal roll=0 — preserves quaternion authority for rendering while making no-roll steering explicit and testable.
+Task 2: Ruling: advanceHead returns both unwrappedPosition and wrappedPosition plus wrapOffset — Task 3 needs continuous trail coordinates and Task 7 needs coherent camera relocation.
+Task 2: RED verified in GitHub Actions run 38814697243: install succeeded; npm test failed with steering/simulation implementations absent.
+Task 2: complete (tests + typecheck: GitHub Actions run 38814836171 → success; head 68f84f9).
