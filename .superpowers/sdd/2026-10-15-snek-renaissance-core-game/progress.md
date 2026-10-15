@@ -30,3 +30,6 @@ Task 6: Ruling: visual radii body/head/food = 0.16/0.17/0.16 world units; cube u
 Task 6: RED verified in GitHub Actions run 38815822962: npm test failed with render modules absent.
 Task 6: Debugging: first GREEN attempt passed 44 tests but failed typecheck because TypeScript did not preserve nullable canvas narrowing inside resize closure; root cause confirmed from job log and fixed by binding a non-null const after the guard.
 Task 6: complete (tests + typecheck + production build: GitHub Actions run 38816119921 → success; head 1d96098).
+Task 7: Ruling: camera stores the previous periodic wrap offset; changes in that offset relocate position and target by the same periodic delta before exponential smoothing resumes.
+Task 7: RED verified in GitHub Actions run 38816257106: npm test failed with chase-camera implementation absent.
+Task 7: complete (tests + typecheck + production build: GitHub Actions run 38816343176 → success; head 62037fe).
