@@ -26,8 +26,12 @@ function deferred<T>(): Deferred<T> {
 class ControlledRankedGateway implements SessionGateway {
   readonly startQueue: Deferred<SessionStart>[] = [];
   readonly submitQueue: Deferred<SessionSubmission>[] = [];
+  readonly leaderboardQueue: Deferred<LeaderboardResponse>[] = [];
+  readonly rankQueue: Deferred<PlayerRankResponse | null>[] = [];
   readonly startCalls: PlayerIdentity[] = [];
   readonly submitCalls: Array<{ identity: PlayerIdentity; sessionId: string; result: RunResult }> = [];
+  readonly leaderboardCalls: Array<number | undefined> = [];
+  readonly rankCalls: string[] = [];
 
   startRun(identity: PlayerIdentity): Promise<SessionStart> {
     this.startCalls.push({ ...identity });
@@ -43,12 +47,18 @@ class ControlledRankedGateway implements SessionGateway {
     return next.promise;
   }
 
-  async getLeaderboard(_limit?: number): Promise<LeaderboardResponse> {
-    return { entries: [] };
+  getLeaderboard(limit?: number): Promise<LeaderboardResponse> {
+    this.leaderboardCalls.push(limit);
+    const next = deferred<LeaderboardResponse>();
+    this.leaderboardQueue.push(next);
+    return next.promise;
   }
 
-  async getPlayerRank(_playerId: string): Promise<PlayerRankResponse | null> {
-    return null;
+  getPlayerRank(playerId: string): Promise<PlayerRankResponse | null> {
+    this.rankCalls.push(playerId);
+    const next = deferred<PlayerRankResponse | null>();
+    this.rankQueue.push(next);
+    return next.promise;
   }
 }
 
@@ -88,6 +98,19 @@ function forceGameOver(controller: AppController, result: RunResult): void {
   run.result = result;
   run.maxLength = result.maxLength;
   controller.handleRunState(run);
+}
+
+async function reachAcceptedGameOver(
+  root: HTMLElement,
+  controller: AppController,
+  gateway: ControlledRankedGateway
+): Promise<void> {
+  enterAndPlay(root, 'ren');
+  gateway.startQueue[0].resolve({ ranked: true, sessionId: 'session-1' });
+  await flush();
+  forceGameOver(controller, { maxLength: 16, foodEaten: 1, durationMs: 1_000 });
+  gateway.submitQueue[0].resolve({ ranked: true, worldRank: 2 });
+  await flush();
 }
 
 describe('ranked application lifecycle', () => {
@@ -214,5 +237,90 @@ describe('ranked application lifecycle', () => {
     gateway.submitQueue[1].resolve({ ranked: true, worldRank: 22 });
     await flush();
     expect(root.textContent).toContain('#22');
+  });
+});
+
+describe('public leaderboard UI', () => {
+  test('shows loading then renders duplicate/Unicode/untrusted usernames as safe text and marks own rank', async () => {
+    const gateway = new ControlledRankedGateway();
+    const { root, controller } = setup(gateway);
+    await reachAcceptedGameOver(root, controller, gateway);
+
+    click(root, '[data-action="rank"]');
+    expect(controller.screen).toBe('rank');
+    expect(root.querySelector('[data-leaderboard-state="loading"]')).not.toBeNull();
+    expect(gateway.leaderboardCalls).toEqual([50]);
+    expect(gateway.rankCalls).toHaveLength(1);
+
+    const playerId = gateway.rankCalls[0];
+    gateway.leaderboardQueue[0].resolve({
+      entries: [
+        { rank: 1, username: '<img src=x onerror=alert(1)>', maxLength: 40, durationMs: 4_000, acceptedAt: 1 },
+        { rank: 2, username: 'same', maxLength: 32, durationMs: 5_000, acceptedAt: 2 },
+        { rank: 3, username: 'same', maxLength: 28, durationMs: 5_500, acceptedAt: 3 },
+        { rank: 4, username: 'João 龍', maxLength: 24, durationMs: 6_000, acceptedAt: 4 }
+      ]
+    });
+    gateway.rankQueue[0].resolve({ rank: 2, username: 'same', maxLength: 32, durationMs: 5_000 });
+    await flush();
+
+    expect(root.querySelector('[data-leaderboard-state="ready"]')).not.toBeNull();
+    expect(root.querySelectorAll('[data-leaderboard-row]')).toHaveLength(4);
+    expect(root.querySelector('[data-leaderboard-row][data-self="true"]')?.textContent).toContain('same');
+    expect(root.textContent).toContain('<img src=x onerror=alert(1)>');
+    expect(root.textContent).toContain('João 龍');
+    expect(root.querySelector('img')).toBeNull();
+    expect(root.querySelector('script')).toBeNull();
+    expect(root.textContent).not.toContain(playerId);
+  });
+
+  test('renders a valid empty leaderboard state', async () => {
+    const gateway = new ControlledRankedGateway();
+    const { root, controller } = setup(gateway);
+    await reachAcceptedGameOver(root, controller, gateway);
+
+    click(root, '[data-action="rank"]');
+    gateway.leaderboardQueue[0].resolve({ entries: [] });
+    gateway.rankQueue[0].resolve(null);
+    await flush();
+
+    expect(root.querySelector('[data-leaderboard-state="empty"]')).not.toBeNull();
+    expect(root.textContent?.toLowerCase()).toContain('no ranked runs');
+  });
+
+  test('shows a concise read error and BACK keeps replay available', async () => {
+    const gateway = new ControlledRankedGateway();
+    const { root, controller } = setup(gateway);
+    await reachAcceptedGameOver(root, controller, gateway);
+
+    click(root, '[data-action="rank"]');
+    gateway.leaderboardQueue[0].reject(new Error('offline'));
+    gateway.rankQueue[0].resolve(null);
+    await flush();
+
+    expect(root.querySelector('[data-leaderboard-state="error"]')).not.toBeNull();
+    expect(root.querySelector('[role="alert"]')?.textContent).toContain('leaderboard');
+    click(root, '[data-action="back"]');
+    expect(controller.screen).toBe('game-over');
+    expect(root.querySelector('[data-action="replay"]')).not.toBeNull();
+  });
+
+  test('late leaderboard response cannot overwrite the screen after BACK', async () => {
+    const gateway = new ControlledRankedGateway();
+    const { root, controller } = setup(gateway);
+    await reachAcceptedGameOver(root, controller, gateway);
+
+    click(root, '[data-action="rank"]');
+    click(root, '[data-action="back"]');
+    expect(controller.screen).toBe('game-over');
+
+    gateway.leaderboardQueue[0].resolve({
+      entries: [{ rank: 1, username: 'late', maxLength: 100, durationMs: 1, acceptedAt: 1 }]
+    });
+    gateway.rankQueue[0].resolve({ rank: 1, username: 'late', maxLength: 100, durationMs: 1 });
+    await flush();
+
+    expect(controller.screen).toBe('game-over');
+    expect(root.textContent).not.toContain('late');
   });
 });
