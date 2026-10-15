@@ -2,6 +2,7 @@ import {
   GROWTH_PER_FOOD,
   INITIAL_BODY_SEGMENTS,
   SEGMENT_SPACING,
+  TRAIL_RESERVE_SEGMENTS,
   WORLD_SIZE
 } from './constants';
 import { isSelfCollision } from './collision';
@@ -47,11 +48,16 @@ export type RunState = {
   result: RunResult | null;
 };
 
+function retainedTrailDistance(snake: SnakeState): number {
+  return (snake.segmentCount + TRAIL_RESERVE_SEGMENTS) * snake.segmentSpacing;
+}
+
 function createInitialTrail(snake: SnakeState): TrailBuffer {
-  const oldestDistance = (snake.segmentCount + 2) * snake.segmentSpacing;
+  const initialHistorySegments = snake.segmentCount + TRAIL_RESERVE_SEGMENTS + 2;
+  const oldestDistance = initialHistorySegments * snake.segmentSpacing;
   const trail = new TrailBuffer({ x: 0, y: 0, z: -oldestDistance });
 
-  for (let index = snake.segmentCount + 1; index >= 0; index -= 1) {
+  for (let index = initialHistorySegments - 1; index >= 0; index -= 1) {
     trail.push({ x: 0, y: 0, z: -index * snake.segmentSpacing });
   }
 
@@ -133,6 +139,7 @@ export function stepRun(
   state.forward = motion.forward;
   state.wrapOffset = motion.wrapOffset;
   state.trail.push(state.headUnwrapped);
+  state.trail.trimToDistance(retainedTrailDistance(state.snake));
   state.bodyPositions = sampleBodyPositions(state.snake, state.trail);
 
   if (state.food && isFoodCollected(state.headWrapped, state.food)) {
