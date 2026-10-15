@@ -5,3 +5,7 @@ export const MAX_PITCH = Math.PI * (80 / 180);
 export const FIXED_STEP_SECONDS = 1 / 60;
 export const MAX_FRAME_DELTA_SECONDS = 0.25;
 export const MAX_CATCHUP_STEPS = 8;
+
+export const INITIAL_BODY_SEGMENTS = 12;
+export const GROWTH_PER_FOOD = 4;
+export const SEGMENT_SPACING = 0.42;
