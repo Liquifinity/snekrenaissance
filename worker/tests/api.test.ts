@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'vitest';
 import { createTestHarness } from 'wrangler';
-import type { D1Database } from '../src/env';
+import type { D1Database, WorkerEnv } from '../src/env';
 import {
   createGame,
   finalizeAcceptedScore,
@@ -8,6 +8,7 @@ import {
   getScoreByGame,
   upsertPlayer
 } from '../src/repository';
+import { getLeaderboard, getPlayerRank, rankPlayer } from '../src/ranking';
 
 const server = createTestHarness({
   workers: [{ configPath: './wrangler.jsonc' }]
@@ -30,9 +31,12 @@ afterAll(async () => {
   await server.close();
 });
 
+async function env(): Promise<WorkerEnv> {
+  return await server.getWorker().getEnv() as WorkerEnv;
+}
+
 async function db(): Promise<D1Database> {
-  const env = await server.getWorker().getEnv() as Record<string, unknown>;
-  return env.DB as D1Database;
+  return (await env()).DB;
 }
 
 async function api(path: string, init: RequestInit = {}): Promise<Response> {
@@ -59,13 +63,38 @@ const zeroFoodResult = (playerId = 'player-1', username = 'ren') => ({
   durationMs: 0
 });
 
+let seededGame = 0;
+async function seedAccepted(input: {
+  playerId: string;
+  username: string;
+  maxLength: number;
+  durationMs: number;
+  acceptedAt: number;
+}): Promise<void> {
+  const database = await db();
+  seededGame += 1;
+  const gameId = `seed-game-${seededGame}`;
+  const foodEaten = Math.max(0, (input.maxLength - 12) / 4);
+  await upsertPlayer(database, input.playerId, input.username, input.acceptedAt - 2);
+  await createGame(database, gameId, input.playerId, input.acceptedAt - 1);
+  await finalizeAcceptedScore(database, {
+    gameId,
+    playerId: input.playerId,
+    username: input.username,
+    maxLength: input.maxLength,
+    foodEaten,
+    durationMs: input.durationMs,
+    acceptedAt: input.acceptedAt
+  });
+}
+
 describe('Worker harness', () => {
   test('worker boots with local bindings', async () => {
-    const env = await server.getWorker().getEnv() as Record<string, unknown>;
-    expect(env.DB).toBeTruthy();
-    expect(env.START_LIMITER).toBeTruthy();
-    expect(env.RESULT_LIMITER).toBeTruthy();
-    expect(env.READ_LIMITER).toBeTruthy();
+    const bindings = await env();
+    expect(bindings.DB).toBeTruthy();
+    expect(bindings.START_LIMITER).toBeTruthy();
+    expect(bindings.RESULT_LIMITER).toBeTruthy();
+    expect(bindings.READ_LIMITER).toBeTruthy();
 
     const response = await server.fetch('/api/health');
     expect(response.status).toBe(200);
@@ -247,6 +276,79 @@ describe('ranked session HTTP API', () => {
       expect(response.status).toBe(200);
     }
     const blocked = await api(path, { method: 'POST', body: JSON.stringify(payload) });
+    expect(blocked.status).toBe(429);
+    expect(await blocked.json()).toMatchObject({ error: { code: 'RATE_LIMITED', retryable: true } });
+  }, 20_000);
+});
+
+describe('canonical leaderboard ranking', () => {
+  test('keeps one best run per player and applies every canonical tie-breaker', async () => {
+    await seedAccepted({ playerId: 'alice', username: 'old-alice', maxLength: 16, durationMs: 1_000, acceptedAt: 500 });
+    await seedAccepted({ playerId: 'alice', username: 'old-alice', maxLength: 20, durationMs: 5_000, acceptedAt: 1_000 });
+    await seedAccepted({ playerId: 'charlie', username: 'same', maxLength: 20, durationMs: 4_000, acceptedAt: 2_000 });
+    await seedAccepted({ playerId: 'dave', username: 'same', maxLength: 20, durationMs: 4_000, acceptedAt: 2_000 });
+    await seedAccepted({ playerId: 'bob', username: 'bob', maxLength: 20, durationMs: 4_000, acceptedAt: 3_000 });
+    await upsertPlayer(await db(), 'alice', 'current-alice', 9_000);
+
+    const entries = await getLeaderboard(await db(), 100);
+    expect(entries).toEqual([
+      { rank: 1, username: 'same', maxLength: 20, durationMs: 4_000, acceptedAt: 2_000 },
+      { rank: 2, username: 'same', maxLength: 20, durationMs: 4_000, acceptedAt: 2_000 },
+      { rank: 3, username: 'bob', maxLength: 20, durationMs: 4_000, acceptedAt: 3_000 },
+      { rank: 4, username: 'current-alice', maxLength: 20, durationMs: 5_000, acceptedAt: 1_000 }
+    ]);
+
+    expect(await rankPlayer(await db(), 'alice')).toBe(4);
+    expect(await getPlayerRank(await db(), 'alice')).toEqual({
+      rank: 4,
+      username: 'current-alice',
+      maxLength: 20,
+      durationMs: 5_000
+    });
+  });
+
+  test('exposes leaderboard and player-rank routes with default/max limits', async () => {
+    const database = await db();
+    const statements: string[] = [];
+    for (let index = 1; index <= 51; index += 1) {
+      statements.push(`INSERT INTO players(id, username, created_at, updated_at) VALUES ('p${index}', 'user${index}', ${index}, ${index});`);
+      statements.push(`INSERT INTO games(id, player_id, started_at, finalized_at, status) VALUES ('g${index}', 'p${index}', ${index}, ${index}, 'accepted');`);
+      statements.push(`INSERT INTO scores(game_id, player_id, username_snapshot, max_length, food_eaten, duration_ms, accepted_at) VALUES ('g${index}', 'p${index}', 'user${index}', ${1000 - index}, 0, ${index}, ${index});`);
+    }
+    await database.exec(statements.join('\n'));
+
+    const defaults = await api('/api/leaderboard');
+    expect(defaults.status).toBe(200);
+    expect(((await defaults.json()) as { entries: unknown[] }).entries).toHaveLength(50);
+
+    const maximum = await api('/api/leaderboard?limit=100');
+    expect(maximum.status).toBe(200);
+    expect(((await maximum.json()) as { entries: unknown[] }).entries).toHaveLength(51);
+
+    const firstRank = await api('/api/player/p1/rank');
+    expect(firstRank.status).toBe(200);
+    expect(await firstRank.json()).toMatchObject({ username: 'user1', maxLength: 999 });
+  }, 20_000);
+
+  test('rejects invalid leaderboard limits and returns 404 for a player without a score', async () => {
+    for (const limit of ['0', '101', '1.5', 'abc']) {
+      const response = await api(`/api/leaderboard?limit=${limit}`);
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ error: { code: 'INVALID_LIMIT' } });
+    }
+
+    await upsertPlayer(await db(), 'no-score', 'waiting', 1);
+    const missing = await api('/api/player/no-score/rank');
+    expect(missing.status).toBe(404);
+    expect(await missing.json()).toMatchObject({ error: { code: 'PLAYER_NOT_RANKED' } });
+  });
+
+  test('enforces read rate limit by IP', async () => {
+    const bindings = await env();
+    for (let index = 0; index < 120; index += 1) {
+      expect((await bindings.READ_LIMITER.limit({ key: CLIENT_IP })).success).toBe(true);
+    }
+    const blocked = await api('/api/leaderboard');
     expect(blocked.status).toBe(429);
     expect(await blocked.json()).toMatchObject({ error: { code: 'RATE_LIMITED', retryable: true } });
   }, 20_000);
