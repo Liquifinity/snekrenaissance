@@ -35,6 +35,7 @@ export class AppController {
   private readonly gateway: SessionGateway;
   private readonly ui: HTMLDivElement;
   private state: AppState;
+  private activeSessionId: string | null = null;
 
   constructor({ root, storage = localStorage, gateway = new LocalSessionGateway() }: AppControllerOptions) {
     this.root = root;
@@ -82,9 +83,12 @@ export class AppController {
       this.state.screen = 'game-over';
       this.renderGameOver();
 
+      const sessionId = this.activeSessionId;
+      if (!sessionId) return;
+
       const identity = this.identity();
       const finalResult = run.result;
-      void this.gateway.submitResult(identity, finalResult).then((submission) => {
+      void this.gateway.submitResult(identity, sessionId, finalResult).then((submission) => {
         if (this.state.run?.result !== finalResult) return;
         this.state.ranked = submission.ranked;
         this.state.worldRank = submission.worldRank;
@@ -119,12 +123,14 @@ export class AppController {
     saveUsername(this.storage, cleanUsername);
     this.state.ranked = false;
     this.state.worldRank = null;
+    this.activeSessionId = null;
     this.state.run = startGameRun(createGameRun());
     this.setScreen('game');
     renderHudView(this.ui, this.state.run.snake.segmentCount);
 
     void this.gateway.startRun(this.identity()).then((session) => {
       this.state.ranked = session.ranked;
+      this.activeSessionId = session.sessionId;
     });
   }
 
