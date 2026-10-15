@@ -36,3 +36,7 @@ Task 7: complete (tests + typecheck + production build: GitHub Actions run 38816
 Task 8: Ruling: keyboard and joystick both emit only normalized yaw/pitch intent; joystick uses a unit-circle clamp and screen-up maps to positive pitch.
 Task 8: RED verified in GitHub Actions run 38816492776: npm test failed with input adapters absent.
 Task 8: complete (tests + typecheck + production build: GitHub Actions run 38816612976 → success; head c90ea6e).
+Task 9: Ruling: the frontend exposes a LocalSessionGateway seam that deliberately reports UNRANKED; Cloudflare ranking remains deferred to the approved backend plan.
+Task 9: RED verified in GitHub Actions run 38816837731: npm test failed with app/identity/UI modules absent.
+Task 9: Debugging: first GREEN attempt passed all 67 tests but typecheck rejected autocomplete="nickname" under the current DOM AutoFill type; root cause confirmed from CI log and corrected to the semantically equivalent accepted token autocomplete="username".
+Task 9: complete (tests + typecheck + production build: GitHub Actions run 38817296997 → success; head c266930).
