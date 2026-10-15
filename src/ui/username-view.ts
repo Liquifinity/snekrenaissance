@@ -20,7 +20,7 @@ export function renderUsernameView(
   input.id = 'username';
   input.name = 'username';
   input.type = 'text';
-  input.autocomplete = 'nickname';
+  input.autocomplete = 'username';
   input.maxLength = 24;
   input.value = initialUsername;
 
