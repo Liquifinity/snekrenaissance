@@ -9,6 +9,7 @@ export const MAX_CATCHUP_STEPS = 8;
 export const INITIAL_BODY_SEGMENTS = 12;
 export const GROWTH_PER_FOOD = 4;
 export const SEGMENT_SPACING = 0.42;
+export const TRAIL_RESERVE_SEGMENTS = 64;
 
 export const FOOD_HEAD_EXCLUSION_RADIUS = 1.2;
 export const FOOD_BODY_CLEARANCE = 0.38;
