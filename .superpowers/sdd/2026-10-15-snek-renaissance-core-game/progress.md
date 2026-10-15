@@ -44,3 +44,7 @@ Task 10: Ruling: browser lifecycle extracted to `src/app/runtime-lifecycle.ts` r
 Task 10: RED verified in GitHub Actions run 38817484581: 71 unit/integration tests passed after lifecycle implementation, but browser smoke failed because runtime input wiring and mobile joystick DOM were still absent.
 Task 10: GREEN verified in GitHub Actions run 38817916304: unit/integration tests, typecheck, production build and Playwright desktop/mobile smoke all passed after wiring fixed-step simulation, keyboard/joystick, chase camera, pause/resume, resize/orientation and renderer error handling.
 Task 10: complete (GitHub Actions run 38817916304 → success; head 06befe8).
+Task 11: Ruling: the canonical CI gate uses the committed lockfile through `npm ci`, then tests, typecheck, production build, Playwright Chromium installation and browser smoke tests.
+Task 11: Debugging: completion-gate run 38818538014 reached `npm test` and exposed one test-fixture error in `trail-scale.test.ts`: repeated `z += 0.1` stopped at 19.9 because of binary floating-point accumulation, so the fixture never inserted its intended 20.0 endpoint. Production trail sampling remained correct.
+Task 11: the scale fixture now generates exact tenths from integer counters; no production gameplay behavior changed.
+Task 11: complete (full canonical gate `npm ci` + `npm test` + `npm run typecheck` + `npm run build` + Playwright Chromium install + `npm run test:e2e`: GitHub Actions run 38818619815 → success; head 6c691e7).
