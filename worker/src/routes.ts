@@ -1,10 +1,12 @@
 import type {
+  LeaderboardResponse,
   StartGameResponse,
   SubmitResultRequest,
   SubmitResultResponse
 } from '../../src/shared/ranking-api';
 import type { D1Database, RateLimitBinding, WorkerEnv } from './env';
 import { ApiError, jsonResponse } from './errors';
+import { getLeaderboard, getPlayerRank, rankPlayer as queryPlayerRank } from './ranking';
 import {
   createGame,
   finalizeAcceptedScore,
@@ -182,6 +184,43 @@ async function submitResult(
   return acceptedResponse(env, playerId, deps.rankPlayer);
 }
 
+function parseLeaderboardLimit(url: URL): number {
+  const raw = url.searchParams.get('limit');
+  if (raw === null) return 50;
+  if (!/^\d+$/.test(raw)) {
+    throw new ApiError(400, 'INVALID_LIMIT', 'Leaderboard limit must be an integer from 1 to 100.', false);
+  }
+  const limit = Number(raw);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+    throw new ApiError(400, 'INVALID_LIMIT', 'Leaderboard limit must be an integer from 1 to 100.', false);
+  }
+  return limit;
+}
+
+async function leaderboard(request: Request, env: WorkerEnv, url: URL): Promise<Response> {
+  await enforceRateLimit(env.READ_LIMITER, requestIp(request));
+  const entries = await getLeaderboard(env.DB, parseLeaderboardLimit(url));
+  const body: LeaderboardResponse = { entries };
+  return jsonResponse(body, 200);
+}
+
+async function playerRank(request: Request, env: WorkerEnv, rawPlayerId: string): Promise<Response> {
+  await enforceRateLimit(env.READ_LIMITER, requestIp(request));
+
+  let playerId: string;
+  try {
+    playerId = validatePlayerId(decodeURIComponent(rawPlayerId));
+  } catch (error) {
+    throw validationError('INVALID_REQUEST', error);
+  }
+
+  const rank = await getPlayerRank(env.DB, playerId);
+  if (!rank) {
+    throw new ApiError(404, 'PLAYER_NOT_RANKED', 'Player does not have an accepted ranked run.', false);
+  }
+  return jsonResponse(rank, 200);
+}
+
 export async function routeRequest(
   request: Request,
   env: WorkerEnv,
@@ -190,7 +229,7 @@ export async function routeRequest(
   const deps: Required<RouteDependencies> = {
     now: dependencies.now ?? (() => Date.now()),
     uuid: dependencies.uuid ?? (() => crypto.randomUUID()),
-    rankPlayer: dependencies.rankPlayer ?? (async () => 1)
+    rankPlayer: dependencies.rankPlayer ?? queryPlayerRank
   };
 
   const url = new URL(request.url);
@@ -202,6 +241,15 @@ export async function routeRequest(
   const resultMatch = /^\/api\/games\/([^/]+)\/result$/.exec(url.pathname);
   if (request.method === 'POST' && resultMatch) {
     return submitResult(request, env, decodeURIComponent(resultMatch[1]), deps);
+  }
+
+  if (request.method === 'GET' && url.pathname === '/api/leaderboard') {
+    return leaderboard(request, env, url);
+  }
+
+  const rankMatch = /^\/api\/player\/([^/]+)\/rank$/.exec(url.pathname);
+  if (request.method === 'GET' && rankMatch) {
+    return playerRank(request, env, rankMatch[1]);
   }
 
   throw new ApiError(404, 'NOT_FOUND', 'API route was not found.', false);
