@@ -18,3 +18,7 @@ Task 2: complete (tests + typecheck: GitHub Actions run 38814836171 → success;
 Task 3: Ruling: segment spacing = 0.42 world units; body positions sample the unwrapped head trail by arc length, newest-to-oldest, with immutable growth state.
 Task 3: RED verified in GitHub Actions run 38814952396: install succeeded; npm test failed with trail/snake implementations absent.
 Task 3: complete (tests + typecheck: GitHub Actions run 38815128341 → success; head 0df71d4).
+Task 4: Ruling: food head exclusion = 1.2, body clearance = 0.38, pickup radius = 0.36, max spawn attempts = 64; all proximity uses toroidal distance.
+Task 4: Ruling: self-collision radius = 0.30 and first 8 body segments are excluded, matching the approved near-head exclusion behavior.
+Task 4: RED verified in GitHub Actions run 38815270147: install succeeded; npm test failed with food/collision implementations absent.
+Task 4: complete (tests + typecheck: GitHub Actions run 38815372226 → success; head 38be8fa).
