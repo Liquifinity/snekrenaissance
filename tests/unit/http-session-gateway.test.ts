@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import { HttpSessionGateway, RankingApiError } from '../../src/app/http-session-gateway';
+import { HttpSessionGateway } from '../../src/app/http-session-gateway';
 import type { PlayerIdentity } from '../../src/app/identity';
 import type { RunResult } from '../../src/game/run-state';
 
@@ -91,7 +91,7 @@ describe('HttpSessionGateway', () => {
     const gateway = new HttpSessionGateway('', fetchMock);
 
     await expect(gateway.startRun({ playerId: 'player-1', username: 'ren' }))
-      .rejects.toMatchObject<Partial<RankingApiError>>({
+      .rejects.toMatchObject({
         name: 'RankingApiError',
         status: 429,
         code: 'RATE_LIMITED',
