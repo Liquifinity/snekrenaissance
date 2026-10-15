@@ -23,15 +23,214 @@ body {
   background: #ffffff;
 }
 
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
 #app {
   position: relative;
-  height: 100vh;
+  height: 100dvh;
+  min-height: 420px;
+  overflow: hidden;
   background: #ffffff;
 }
 
 #game-canvas {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
   touch-action: none;
+  transition: opacity 160ms ease;
+}
+
+#app[data-screen="intro"] #game-canvas,
+#app[data-screen="username"] #game-canvas {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.app-ui {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  pointer-events: none;
+}
+
+.screen,
+.game-hud {
+  pointer-events: auto;
+}
+
+.screen {
+  align-self: stretch;
+  justify-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: max(24px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.screen-intro {
+  background-image: radial-gradient(circle, #e5e7eb 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+.meme-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 0;
+  padding: 18px 20px;
+  background: transparent;
+  color: #111827;
+  font-size: clamp(28px, 5vw, 64px);
+  font-weight: 500;
+  line-height: 1.05;
+  letter-spacing: -0.045em;
+  text-align: left;
+}
+
+.meme-copy:hover,
+.meme-copy:focus-visible {
+  color: #3b82f6;
+}
+
+.username-form {
+  width: min(420px, 100%);
+  display: grid;
+  gap: 12px;
+}
+
+.username-form label {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.username-form input {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  padding: 0 14px;
+  outline: none;
+  color: #111827;
+  background: #ffffff;
+}
+
+.username-form input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+.username-form button,
+.result-actions button,
+.local-rank button {
+  min-height: 46px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  padding: 0 18px;
+  color: #111827;
+  background: #ffffff;
+}
+
+.username-form button {
+  border-color: #3b82f6;
+  color: #ffffff;
+  background: #3b82f6;
+}
+
+.form-error {
+  min-height: 18px;
+  margin: 0;
+  font-size: 13px;
+  color: #b42318;
+}
+
+.game-hud {
+  align-self: start;
+  justify-self: stretch;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: max(16px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) 0 max(18px, env(safe-area-inset-left));
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: #374151;
+  pointer-events: none;
+}
+
+.game-over,
+.local-rank {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+}
+
+.game-over h1,
+.local-rank h1 {
+  margin: 0;
+  font-size: clamp(28px, 5vw, 52px);
+  letter-spacing: -0.04em;
+}
+
+.result-metrics {
+  width: min(360px, 100%);
+  display: grid;
+  gap: 10px;
+}
+
+.result-metrics p {
+  margin: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 8px 0;
+}
+
+.result-metrics span,
+.rank-status {
+  color: #6b7280;
+}
+
+.result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.rank-status,
+.rank-best {
+  margin: 0;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .meme-copy {
+    font-size: clamp(30px, 10vw, 48px);
+    padding: 12px;
+  }
+
+  .game-hud {
+    font-size: 11px;
+  }
+
+  .result-actions {
+    width: min(320px, 100%);
+  }
+
+  .result-actions button {
+    flex: 1 1 130px;
+  }
 }
