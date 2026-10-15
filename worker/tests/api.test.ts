@@ -19,6 +19,12 @@ afterAll(async () => {
 
 describe('Worker harness', () => {
   test('worker boots with local bindings', async () => {
+    const env = await server.getWorker().getEnv() as Record<string, unknown>;
+    expect(env.DB).toBeTruthy();
+    expect(env.START_LIMITER).toBeTruthy();
+    expect(env.RESULT_LIMITER).toBeTruthy();
+    expect(env.READ_LIMITER).toBeTruthy();
+
     const response = await server.fetch('/api/health');
 
     expect(response.status).toBe(200);
