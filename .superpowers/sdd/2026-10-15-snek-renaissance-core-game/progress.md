@@ -15,3 +15,6 @@ Task 2: Ruling: OrientationState stores yaw/pitch plus a derived quaternion and 
 Task 2: Ruling: advanceHead returns both unwrappedPosition and wrappedPosition plus wrapOffset — Task 3 needs continuous trail coordinates and Task 7 needs coherent camera relocation.
 Task 2: RED verified in GitHub Actions run 38814697243: install succeeded; npm test failed with steering/simulation implementations absent.
 Task 2: complete (tests + typecheck: GitHub Actions run 38814836171 → success; head 68f84f9).
+Task 3: Ruling: segment spacing = 0.42 world units; body positions sample the unwrapped head trail by arc length, newest-to-oldest, with immutable growth state.
+Task 3: RED verified in GitHub Actions run 38814952396: install succeeded; npm test failed with trail/snake implementations absent.
+Task 3: complete (tests + typecheck: GitHub Actions run 38815128341 → success; head 0df71d4).
