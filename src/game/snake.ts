@@ -1,5 +1,5 @@
 import { INITIAL_BODY_SEGMENTS, SEGMENT_SPACING } from './constants';
-import { sampleTrailAtDistance, type TrailBuffer } from './trail';
+import type { TrailBuffer } from './trail';
 import type { Vec3 } from './types';
 
 export type SnakeState = {
@@ -33,7 +33,9 @@ export function growSnake(state: SnakeState, amount: number): SnakeState {
 }
 
 export function sampleBodyPositions(state: SnakeState, trail: TrailBuffer): Vec3[] {
-  return Array.from({ length: state.segmentCount }, (_, index) =>
-    sampleTrailAtDistance(trail, (index + 1) * state.segmentSpacing)
+  const distances = Array.from(
+    { length: state.segmentCount },
+    (_, index) => (index + 1) * state.segmentSpacing
   );
+  return trail.sampleManyFromNewest(distances);
 }
