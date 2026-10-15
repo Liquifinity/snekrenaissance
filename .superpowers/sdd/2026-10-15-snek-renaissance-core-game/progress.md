@@ -26,3 +26,7 @@ Task 5: Ruling: RunState is the single gameplay authority; rendering/input consu
 Task 5: Ruling: game-over result is finalized once and subsequent stepRun calls return the same state unchanged.
 Task 5: RED verified in GitHub Actions run 38815557131: install succeeded; npm test failed with run-state implementation absent.
 Task 5: complete (tests + typecheck: GitHub Actions run 38815669236 → success; head 95acbf9).
+Task 6: Ruling: visual radii body/head/food = 0.16/0.17/0.16 world units; cube uses translucent edges; palette background #ffffff, guides #e5e7eb, accent #3b82f6.
+Task 6: RED verified in GitHub Actions run 38815822962: npm test failed with render modules absent.
+Task 6: Debugging: first GREEN attempt passed 44 tests but failed typecheck because TypeScript did not preserve nullable canvas narrowing inside resize closure; root cause confirmed from job log and fixed by binding a non-null const after the guard.
+Task 6: complete (tests + typecheck + production build: GitHub Actions run 38816119921 → success; head 1d96098).
