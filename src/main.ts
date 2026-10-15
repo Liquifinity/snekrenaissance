@@ -4,10 +4,11 @@ import { FoodRenderer } from './render/food-renderer';
 import { createScene } from './render/scene';
 import { SnakeRenderer } from './render/snake-renderer';
 
-const canvas = document.querySelector<HTMLCanvasElement>('#game-canvas');
-if (!canvas) {
+const canvasCandidate = document.querySelector<HTMLCanvasElement>('#game-canvas');
+if (!canvasCandidate) {
   throw new Error('Missing #game-canvas.');
 }
+const canvas = canvasCandidate;
 
 const scene = createScene(canvas);
 const snakeRenderer = new SnakeRenderer(scene.scene);
