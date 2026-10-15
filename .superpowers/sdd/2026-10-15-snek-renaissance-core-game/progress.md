@@ -33,3 +33,6 @@ Task 6: complete (tests + typecheck + production build: GitHub Actions run 38816
 Task 7: Ruling: camera stores the previous periodic wrap offset; changes in that offset relocate position and target by the same periodic delta before exponential smoothing resumes.
 Task 7: RED verified in GitHub Actions run 38816257106: npm test failed with chase-camera implementation absent.
 Task 7: complete (tests + typecheck + production build: GitHub Actions run 38816343176 → success; head 62037fe).
+Task 8: Ruling: keyboard and joystick both emit only normalized yaw/pitch intent; joystick uses a unit-circle clamp and screen-up maps to positive pitch.
+Task 8: RED verified in GitHub Actions run 38816492776: npm test failed with input adapters absent.
+Task 8: complete (tests + typecheck + production build: GitHub Actions run 38816612976 → success; head c90ea6e).
