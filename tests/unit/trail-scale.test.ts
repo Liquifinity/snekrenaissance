@@ -5,8 +5,8 @@ import { TrailBuffer } from '../../src/game/trail';
 describe('long-run trail scalability', () => {
   it('samples many body distances in one trail traversal API call', () => {
     const trail = new TrailBuffer({ x: 0, y: 0, z: 0 });
-    for (let z = 0.1; z <= 20; z += 0.1) {
-      trail.push({ x: 0, y: 0, z });
+    for (let step = 1; step <= 200; step += 1) {
+      trail.push({ x: 0, y: 0, z: step / 10 });
     }
 
     const batch = vi.spyOn(trail, 'sampleManyFromNewest');
@@ -31,8 +31,8 @@ describe('long-run trail scalability', () => {
 
   it('trims ancient history while preserving interpolation at the retained tail distance', () => {
     const trail = new TrailBuffer({ x: 0, y: 0, z: 0 });
-    for (let z = 0.1; z <= 100; z += 0.1) {
-      trail.push({ x: 0, y: 0, z });
+    for (let step = 1; step <= 1000; step += 1) {
+      trail.push({ x: 0, y: 0, z: step / 10 });
     }
 
     trail.trimToDistance(5);
