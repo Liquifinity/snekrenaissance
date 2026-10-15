@@ -40,3 +40,7 @@ Task 9: Ruling: the frontend exposes a LocalSessionGateway seam that deliberatel
 Task 9: RED verified in GitHub Actions run 38816837731: npm test failed with app/identity/UI modules absent.
 Task 9: Debugging: first GREEN attempt passed all 67 tests but typecheck rejected autocomplete="nickname" under the current DOM AutoFill type; root cause confirmed from CI log and corrected to the semantically equivalent accepted token autocomplete="username".
 Task 9: complete (tests + typecheck + production build: GitHub Actions run 38817296997 → success; head c266930).
+Task 10: Ruling: browser lifecycle extracted to `src/app/runtime-lifecycle.ts` rather than buried in the app controller — makes pause/resize/orientation/renderer failure independently testable without WebGL; no gameplay semantics changed.
+Task 10: RED verified in GitHub Actions run 38817484581: 71 unit/integration tests passed after lifecycle implementation, but browser smoke failed because runtime input wiring and mobile joystick DOM were still absent.
+Task 10: GREEN verified in GitHub Actions run 38817916304: unit/integration tests, typecheck, production build and Playwright desktop/mobile smoke all passed after wiring fixed-step simulation, keyboard/joystick, chase camera, pause/resume, resize/orientation and renderer error handling.
+Task 10: complete (GitHub Actions run 38817916304 → success; head 06befe8).
