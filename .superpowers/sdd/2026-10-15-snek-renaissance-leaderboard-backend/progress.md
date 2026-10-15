@@ -11,3 +11,8 @@ Pre-flight: Task 6 explicit sessionId gateway is consumed by Task 7 controller l
 Pre-flight: Task 7 controller state is consumed by Task 8 leaderboard UI and Task 9 E2E.
 Pre-flight: Task 9 runtime selection is consumed by Task 10 CI/release documentation.
 Ruling: Wrangler 4.150.0 is pinned for reproducible execution; it satisfies the approved >=4.36 floor and current Cloudflare harness documentation.
+Task 1: Ruling: existing vitest.config.ts intentionally includes only tests/**/*.test.ts, so Worker tests use a separate vitest.worker.config.ts and CI invokes test:worker explicitly; this preserves the frontend suite while making Worker RED/GREEN independently visible.
+Task 1: RED verified in GitHub Actions run 38824489303: frontend suite passed, Worker suite failed exactly because package `wrangler` was absent.
+Task 1: Ruling: package-lock regeneration ran in an isolated GitHub Actions helper because the execution sandbox cannot access npm; the helper committed only the deterministic lockfile and was then removed.
+Task 1: Debugging: first GREEN attempt reached the Worker harness but workerd rejected compatibility_date 2026-10-15 because Wrangler 4.150.0 embeds a runtime supporting at most 2026-10-13.
+Task 1: Ruling: compatibility_date is 2026-10-13, the newest date supported by the pinned runtime; this changes Worker compatibility selection only and does not alter product semantics.
