@@ -1,6 +1,6 @@
 # SNEK RENAISSANCE — V1 Design
 
-Status: DRAFT FOR USER REVIEW  
+Status: APPROVED / CANONICAL  
 Date: 2026-10-15  
 Repository: `Liquifinity/snekrenaissance`  
 Target: public, browser-playable V1
