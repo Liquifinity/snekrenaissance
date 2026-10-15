@@ -22,3 +22,7 @@ Task 4: Ruling: food head exclusion = 1.2, body clearance = 0.38, pickup radius 
 Task 4: Ruling: self-collision radius = 0.30 and first 8 body segments are excluded, matching the approved near-head exclusion behavior.
 Task 4: RED verified in GitHub Actions run 38815270147: install succeeded; npm test failed with food/collision implementations absent.
 Task 4: complete (tests + typecheck: GitHub Actions run 38815372226 → success; head 38be8fa).
+Task 5: Ruling: RunState is the single gameplay authority; rendering/input consume or mutate it only through the run APIs. Food may be temporarily null only when bounded spawn attempts fail, with respawn retried on subsequent steps.
+Task 5: Ruling: game-over result is finalized once and subsequent stepRun calls return the same state unchanged.
+Task 5: RED verified in GitHub Actions run 38815557131: install succeeded; npm test failed with run-state implementation absent.
+Task 5: complete (tests + typecheck: GitHub Actions run 38815669236 → success; head 95acbf9).
