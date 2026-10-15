@@ -1,0 +1,26 @@
+{
+  "name": "snekrenaissance",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "test": "vitest run",
+    "typecheck": "tsc -b --pretty false",
+    "e2e": "playwright test",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@types/node": "^24.0.0",
+    "@types/three": "^0.180.0",
+    "jsdom": "^26.1.0",
+    "typescript": "^5.8.3",
+    "vite": "^7.1.0",
+    "vitest": "^3.2.4"
+  }
+}

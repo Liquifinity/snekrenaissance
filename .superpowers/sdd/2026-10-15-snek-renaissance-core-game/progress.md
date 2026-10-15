@@ -1,0 +1,50 @@
+# SDD ledger — plan: docs/superpowers/plans/2026-10-15-snek-renaissance-core-game.md
+
+Execution mode: Native.
+Workspace ruling: local git worktree unavailable because the sandbox cannot resolve github.com; implementation is isolated on public branch `feat/core-game-v1` and verified through GitHub Actions.
+Ruling: CI workflow moved forward from the final CI task to Task 1 because the execution sandbox has no package-network access; GitHub Actions is the authoritative TDD runner. Product behavior is unchanged.
+Pre-flight: Task 1 produces Vec3/torus APIs consumed by Tasks 2, 4, 5; signatures match plan.
+Pre-flight: Task 2 produces orientation/motion consumed by Tasks 3, 5, 7; unwrapped path authority remains required by spec.
+Pre-flight: Task 3 produces SnakeState/body samples consumed by Tasks 4, 5, 6; no interface conflict found.
+Pre-flight: Task 4 produces food/collision consumed by Task 5; toroidal distance semantics match spec.
+Pre-flight: Task 5 produces run snapshots consumed by rendering/UI tasks; renderer remains read-only.
+Task 1: Ruling: WORLD_SIZE = 16 world units — matches the approved prototype scale while remaining a single tunable constant — wrong tuning would affect feel, not topology semantics.
+Task 1: RED verified in GitHub Actions run 38814449349: setup-node and npm install succeeded; npm test failed before implementation.
+Task 1: complete (tests + typecheck: GitHub Actions run 38814556126 → success; head b50d4e5).
+Task 2: Ruling: OrientationState stores yaw/pitch plus a derived quaternion and literal roll=0 — preserves quaternion authority for rendering while making no-roll steering explicit and testable.
+Task 2: Ruling: advanceHead returns both unwrappedPosition and wrappedPosition plus wrapOffset — Task 3 needs continuous trail coordinates and Task 7 needs coherent camera relocation.
+Task 2: RED verified in GitHub Actions run 38814697243: install succeeded; npm test failed with steering/simulation implementations absent.
+Task 2: complete (tests + typecheck: GitHub Actions run 38814836171 → success; head 68f84f9).
+Task 3: Ruling: segment spacing = 0.42 world units; body positions sample the unwrapped head trail by arc length, newest-to-oldest, with immutable growth state.
+Task 3: RED verified in GitHub Actions run 38814952396: install succeeded; npm test failed with trail/snake implementations absent.
+Task 3: complete (tests + typecheck: GitHub Actions run 38815128341 → success; head 0df71d4).
+Task 4: Ruling: food head exclusion = 1.2, body clearance = 0.38, pickup radius = 0.36, max spawn attempts = 64; all proximity uses toroidal distance.
+Task 4: Ruling: self-collision radius = 0.30 and first 8 body segments are excluded, matching the approved near-head exclusion behavior.
+Task 4: RED verified in GitHub Actions run 38815270147: install succeeded; npm test failed with food/collision implementations absent.
+Task 4: complete (tests + typecheck: GitHub Actions run 38815372226 → success; head 38be8fa).
+Task 5: Ruling: RunState is the single gameplay authority; rendering/input consume or mutate it only through the run APIs. Food may be temporarily null only when bounded spawn attempts fail, with respawn retried on subsequent steps.
+Task 5: Ruling: game-over result is finalized once and subsequent stepRun calls return the same state unchanged.
+Task 5: RED verified in GitHub Actions run 38815557131: install succeeded; npm test failed with run-state implementation absent.
+Task 5: complete (tests + typecheck: GitHub Actions run 38815669236 → success; head 95acbf9).
+Task 6: Ruling: visual radii body/head/food = 0.16/0.17/0.16 world units; cube uses translucent edges; palette background #ffffff, guides #e5e7eb, accent #3b82f6.
+Task 6: RED verified in GitHub Actions run 38815822962: npm test failed with render modules absent.
+Task 6: Debugging: first GREEN attempt passed 44 tests but failed typecheck because TypeScript did not preserve nullable canvas narrowing inside resize closure; root cause confirmed from job log and fixed by binding a non-null const after the guard.
+Task 6: complete (tests + typecheck + production build: GitHub Actions run 38816119921 → success; head 1d96098).
+Task 7: Ruling: camera stores the previous periodic wrap offset; changes in that offset relocate position and target by the same periodic delta before exponential smoothing resumes.
+Task 7: RED verified in GitHub Actions run 38816257106: npm test failed with chase-camera implementation absent.
+Task 7: complete (tests + typecheck + production build: GitHub Actions run 38816343176 → success; head 62037fe).
+Task 8: Ruling: keyboard and joystick both emit only normalized yaw/pitch intent; joystick uses a unit-circle clamp and screen-up maps to positive pitch.
+Task 8: RED verified in GitHub Actions run 38816492776: npm test failed with input adapters absent.
+Task 8: complete (tests + typecheck + production build: GitHub Actions run 38816612976 → success; head c90ea6e).
+Task 9: Ruling: the frontend exposes a LocalSessionGateway seam that deliberately reports UNRANKED; Cloudflare ranking remains deferred to the approved backend plan.
+Task 9: RED verified in GitHub Actions run 38816837731: npm test failed with app/identity/UI modules absent.
+Task 9: Debugging: first GREEN attempt passed all 67 tests but typecheck rejected autocomplete="nickname" under the current DOM AutoFill type; root cause confirmed from CI log and corrected to the semantically equivalent accepted token autocomplete="username".
+Task 9: complete (tests + typecheck + production build: GitHub Actions run 38817296997 → success; head c266930).
+Task 10: Ruling: browser lifecycle extracted to `src/app/runtime-lifecycle.ts` rather than buried in the app controller — makes pause/resize/orientation/renderer failure independently testable without WebGL; no gameplay semantics changed.
+Task 10: RED verified in GitHub Actions run 38817484581: 71 unit/integration tests passed after lifecycle implementation, but browser smoke failed because runtime input wiring and mobile joystick DOM were still absent.
+Task 10: GREEN verified in GitHub Actions run 38817916304: unit/integration tests, typecheck, production build and Playwright desktop/mobile smoke all passed after wiring fixed-step simulation, keyboard/joystick, chase camera, pause/resume, resize/orientation and renderer error handling.
+Task 10: complete (GitHub Actions run 38817916304 → success; head 06befe8).
+Task 11: Ruling: the canonical CI gate uses the committed lockfile through `npm ci`, then tests, typecheck, production build, Playwright Chromium installation and browser smoke tests.
+Task 11: Debugging: completion-gate run 38818538014 reached `npm test` and exposed one test-fixture error in `trail-scale.test.ts`: repeated `z += 0.1` stopped at 19.9 because of binary floating-point accumulation, so the fixture never inserted its intended 20.0 endpoint. Production trail sampling remained correct.
+Task 11: the scale fixture now generates exact tenths from integer counters; no production gameplay behavior changed.
+Task 11: complete (full canonical gate `npm ci` + `npm test` + `npm run typecheck` + `npm run build` + Playwright Chromium install + `npm run test:e2e`: GitHub Actions run 38818619815 → success; head 6c691e7).
