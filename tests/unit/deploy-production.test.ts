@@ -61,6 +61,18 @@ describe('production deployment workflow contract', () => {
     ]);
   });
 
+  test('validates managed origins before the first D1 mutation', () => {
+    const workflow = readWorkflow();
+
+    expectOrdered(workflow, [
+      'wrangler deploy --dry-run --config .wrangler.production.jsonc',
+      '/workers/subdomain',
+      'wrangler pages project list',
+      'wrangler pages project create snekrenaissance --production-branch main',
+      'wrangler d1 migrations apply snekrenaissance-leaderboard --remote'
+    ]);
+  });
+
   test('creates only the canonical Pages project and never creates D1', () => {
     const workflow = readWorkflow();
 
