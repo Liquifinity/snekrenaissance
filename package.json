@@ -13,6 +13,7 @@
     "worker:types": "wrangler types",
     "worker:build": "wrangler deploy --dry-run",
     "worker:migrate": "wrangler d1 migrations apply snekrenaissance-leaderboard --local",
+    "render:wrangler:production": "node scripts/render-production-wrangler.mjs",
     "e2e": "playwright test",
     "test:e2e": "playwright test"
   },
