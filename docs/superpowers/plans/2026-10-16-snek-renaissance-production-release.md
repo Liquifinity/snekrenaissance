@@ -81,37 +81,44 @@ Commit message: `fix: enable production ranking API cors`
 
 **Files:**
 - Create: `scripts/render-production-wrangler.mjs`
-- Create: `tests/unit/production-config.test.ts`
 - Modify: `.gitignore`
 - Modify: `package.json`
+- Test: `tests/unit/production-config.test.ts`
 
 **Interfaces:**
-- Consumes: canonical `wrangler.jsonc` containing the all-zero D1 placeholder.
-- Produces: generated `.wrangler.production.jsonc` with the exact runtime config and production D1 UUID; script exits non-zero on missing/placeholder/invalid UUID.
+- Consumes: committed `wrangler.jsonc` with one all-zero production `database_id` placeholder and runtime env `CLOUDFLARE_D1_DATABASE_ID`.
+- Produces: ignored `.wrangler.production.jsonc` with only that D1 UUID substituted.
 
-- [ ] **Step 1: Write failing tests**
+- [ ] **Step 1: Write failing renderer tests**
 
-Tests assert the renderer:
-- rejects missing `CLOUDFLARE_D1_DATABASE_ID`;
-- rejects `00000000-0000-0000-0000-000000000000`;
-- rejects malformed UUID text;
-- replaces only `database_id` and preserves Worker name, D1 database name, compatibility date, migrations directory, and rate-limit bindings.
+Pin these cases:
+- missing ID fails before output;
+- all-zero placeholder fails;
+- malformed non-UUID fails;
+- valid UUID replaces exactly one D1 `database_id` and preserves Worker name, entrypoint, compatibility date, rate limits, binding name, database name, preview identifier, and migrations directory.
 
 - [ ] **Step 2: Verify RED**
 
 Run: `npm test -- production-config`
 
-Expected: FAIL because renderer does not exist.
+Expected: FAIL because the renderer does not exist.
 
-- [ ] **Step 3: Implement renderer**
+- [ ] **Step 3: Implement deterministic rendering**
 
-Add script `render:wrangler:production` that writes `.wrangler.production.jsonc`. Add generated file to `.gitignore`. Do not mutate committed `wrangler.jsonc`.
+Create `renderProductionWrangler({ databaseId?, inputPath?, outputPath? })` in `scripts/render-production-wrangler.mjs`. Reject zero/missing/malformed IDs, require exactly one known placeholder, write `.wrangler.production.jsonc`, and never rewrite committed `wrangler.jsonc`.
 
-- [ ] **Step 4: Verify GREEN**
+Add `.wrangler.production.jsonc` to `.gitignore` and expose `npm run render:wrangler:production`.
 
-Run: `npm test -- production-config && CLOUDFLARE_D1_DATABASE_ID=11111111-1111-4111-8111-111111111111 npm run render:wrangler:production && npx wrangler deploy --dry-run --config .wrangler.production.jsonc`
+- [ ] **Step 4: Verify GREEN and Wrangler parseability**
 
-Expected: PASS and dry-run succeeds.
+Run with a test UUID:
+
+```bash
+CLOUDFLARE_D1_DATABASE_ID=11111111-1111-4111-8111-111111111111 npm run render:wrangler:production
+npx wrangler deploy --dry-run --config .wrangler.production.jsonc
+```
+
+Expected: renderer tests PASS and Wrangler dry-run accepts the generated config.
 
 - [ ] **Step 5: Commit**
 
@@ -123,180 +130,158 @@ Commit message: `build: render production wrangler config`
 
 **Files:**
 - Create: `.github/workflows/deploy-production.yml`
-- Modify: `README.md`
+- Modify: `.github/workflows/ci.yml`
+- Test: `tests/unit/deploy-production.test.ts`
 
 **Interfaces:**
-- Consumes: GitHub Secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_D1_DATABASE_ID`; output of Task 2; `dist/` frontend build.
-- Produces: one manual production workflow that migrates D1, deploys Worker, resolves its `workers.dev` origin, builds a ranked frontend, ensures Pages project existence, deploys Pages, and emits both production URLs.
+- Consumes: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_D1_DATABASE_ID`, `render:wrangler:production`, `migrations/`, and production build.
+- Produces: `WORKER_URL`, `PAGES_URL`, `WORKER_VERSION_ID`, `PAGES_DEPLOYMENT_ID` as release evidence.
 
-- [ ] **Step 1: Add static workflow contract tests/checks**
+- [ ] **Step 1: Write failing static workflow tests**
 
-Extend an existing test or add a lightweight unit test that reads `.github/workflows/deploy-production.yml` and asserts:
-- trigger is `workflow_dispatch` only;
-- job uses GitHub `environment: production`;
-- permissions are read-only for repository contents;
-- the three required Cloudflare secret names are referenced;
-- deploy sequence places full verification before remote migration;
-- remote migration precedes Worker deploy;
-- Worker deploy precedes frontend production build;
-- frontend build receives non-empty `VITE_RANKING_API_BASE`;
-- Pages deploy is last mutation before smoke tests.
+Pin that production workflow:
+- is `workflow_dispatch` only;
+- runs under GitHub environment `production`;
+- grants only `contents: read` to `GITHUB_TOKEN`;
+- references all three required Cloudflare secrets;
+- checks out canonical `main`;
+- runs production audit/tests/typecheck/build/dry-runs before production mutation;
+- resolves Workers subdomain and validates/creates exact Pages project before remote D1 mutation;
+- never executes `wrangler d1 create`;
+- lists/applies remote D1 migrations before Worker deployment;
+- deploys Worker before ranked frontend build;
+- compiles `VITE_RANKING_API_BASE` from live Worker URL;
+- deploys Pages after ranked build;
+- runs smoke last;
+- records Worker version and Pages deployment IDs.
 
 - [ ] **Step 2: Verify RED**
 
 Run: `npm test -- deploy-production`
 
-Expected: FAIL because workflow is absent.
+Expected: FAIL because the workflow is absent.
 
 - [ ] **Step 3: Implement workflow**
 
-Workflow order:
-1. checkout current `main` SHA;
-2. setup Node and `npm ci`;
-3. validate all three required secrets are non-empty;
-4. production dependency audit;
-5. frontend tests, Worker tests, typecheck, Worker dry-run, frontend neutral build;
-6. render `.wrangler.production.jsonc`;
-7. `wrangler d1 migrations list snekrenaissance-leaderboard --remote --config .wrangler.production.jsonc`;
-8. `wrangler d1 migrations apply snekrenaissance-leaderboard --remote --config .wrangler.production.jsonc`;
-9. `wrangler deploy --config .wrangler.production.jsonc`;
-10. resolve the account Workers subdomain through Cloudflare API and construct `https://snekrenaissance-api.<subdomain>.workers.dev`;
-11. set `VITE_RANKING_API_BASE` to that exact HTTPS origin and rebuild `dist/`;
-12. inspect `wrangler pages project list --json`; create `snekrenaissance --production-branch main` only if absent; fail if a conflicting/unusable project state is returned;
-13. `wrangler pages deploy dist --project-name snekrenaissance --branch main --commit-hash "$GITHUB_SHA"`;
-14. capture the production Pages URL and Worker URL in the GitHub Actions summary;
-15. run Task 4 smoke tests.
+Use `actions/checkout@v4`, `actions/setup-node@v4`, Node 22, `npm ci`, secret validation, all canonical verification gates, production config rendering, Cloudflare target preflight, remote migrations, Worker deploy, ranked frontend build, Pages deploy, smoke, and rollback evidence.
 
-Do not create or delete D1 in this workflow. Production D1 is a prerequisite so an accidental rerun cannot replace persistent ranking data.
+The workflow may create Pages project `snekrenaissance` only when absent. It must stop rather than rename if Cloudflare rejects that exact project. It must never create or delete D1.
 
-- [ ] **Step 4: Verify workflow structurally and through CI dry gates**
+- [ ] **Step 4: Verify GREEN**
 
-Run: `npm test && npm run test:worker && npm run typecheck && npm run worker:build && npm run build`
+Run complete CI on the branch.
 
-Expected: PASS. Do not dispatch production yet.
+Expected: frontend tests, Worker tests, typecheck, rendered production config dry-run, neutral Worker dry-run, frontend build, Playwright all PASS.
 
-- [ ] **Step 5: Update README**
-
-Document required Cloudflare resource names, secret names, first-time D1 prerequisite, manual workflow trigger, production URLs, and rollback commands/procedure.
-
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 
 Commit message: `ci: add manual production deployment`
 
 ---
 
-### Task 4: Production smoke verification and rollback evidence
+### Task 4: Production smoke verification and rollback documentation
 
 **Files:**
 - Create: `scripts/smoke-production.mjs`
-- Create: `tests/unit/production-smoke.test.ts`
-- Modify: `.github/workflows/deploy-production.yml`
+- Create: `scripts/smoke-production.d.mts`
 - Modify: `README.md`
+- Test: `tests/unit/production-smoke.test.ts`
 
 **Interfaces:**
-- Consumes: `WORKER_URL` and `PAGES_URL` from Task 3.
-- Produces: deterministic release acceptance with no persistent fake score rows.
+- Consumes: `WORKER_URL`, `PAGES_URL`, public production HTTP endpoints.
+- Produces: fail-fast release acceptance result without inserting a fake leaderboard score.
 
-- [ ] **Step 1: Write failing smoke-script tests**
+- [ ] **Step 1: Write failing smoke tests**
 
-Mock fetch and assert the script fails unless all conditions hold:
-- `GET $WORKER_URL/api/health` returns `{ ok: true }`;
-- `GET $WORKER_URL/api/leaderboard` returns valid JSON and CORS `*`;
-- `OPTIONS $WORKER_URL/api/games` returns `204` and expected CORS headers;
-- `GET $PAGES_URL` returns HTML containing the canonical meme text `just because ChatGPT` and `didn't complete my image.`;
-- downloaded production JavaScript contains the resolved Worker origin, proving ranked configuration was compiled into the frontend.
+Mock production HTTP and assert:
+- health must be 200 + `{ ok: true }` + public CORS;
+- leaderboard must be 200 JSON with entries array + public CORS;
+- preflight must be 204 and allow POST + Content-Type;
+- Pages root must expose `#app` and JavaScript assets;
+- deployed JS must contain the canonical meme copy and exact live Worker origin;
+- missing Worker origin in bundle is a release failure, because it would produce UNRANKED fallback.
 
 - [ ] **Step 2: Verify RED**
 
 Run: `npm test -- production-smoke`
 
-Expected: FAIL because smoke script does not exist.
+Expected: FAIL because smoke module is absent.
 
-- [ ] **Step 3: Implement smoke script and workflow call**
+- [ ] **Step 3: Implement smoke CLI**
 
-The workflow runs the smoke script only after both deploys. Do not POST a fake completed score to production; POST/result semantics remain covered by the Worker+D1 E2E suite.
+Export `smokeProduction({ workerUrl?, pagesUrl?, fetchImpl? })`. Require HTTPS origins, verify Worker health/leaderboard/preflight, fetch Pages root and referenced JavaScript bundles, require canonical meme strings and Worker origin, return `{ workerUrl, pagesUrl, ranked: true }`. CLI reads env and exits non-zero on failure.
 
-- [ ] **Step 4: Document rollback**
+Do not POST a fake result in production.
+
+- [ ] **Step 4: Document rollback model**
 
 README must state:
-- Worker code rollback: `npx wrangler rollback --name snekrenaissance-api` (or target a recorded version ID);
-- Pages rollback: select the prior production deployment through Cloudflare Pages Deployments or call the Pages deployment rollback API;
-- D1 migration rollback is not coupled to Worker rollback; migration failure is transactional per migration, but already-applied schema changes require a new forward migration rather than deleting the production DB.
+- list Worker versions with `wrangler versions list`;
+- rollback Worker with `wrangler rollback <VERSION_ID>`;
+- list Pages production deployments;
+- use Cloudflare Pages rollback UI/API for selected previous deployment;
+- D1 remains persistent and migrations are forward-only;
+- rerun production smoke after any rollback.
 
 - [ ] **Step 5: Verify GREEN**
 
-Run full canonical gate:
-`npm ci && npm audit --omit=dev --audit-level=moderate && npm test && npm run test:worker && npm run typecheck && npm run worker:build && npm run build && npm run test:e2e`
+Run complete CI.
 
-Expected: PASS.
+Expected: all gates PASS.
 
 - [ ] **Step 6: Commit**
 
-Commit message: `test: add production release smoke gate`
+Commit message: `test: add production release smoke verification`
 
 ---
 
-### Task 5: Provisioning gate and first production dispatch
+### Task 5: First production dispatch and acceptance
 
 **Files:**
-- No product code changes unless Cloudflare returns a concrete production-only incompatibility.
-- Record evidence in: `.superpowers/sdd/2026-10-16-snek-renaissance-production-release/progress.md`
+- No source mutation required unless production evidence reveals a defect.
+- Update release evidence/ledger only after actual production dispatch.
 
 **Interfaces:**
-- Consumes: merged release workflow on `main`; existing permanent Cloudflare account; production D1; GitHub Secrets.
-- Produces: live Pages URL, live Worker URL, migrated production D1, green production smoke evidence, and rollback identifiers.
+- Consumes: merged `main`, D1 `snekrenaissance-leaderboard`, GitHub `production` environment secrets, manual `deploy production` workflow.
+- Produces: public Worker and Pages URLs plus live production acceptance evidence.
 
-- [ ] **Step 1: Create the permanent D1 resource once**
+- [ ] **Step 1: Provision/identify the persistent D1 resource**
 
-In the intended Cloudflare account create exactly `snekrenaissance-leaderboard`. Capture its UUID. Do not create a second DB if that name already exists; inspect and reuse the intended empty/known database.
+Create exactly once or reuse `snekrenaissance-leaderboard`; capture its UUID. Do not commit it.
 
-- [ ] **Step 2: Configure GitHub production secrets**
+- [ ] **Step 2: Configure GitHub production environment**
 
-Set:
+Store only in GitHub Secrets:
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_ACCOUNT_ID`
 - `CLOUDFLARE_D1_DATABASE_ID`
 
-Token scope must be sufficient for the one-time Worker creation/deployment, D1 migration access, Workers subdomain read, and Pages project/deployment. No token value is committed or printed.
+Do not paste secret values into issues, PRs, commits, logs, or chat.
 
-- [ ] **Step 3: Merge release PR to `main` only after canonical CI is green**
+- [ ] **Step 3: Merge release tooling to main and verify main CI**
 
-Use the verified head SHA when merging.
+Expected: same canonical CI gates PASS on the integrated tree.
 
-- [ ] **Step 4: Manually dispatch `deploy-production.yml` from `main`**
+- [ ] **Step 4: Dispatch production manually**
 
-Expected: all preflight verification passes before the first remote mutation.
+Run GitHub Actions workflow `deploy production` from `main`.
 
-- [ ] **Step 5: Require production smoke PASS**
+Expected order: credential validation → verification → config dry-run → target preflight → D1 migrations → Worker → ranked frontend → Pages → smoke → rollback evidence.
 
-Capture in the SDD ledger:
-- release commit SHA;
-- GitHub Actions run ID;
-- Worker production URL;
-- Pages production URL;
-- D1 database name/UUID suffix only (never credentials);
-- Worker deployment/version identifier when available;
-- Pages production deployment identifier;
-- smoke result.
+- [ ] **Step 5: Verify live public endpoints**
 
-- [ ] **Step 6: Human acceptance on live URL**
+Required:
+- Worker health 200;
+- leaderboard 200;
+- CORS preflight 204;
+- Pages root 200;
+- production smoke reports `RANKED`;
+- no fake leaderboard row created by release verification.
 
-Verify desktop and mobile: intro meme, username, ranked session starts, normal gameplay, game over, leaderboard read, and replay. This is the final release gate.
+- [ ] **Step 6: Human acceptance**
 
-- [ ] **Step 7: Roll back if any production-only defect is found**
+On desktop and mobile confirm welcome meme, username flow, gameplay, joystick/keyboard, game-over, leaderboard, and rank behavior.
 
-Rollback Worker/Pages code first; never delete the D1 database. Open a fix branch from `main`, reproduce the defect, and redeploy only after the canonical gate passes again.
+- [ ] **Step 7: Record release evidence**
 
----
-
-## Self-Review
-
-**Spec coverage:** Preserves Pages + Worker + D1 architecture, ranked browser configuration, persistent leaderboard, public access, anti-cheat validation, and desktop/mobile release acceptance. No custom domain or multiplayer scope added.
-
-**Step scan:** Each task has an observable RED/GREEN or production gate. Remote mutations occur only after tests and credential/config validation.
-
-**Type/config consistency:** Worker name, D1 database name, `DB` binding, `VITE_RANKING_API_BASE`, migrations directory, and existing rate-limit bindings remain unchanged.
-
-**Review Focus coverage:** CORS is Task 1; identifier/secret validation Task 2/3; migration ordering Task 3; partial-deploy/rollback Task 4; ranked-bundle proof Task 4.
-
-**Proportion:** The plan confines production changes to CORS, deployment config rendering, one manual workflow, smoke verification, and documented provisioning. It deliberately avoids automatic continuous production deploys and custom domains for the first release.
+Record release SHA, public URLs, Worker version ID, Pages deployment ID, smoke result, and acceptance result. Do not record secrets.
