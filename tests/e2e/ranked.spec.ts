@@ -12,6 +12,11 @@ test('ranked browser flow uses Worker+D1 and survives leaderboard read failure',
   });
 
   await page.goto('/');
+  const apiBase = await page.evaluate(() => (
+    window as unknown as { __SNEK_TEST__?: { apiBase: string } }
+  ).__SNEK_TEST__?.apiBase ?? null);
+  expect(apiBase).toBe('/rank');
+
   await expect(page.locator('[data-copy-line]').nth(0)).toHaveText('just because ChatGPT');
   await expect(page.locator('[data-copy-line]').nth(1)).toHaveText("didn't complete my image.");
 
