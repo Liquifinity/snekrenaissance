@@ -45,6 +45,10 @@ class ControlledRankedGateway implements SessionGateway {
   readonly leaderboardCalls: Array<number | undefined> = [];
   readonly rankCalls: string[] = [];
 
+  supportsRuleset(rulesetId: string): boolean {
+    return rulesetId === 'pixel-flight-grid-v2';
+  }
+
   startRun(identity: PlayerIdentity): Promise<SessionStart> {
     this.startCalls.push({ ...identity });
     const next = deferred<SessionStart>();

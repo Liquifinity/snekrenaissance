@@ -11,8 +11,7 @@ export type SessionSubmission =
   | { ranked: true; worldRank: number };
 
 export interface SessionGateway {
-  /** Production gateways should explicitly declare ruleset capability. */
-  supportsRuleset?(rulesetId: string): boolean;
+  supportsRuleset(rulesetId: string): boolean;
   startRun(identity: PlayerIdentity): Promise<SessionStart>;
   submitResult(
     identity: PlayerIdentity,
