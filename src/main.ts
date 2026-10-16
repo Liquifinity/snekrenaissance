@@ -1,152 +1,113 @@
-import './styles.css';
 import { AppController } from './app/app-controller';
 import { createSessionGateway } from './app/gateway-selection';
 import { RuntimeLifecycle } from './app/runtime-lifecycle';
-import { stepRun, type RunResult, type RunState } from './game/run-state';
 import { FixedStepClock } from './game/simulation';
-import { clampInputAxis, type InputState } from './input/input-state';
-import { JoystickInput } from './input/joystick';
+import { stepRun } from './game/run-state';
 import { KeyboardInput } from './input/keyboard';
+import { JoystickInput } from './input/joystick';
+import { combineInputStates } from './input/input-state';
 import { ChaseCameraController } from './render/chase-camera';
 import { FoodRenderer } from './render/food-renderer';
 import { applyOverviewCamera } from './render/overview-camera';
 import { createScene } from './render/scene';
 import { SnakeRenderer } from './render/snake-renderer';
+import type { RunState } from './game/run-state';
+import type { InputState } from './input/input-state';
+import './styles.css';
 
-const appCandidate = document.querySelector<HTMLElement>('#app');
-const canvasCandidate = document.querySelector<HTMLCanvasElement>('#game-canvas');
-if (!appCandidate || !canvasCandidate) {
-  throw new Error('Missing application shell.');
-}
-const app = appCandidate;
-const canvas = canvasCandidate;
+const root = document.querySelector<HTMLElement>('#app');
+const canvas = document.querySelector<HTMLCanvasElement>('#game-canvas');
+if (!root || !canvas) throw new Error('missing app root or game canvas');
 
-const scene = createScene(canvas);
-const snakeRenderer = new SnakeRenderer(scene.scene);
-const foodRenderer = new FoodRenderer(scene.scene);
-const cameraController = new ChaseCameraController(scene.camera);
-const sessionGateway = createSessionGateway(import.meta.env.VITE_RANKING_API_BASE);
-const controller = new AppController({ root: app, gateway: sessionGateway });
+const gateway = createSessionGateway();
+const controller = new AppController({ root, gateway });
+controller.mount();
+
+const sceneRuntime = createScene(canvas);
+const snakeRenderer = new SnakeRenderer(sceneRuntime.scene);
+const foodRenderer = new FoodRenderer(sceneRuntime.scene);
+const cameraController = new ChaseCameraController(sceneRuntime.camera);
 const fixedClock = new FixedStepClock();
-const joystick = new JoystickInput();
+const lifecycle = new RuntimeLifecycle(fixedClock);
 
-type CameraMode = 'chase' | 'overview';
-let cameraMode: CameraMode = 'chase';
-app.dataset.cameraMode = cameraMode;
-
-function setCameraMode(mode: CameraMode): void {
-  cameraMode = mode;
-  app.dataset.cameraMode = mode;
-  const run = controller.currentRun;
-
-  if (mode === 'overview') {
-    applyOverviewCamera(scene.camera);
-    return;
-  }
-
-  cameraController.reset();
-  if (run) cameraController.update(run, 0);
-}
+let cameraMode: 'chase' | 'overview' = 'chase';
+let activeRun: RunState | null = null;
+let lastTimestamp: number | null = null;
 
 function toggleCamera(): void {
-  if (controller.screen !== 'game') return;
-  setCameraMode(cameraMode === 'chase' ? 'overview' : 'chase');
+  cameraMode = cameraMode === 'chase' ? 'overview' : 'chase';
+  cameraController.reset();
+  if (cameraMode === 'overview') applyOverviewCamera(sceneRuntime.camera);
+  const button = document.querySelector<HTMLButtonElement>('[data-camera-toggle]');
+  if (button) button.textContent = cameraMode === 'chase' ? 'CAM X' : 'CAM C';
 }
 
 const keyboard = new KeyboardInput({ onCameraToggle: toggleCamera });
-
-const joystickShell = document.createElement('div');
-joystickShell.className = 'joystick-shell';
-joystickShell.dataset.joystick = '';
-joystickShell.setAttribute('aria-label', 'Steering joystick');
-const joystickKnob = document.createElement('div');
-joystickKnob.className = 'joystick-knob';
-joystickShell.append(joystickKnob);
-app.append(joystickShell);
-
-const cameraToggle = document.createElement('button');
-cameraToggle.type = 'button';
-cameraToggle.className = 'camera-toggle';
-cameraToggle.dataset.cameraToggle = '';
-cameraToggle.textContent = 'X CAMERA';
-cameraToggle.setAttribute('aria-label', 'Change camera');
-cameraToggle.addEventListener('click', toggleCamera);
-app.append(cameraToggle);
-
-const runtimeError = document.createElement('div');
-runtimeError.className = 'runtime-error';
-runtimeError.dataset.runtimeError = '';
-runtimeError.hidden = true;
-app.append(runtimeError);
-
 const detachKeyboard = keyboard.attach(window);
-const detachJoystick = joystick.attach(joystickShell, window);
-controller.mount();
 
-if (import.meta.env.MODE === 'e2e-ranked') {
-  const testWindow = window as typeof window & {
-    __SNEK_TEST__?: {
-      apiBase: string;
-      gatewayKind: string;
-      forceGameOver: (result: RunResult) => void;
-    };
-  };
-  testWindow.__SNEK_TEST__ = {
-    apiBase: import.meta.env.VITE_RANKING_API_BASE ?? '',
-    gatewayKind: sessionGateway.constructor.name,
-    forceGameOver: (result) => {
-      const run = controller.currentRun;
-      if (!run) throw new Error('No active run to finish.');
-      run.phase = 'game-over';
-      run.result = result;
-      run.maxLength = result.maxLength;
-      controller.handleRunState(run);
-    }
-  };
+let joystick: JoystickInput | null = null;
+let detachJoystick: (() => void) | null = null;
+
+function attachJoystick(): void {
+  const element = document.querySelector<HTMLElement>('[data-joystick]');
+  if (!element) {
+    detachJoystick?.();
+    detachJoystick = null;
+    joystick = null;
+    return;
+  }
+  if (joystick && detachJoystick) return;
+  joystick = new JoystickInput();
+  detachJoystick = joystick.attach(element, window);
 }
 
-function resize(): void {
-  const rect = canvas.getBoundingClientRect();
-  scene.resize(rect.width, rect.height);
+function bindCameraButton(): void {
+  const button = document.querySelector<HTMLButtonElement>('[data-camera-toggle]');
+  if (!button || button.dataset.bound === 'true') return;
+  button.dataset.bound = 'true';
+  button.addEventListener('click', toggleCamera);
 }
 
-function showRuntimeError(message: string): void {
-  runtimeError.textContent = message;
-  runtimeError.hidden = false;
-  app.dataset.runtimeError = 'true';
-}
-
-const lifecycle = new RuntimeLifecycle(fixedClock, {
-  resize,
-  resetTouch: () => joystick.reset(),
-  showError: showRuntimeError
+const observer = new MutationObserver(() => {
+  attachJoystick();
+  bindCameraButton();
 });
+observer.observe(root, { childList: true, subtree: true });
+attachJoystick();
+bindCameraButton();
 
 function readInput(): InputState {
-  const keyboardState = keyboard.state;
-  const joystickState = joystick.state;
-  return {
-    yaw: clampInputAxis(keyboardState.yaw + joystickState.yaw),
-    pitch: clampInputAxis(keyboardState.pitch + joystickState.pitch)
-  };
+  return combineInputStates(keyboard.state, joystick?.state ?? { yaw: 0, pitch: 0 });
 }
 
 function exposeInput(input: InputState): void {
-  app.dataset.inputYaw = String(input.yaw);
-  app.dataset.inputPitch = String(input.pitch);
-  joystickKnob.style.transform = `translate(${input.yaw * 28}px, ${-input.pitch * 28}px)`;
+  root.dataset.inputYaw = input.yaw.toFixed(3);
+  root.dataset.inputPitch = input.pitch.toFixed(3);
 }
 
 function initializeRun(run: RunState): void {
   fixedClock.reset();
-  setCameraMode('chase');
+  lifecycle.reset();
   cameraController.reset();
-  cameraController.update(run, 0);
+  if (cameraMode === 'overview') {
+    applyOverviewCamera(sceneRuntime.camera);
+  } else {
+    cameraController.update(run, 0);
+  }
 }
 
-let activeRun: RunState | null = null;
-let lastTimestamp: number | null = null;
-let frameId = 0;
+function resizeRenderer(): void {
+  const width = Math.max(1, canvas.clientWidth || window.innerWidth);
+  const height = Math.max(1, canvas.clientHeight || window.innerHeight);
+  sceneRuntime.renderer.setSize(width, height, false);
+  sceneRuntime.camera.aspect = width / height;
+  sceneRuntime.camera.updateProjectionMatrix();
+}
+
+window.addEventListener('resize', resizeRenderer);
+window.addEventListener('orientationchange', resizeRenderer);
+resizeRenderer();
+
 let rendererFailed = false;
 
 function frame(timestamp: number): void {
@@ -167,7 +128,7 @@ function frame(timestamp: number): void {
 
   if (run?.phase === 'playing') {
     lifecycle.consumeFrame(frameDeltaSeconds, (dt) => {
-      const previousLength = run.snake.segmentCount;
+      const previousLength = run.snake.segments.length;
       stepRun(run, input, dt);
       if (cameraMode === 'chase') {
         cameraController.update(run, dt);
@@ -176,7 +137,7 @@ function frame(timestamp: number): void {
       if (
         run.phase === 'game-over'
         || run.phase === 'completed'
-        || run.snake.segmentCount !== previousLength
+        || run.snake.segments.length !== previousLength
       ) {
         controller.handleRunState(run);
       }
@@ -194,53 +155,19 @@ function frame(timestamp: number): void {
 
   if (!rendererFailed) {
     try {
-      scene.render();
+      sceneRuntime.renderer.render(sceneRuntime.scene, sceneRuntime.camera);
     } catch (error) {
       rendererFailed = true;
-      lifecycle.handleRendererError(error);
+      console.error('Renderer failed:', error);
     }
   }
-
-  frameId = requestAnimationFrame(frame);
+  requestAnimationFrame(frame);
 }
 
-function handleVisibilityChange(): void {
-  lifecycle.setHidden(document.hidden);
-  lastTimestamp = null;
-}
+requestAnimationFrame(frame);
 
-function handleResize(): void {
-  lifecycle.handleResize();
-  if (cameraMode === 'overview') applyOverviewCamera(scene.camera);
-}
-
-function handleOrientationChange(): void {
-  lifecycle.handleOrientationChange();
-  if (cameraMode === 'overview') applyOverviewCamera(scene.camera);
-}
-
-canvas.addEventListener('webglcontextlost', (event) => {
-  event.preventDefault();
-  rendererFailed = true;
-  lifecycle.handleRendererError(new Error('WebGL context lost'));
-});
-
-document.addEventListener('visibilitychange', handleVisibilityChange);
-window.addEventListener('resize', handleResize);
-window.addEventListener('orientationchange', handleOrientationChange);
-
-resize();
-frameId = requestAnimationFrame(frame);
-
-window.addEventListener('pagehide', () => {
-  cancelAnimationFrame(frameId);
+window.addEventListener('beforeunload', () => {
   detachKeyboard();
-  detachJoystick();
-  cameraToggle.removeEventListener('click', toggleCamera);
-  document.removeEventListener('visibilitychange', handleVisibilityChange);
-  window.removeEventListener('resize', handleResize);
-  window.removeEventListener('orientationchange', handleOrientationChange);
-  snakeRenderer.dispose();
-  foodRenderer.dispose();
-  scene.dispose();
-}, { once: true });
+  detachJoystick?.();
+  observer.disconnect();
+});
