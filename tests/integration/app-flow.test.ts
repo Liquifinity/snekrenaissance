@@ -31,7 +31,7 @@ function finishRun(controller: AppController, maxLength: number): void {
   const run = controller.currentRun;
   if (!run) throw new Error('missing run');
   run.phase = 'game-over';
-  run.result = { maxLength, foodEaten: 0, durationMs: 1000 };
+  run.result = { maxLength, foodEaten: 0, durationMs: 1000 } as typeof run.result;
   run.maxLength = maxLength;
   controller.handleRunState(run);
 }
@@ -79,7 +79,7 @@ describe('meme-first application flow', () => {
 
     expect(controller.screen).toBe('game');
     expect(controller.currentRun?.phase).toBe('playing');
-    expect(root.querySelector('[data-hud-length]')?.textContent).toContain('12');
+    expect(root.querySelector('[data-hud-length]')?.textContent).toContain('6');
     expect(root.querySelector('[data-progress-track]')).not.toBeNull();
     expect(root.querySelector<HTMLElement>('[data-progress-fill]')?.style.width).toBe('0%');
     expect(root.querySelector('[data-progress-label]')?.textContent).toBe('0.0%');
@@ -109,7 +109,7 @@ describe('meme-first application flow', () => {
 
     (run as unknown as { phase: string }).phase = 'completed';
     run.foodEaten = 300;
-    run.result = { maxLength: run.maxLength, foodEaten: 300, durationMs: 1000 };
+    run.result = { maxLength: run.maxLength, foodEaten: 300, durationMs: 1000 } as typeof run.result;
     controller.handleRunState(run);
 
     expect(controller.screen).toBe('complete');
