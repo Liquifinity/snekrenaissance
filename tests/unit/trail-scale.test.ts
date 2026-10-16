@@ -1,19 +1,17 @@
-import { describe, expect, it, vi } from 'vitest';
-import { createSnakeState, sampleBodyPositions } from '../../src/game/snake';
+import { describe, expect, it } from 'vitest';
 import { TrailBuffer } from '../../src/game/trail';
 
-describe('long-run trail scalability', () => {
-  it('samples many body distances in one trail traversal API call', () => {
+describe('legacy TrailBuffer scalability during V2 migration', () => {
+  it('batch-samples many retained distances directly from TrailBuffer', () => {
     const trail = new TrailBuffer({ x: 0, y: 0, z: 0 });
     for (let step = 1; step <= 200; step += 1) {
       trail.push({ x: 0, y: 0, z: step / 10 });
     }
 
-    const batch = vi.spyOn(trail, 'sampleManyFromNewest');
-    const body = sampleBodyPositions(createSnakeState(100, 0.1), trail);
+    const distances = Array.from({ length: 100 }, (_, index) => (index + 1) * 0.1);
+    const body = trail.sampleManyFromNewest(distances);
 
     expect(body).toHaveLength(100);
-    expect(batch).toHaveBeenCalledTimes(1);
     expect(body[0].z).toBeCloseTo(19.9, 6);
     expect(body[99].z).toBeCloseTo(10, 6);
   });
