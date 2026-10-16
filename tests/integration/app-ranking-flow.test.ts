@@ -23,6 +23,18 @@ function deferred<T>(): Deferred<T> {
   return { promise, resolve, reject };
 }
 
+function v2Result(maxLength: number, foodsCollected: number, durationMs: number): RunResult {
+  return {
+    rulesetId: 'pixel-flight-grid-v2',
+    score: foodsCollected,
+    foodsCollected,
+    length: maxLength,
+    maxLength,
+    durationMs,
+    foodEaten: foodsCollected
+  };
+}
+
 class ControlledRankedGateway implements SessionGateway {
   readonly startQueue: Deferred<SessionStart>[] = [];
   readonly submitQueue: Deferred<SessionSubmission>[] = [];
@@ -108,7 +120,7 @@ async function reachAcceptedGameOver(
   enterAndPlay(root, 'ren');
   gateway.startQueue[0].resolve({ ranked: true, sessionId: 'session-1' });
   await flush();
-  forceGameOver(controller, { maxLength: 16, foodEaten: 1, durationMs: 1_000 });
+  forceGameOver(controller, v2Result(16, 1, 1_000));
   gateway.submitQueue[0].resolve({ ranked: true, worldRank: 2 });
   await flush();
 }
@@ -172,7 +184,7 @@ describe('ranked application lifecycle', () => {
     gateway.startQueue[0].resolve({ ranked: true, sessionId: 'captured-session' });
     await flush();
 
-    const result = { maxLength: 20, foodEaten: 2, durationMs: 4_000 };
+    const result = v2Result(20, 2, 4_000);
     forceGameOver(controller, result);
 
     expect(gateway.submitCalls[0]).toMatchObject({ sessionId: 'captured-session', result });
@@ -212,7 +224,7 @@ describe('ranked application lifecycle', () => {
     gateway.startQueue[0].resolve({ ranked: true, sessionId: 'session-A' });
     await flush();
 
-    forceGameOver(controller, { maxLength: 12, foodEaten: 0, durationMs: 0 });
+    forceGameOver(controller, v2Result(12, 0, 0));
     expect(gateway.submitCalls[0].sessionId).toBe('session-B');
   });
 
@@ -222,12 +234,12 @@ describe('ranked application lifecycle', () => {
     enterAndPlay(root, 'ren');
     gateway.startQueue[0].resolve({ ranked: true, sessionId: 'session-A' });
     await flush();
-    forceGameOver(controller, { maxLength: 12, foodEaten: 0, durationMs: 0 });
+    forceGameOver(controller, v2Result(12, 0, 0));
 
     click(root, '[data-action="replay"]');
     gateway.startQueue[1].resolve({ ranked: true, sessionId: 'session-B' });
     await flush();
-    forceGameOver(controller, { maxLength: 16, foodEaten: 1, durationMs: 1_000 });
+    forceGameOver(controller, v2Result(16, 1, 1_000));
     expect(gateway.submitCalls[1].sessionId).toBe('session-B');
 
     gateway.submitQueue[0].resolve({ ranked: true, worldRank: 1 });
