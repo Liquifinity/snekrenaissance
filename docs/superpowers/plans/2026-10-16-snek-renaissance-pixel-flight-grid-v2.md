@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the continuous V1 spatial authority with a deterministic 3D voxel-grid Snake while preserving smooth wrap-aware interpolation, toroidal identity, local-first product flow, mobile/desktop controls, camera switching, completion flow, and the future ranking seam.
+**Goal:** Replace the continuous V1 spatial authority with a deterministic 3D voxel-grid Snake while preserving smooth wrap-aware presentation, toroidal identity, local-first product flow, mobile/desktop controls, camera switching, completion flow, and the future ranking seam.
 
-**Architecture:** Gameplay becomes integer-authoritative: `GridCell` + `GridFrame` + exact occupied-cell collision/food/growth. Rendering receives immutable logical transitions and performs presentation-only interpolation, including explicit toroidal virtual targets. Three.js presentation becomes voxel-based and intentionally low-resolution; camera/input/UI/persistence remain separate adapters around the new simulation core.
+**Architecture:** Gameplay becomes integer-authoritative: `GridCell` + `GridFrame` + exact occupied-cell collision/food/growth. The run publishes immutable logical step snapshots; the render layer derives stable-ID segment transitions, toroidal virtual targets, smooth position/orientation interpolation, voxel geometry, and a deliberately low-resolution frame. Camera, input, UI, persistence, and the preserved legacy ranking backend remain adapters around the V2 simulation core.
 
 **Tech Stack:** TypeScript, Vite, Three.js, Vitest, Playwright, browser-native DOM/Pointer Events, GitHub Pages.
 
@@ -18,7 +18,7 @@
 - `WORLD_SIZE` is derived as `resolution × cellSize`; callers never configure `worldSize` independently.
 - Baseline `GRID_STEPS_PER_SECOND = 6.0`.
 - Initial snake length: `6` total occupied cells including the head.
-- Growth: exactly `+2` occupied cells per food.
+- Growth: exactly `+2` occupied cells per food at the approved baseline.
 - Canonical V2 score: `foodsCollected`; occupied length is a separate metric.
 - `worldToCell()` is debug/test/tooling-only and must not become a gameplay dependency.
 - Gameplay positions remain integer `GridCell` values; world-space floats never feed simulation, collision, food, growth, scoring, or persistence.
@@ -27,83 +27,86 @@
 - Toroidal wrap is exact integer modulo on X/Y/Z.
 - Self-collision is exact occupied-cell collision with the explicit tail-vacate rule.
 - Food occupies one free logical cell and is collected only by cell equality.
-- Rendering uses immutable previous/current logical transition data plus presentation `alpha`.
+- Rendering uses immutable previous/current logical step data plus presentation `alpha`.
 - Wrap interpolation uses the spec's virtual-target algorithm for head and body; no full-cube lerp.
 - Stable segment correspondence is mandatory across movement/growth/tail removal.
 - Visual grid divisions equal `GRID_RESOLUTION`.
 - Snake and food presentation are voxel-based and aligned to `CELL_SIZE`.
 - Baseline pixel pipeline: `RENDER_SCALE = 0.50`, antialiasing disabled, CSS upscale/pixelation before any shader fallback.
 - Baseline chase camera: distance `4.0 cells`, height `2.8 cells`, look-ahead `2.0 cells`, `FOV = 60°`.
-- Existing `X` / mobile camera toggle remains available.
+- Existing `X` / mobile camera toggle remains available; overview remains front-facing.
 - Existing local-first username/player identity flow remains intact.
 - Existing V1 personal-best data is preserved; V2 best is stored under a V2-specific record.
-- The current V1 online ranking validator must never receive V2 results silently.
-- `300 foods = 100%` remains provisionally unchanged through implementation; Phase 7 may recommend a change but may not apply it without explicit product approval/spec amendment.
+- The current unversioned V1 online ranking validator must never receive V2 results silently.
+- `300 foods = 100%` remains provisionally unchanged; Phase 7 may recommend a change but may not apply it without explicit product approval/spec amendment.
 - V1 design/spec remains historical; do not rewrite it to describe V2 behavior.
 - Do not develop V2 directly on `main`; implementation starts from the approved spec/plan line in an isolated feature branch/worktree.
 
 ## Review Focus
 
-1. **Turn-frame handedness at vertical flight:** repeated `up/down/left/right` while forward is `±Y` must preserve a valid orthonormal local frame and intuitive screen-relative semantics; pinned in Task 2 frame-rotation tests.
-2. **Tail-cell entry during growth:** moving into the current tail must be legal only when that exact tail vacates in the same step; pinned in Task 4 collision tests.
-3. **Body interpolation when growth creates a new tail across wrap:** no new segment may pop from an unrelated index or travel across the cube; pinned in Task 6 stable-ID/birth-transition tests.
-4. **Long frame stalls / multiple logical steps:** fixed-step catch-up must not expose partially mutated render transitions or skip deterministic step ordering; pinned in Task 5 simulation-clock tests.
-5. **Responsive low-resolution rendering:** DPR, resize, portrait and landscape must change backing resolution without changing gameplay coordinates, camera aspect semantics, or introducing horizontal overflow; pinned in Tasks 8 and 11 tests.
+1. **Turn-frame handedness during vertical flight:** repeated local turns while forward is `±Y` must preserve a valid orthonormal frame and the established left/right/up/down semantics. Covered in Task 2.
+2. **Tail-cell entry during growth:** entering the current tail cell is legal only when that exact tail vacates in the same logical step. Covered in Task 4.
+3. **Growth + wrap render correspondence:** a new tail segment must never inherit an unrelated previous index or interpolate across the cube. Covered in Task 6.
+4. **Long frame stalls / queued turns:** bounded catch-up must preserve step ordering, consume at most one turn per cell, and never expose half-mutated snapshots. Covered in Task 5.
+5. **Low-resolution responsive rendering:** DPR, resize, portrait, and landscape must change presentation backing dimensions without changing gameplay coordinates/camera aspect semantics or causing overflow. Covered in Tasks 8 and 13.
 
 ---
 
 ## File Structure and Responsibility Map
 
-The implementation should converge toward this structure. Existing filenames may be retained where their responsibility remains valid; V1-only modules are removed from V2 authority only after their replacements are green.
-
 ```text
 src/
 ├─ game/
 │  ├─ constants.ts                # fixed runtime timing + legacy constants only while migrating
-│  ├─ grid-config.ts              # GridConfig factory, derived worldSize, active V2 config/ruleset
-│  ├─ grid-types.ts               # GridCell/GridDirection/GridFrame/TurnIntent/SnakeSegment
-│  ├─ grid-topology.ts            # wrapCellAxis, advanceGridStep, cell key, cellToWorld; debug-only worldToCell
+│  ├─ grid-config.ts              # config factory; derived worldSize/totalCells; active V2 ruleset
+│  ├─ grid-types.ts               # GridCell/GridDirection/GridFrame/TurnIntent/axis vectors
+│  ├─ grid-topology.ts            # cell key/wrap/advance/cellToWorld; restricted worldToCell
 │  ├─ grid-frame.ts               # deterministic 90° local-frame rotations
-│  ├─ grid-movement.ts            # logical step accumulator / queued turn consumption
-│  ├─ snake.ts                    # ordered stable-ID segment chain + pendingGrowth
-│  ├─ collision.ts                # exact next-cell occupancy / tail-vacate rule
-│  ├─ food.ts                     # free-cell enumeration and deterministic selection
-│  ├─ run-state.ts                # V2 run orchestration and results
-│  ├─ metrics.ts                  # occupancy/pressure/confinement/tuning metrics
-│  ├─ progress.ts                 # provisional 300-food completion math
-│  └─ simulation.ts               # existing outer fixed-step clock only
+│  ├─ grid-movement.ts            # capacity-2 turn queue + cell-step clock
+│  ├─ snake.ts                    # stable-ID occupied segment chain + pendingGrowth
+│  ├─ collision.ts                # exact next-cell collision + tail-vacate rule
+│  ├─ food.ts                     # free-cell enumeration/selection
+│  ├─ logical-transition.ts       # immutable simulation snapshots between committed cell states
+│  ├─ run-state.ts                # V2 run orchestration/result/queue/step clock
+│  ├─ metrics.ts                  # occupancy/pressure/confinement metrics
+│  ├─ progress.ts                 # provisional 300-food completion contract
+│  └─ simulation.ts               # existing outer bounded fixed-step clock
 ├─ input/
-│  ├─ input-state.ts              # discrete turn-intent queue contract
-│  ├─ keyboard.ts                 # edge-triggered keyboard intent + X camera toggle
+│  ├─ input-state.ts              # discrete input primitives
+│  ├─ keyboard.ts                 # edge-triggered turn intent + X camera toggle
 │  └─ joystick.ts                 # threshold/rearm analog→discrete intent
 ├─ render/
-│  ├─ interpolation.ts            # immutable transition mapping + virtual wrap targets
-│  ├─ pixel-resolution.ts         # backing-buffer scale math
-│  ├─ scene.ts                    # 9-cell visual grid, AA off, low-res renderer
-│  ├─ snake-renderer.ts           # instanced box voxels + head eyes
-│  ├─ food-renderer.ts            # voxel food presentation
-│  ├─ chase-camera.ts             # elevated GridFrame-aware chase camera
-│  └─ overview-camera.ts          # preserved secondary camera
+│  ├─ interpolation.ts            # stable-ID mapping, virtual targets, frame slerp, wrap offsets
+│  ├─ pixel-resolution.ts         # internal backing-buffer scale math
+│  ├─ scene.ts                    # visual grid + AA-off low-res renderer
+│  ├─ snake-renderer.ts           # instanced body voxels + voxel head/eyes
+│  ├─ food-renderer.ts            # voxel food
+│  ├─ chase-camera.ts             # elevated presentation-frame-aware chase camera
+│  └─ overview-camera.ts          # front-facing secondary camera derived from GridConfig
 ├─ app/
-│  ├─ app-controller.ts           # V2 result/persistence wiring
-│  ├─ identity.ts                 # V1 key preservation + V2 best key
-│  └─ gateway-selection.ts        # guard V1 online path from V2 result submission
+│  ├─ app-controller.ts           # V2 score/persistence wiring + ranking capability guard
+│  ├─ app-state.ts
+│  ├─ identity.ts                 # historical V1 key + V2 best key
+│  ├─ gateway-selection.ts
+│  └─ session-gateway.ts          # explicit ruleset capability surface
 ├─ ui/
-│  ├─ hud-view.ts                 # score/length/progress presentation
-│  └─ game-over-view.ts           # score-based local result view
-├─ main.ts                        # fixed clock, logical stepping, render-alpha wiring
-└─ styles.css                     # pixelated canvas and responsive rules
+│  ├─ hud-view.ts                 # score/length/progress
+│  └─ game-over-view.ts           # score-based result
+├─ main.ts                        # input drain → fixed simulation → interpolation → render/camera
+└─ styles.css                     # pixelated canvas + responsive layout
 
 tests/
 ├─ unit/
 │  ├─ grid-config.test.ts
 │  ├─ grid-topology.test.ts
+│  ├─ grid-authority-boundary.test.ts
 │  ├─ grid-frame.test.ts
 │  ├─ grid-movement.test.ts
 │  ├─ snake-grid.test.ts
 │  ├─ collision.test.ts
 │  ├─ food.test.ts
 │  ├─ interpolation.test.ts
+│  ├─ voxel-renderer.test.ts
 │  ├─ pixel-resolution.test.ts
 │  ├─ chase-camera.test.ts
 │  ├─ identity.test.ts
@@ -117,7 +120,8 @@ tests/
 ├─ metrics/
 │  └─ grid-tuning.test.ts
 └─ e2e/
-   └─ game.spec.ts
+   ├─ game.spec.ts
+   └─ ranked.spec.ts              # preserved seam / V2 non-submission contract
 ```
 
 ### Closed planning decision A — deterministic `GridFrame` rotations
@@ -128,7 +132,7 @@ Use the invariant:
 right = cross(forward, up)
 ```
 
-with initial frame:
+Initial frame:
 
 ```text
 forward = +Z
@@ -136,22 +140,33 @@ up      = +Y
 right   = -X
 ```
 
-This preserves the current chase-camera control semantics: from the initial view, `left` turns toward world `+X` and `right` turns toward world `-X`.
+This preserves the current chase-view semantics: from the initial view, `left` turns toward world `+X` and `right` toward world `-X`.
 
-For a current frame `(F, R, U)`, the four rotations are normative:
+For `(F, R, U)`, the formulas are normative:
 
 ```text
 left:   F' = -R,  R' =  F,  U' =  U
 right:  F' =  R,  R' = -F,  U' =  U
 up:     F' =  U,  R' =  R,  U' = -F
 down:   F' = -U,  R' =  R,  U' =  F
+none:   F' =  F,  R' =  R,  U' =  U
 ```
 
-`none` leaves the frame unchanged. Every output direction must remain one of the six signed axes; `right = cross(forward, up)` must still hold after every rotation. No gameplay quaternion/Euler conversion is involved.
+All operations are signed-axis lookup operations, not float rotations. Every result must satisfy the same handedness invariant.
 
-### Closed planning decision B — `worldSize` construction
+For **presentation only**, a GridFrame maps to a Three.js/local visual basis as:
 
-Do not expose `worldSize` as constructor input.
+```text
+local +X = -GridFrame.right
+local +Y =  GridFrame.up
+local +Z =  GridFrame.forward
+```
+
+That makes the approved initial frame an identity visual orientation while keeping the gameplay `right` semantic consistent with the chase view.
+
+### Closed planning decision B — derived/validated world size
+
+No constructor takes `worldSize`.
 
 ```ts
 export type GridConfigInput = Readonly<{
@@ -170,35 +185,32 @@ export type GridConfig = GridConfigInput & Readonly<{
 export function createGridConfig(input: GridConfigInput): GridConfig;
 ```
 
-`createGridConfig()` validates all primitive inputs, then computes:
+The factory validates primitive inputs, then computes:
 
 ```text
 worldSize = resolution * cellSize
 totalCells = resolution ** 3
 ```
 
-No production code may construct `GridConfig` literals directly. Export the active V2 singleton as `GRID_CONFIG = createGridConfig(...)`. Tests may build alternate 8³/9³/10³ configs through the same factory.
+Production code uses `GRID_CONFIG = createGridConfig(...)`. Alternate 8³/9³/10³ experiments use the same factory. No production code constructs a `GridConfig` literal with an independently supplied `worldSize`.
 
 ---
 
 ## Phase 0 — Baseline and isolated execution line
 
-### Task 0: Establish the V2 implementation branch/worktree and fresh baseline evidence
+### Task 0: Establish the implementation worktree and fresh baseline evidence
 
-**Files:**
-- No production source changes.
-- Read: approved spec and this plan.
-- Record evidence in the implementation session/PR description; do not add a redundant progress document unless execution tooling requires it.
+**Files:** No production changes.
 
 **Interfaces:**
-- Consumes: spec commit `b5650def5a346a8c6d6eea127a679014c5929bc0` and this plan.
-- Produces: isolated implementation worktree/branch based on the approved docs line and a fresh green/known baseline.
+- Consumes: approved spec and this plan.
+- Produces: isolated implementation branch/worktree and fresh baseline evidence.
 
-- [ ] **Step 1: Create an isolated worktree/feature branch**
+- [ ] **Step 1: Create an isolated worktree/branch**
 
-Use `superpowers:using-git-worktrees` before implementation. Base the worktree on the commit containing both approved spec and plan; do not branch from a stale earlier `main` if the docs commits are not yet merged.
+Use `superpowers:using-git-worktrees` before implementation. Base it on the commit containing both approved spec and this reviewed plan.
 
-Suggested implementation branch:
+Suggested branch:
 
 ```text
 feat/pixel-flight-grid-v2
@@ -206,20 +218,15 @@ feat/pixel-flight-grid-v2
 
 - [ ] **Step 2: Record repository state**
 
-Record:
-
-```text
-branch
-HEAD SHA
+```bash
 git status --short
-merge-base with main
+git rev-parse HEAD
+git merge-base HEAD main
 ```
 
-Expected: clean worktree before code changes.
+Expected: clean worktree and an explicit base SHA.
 
-- [ ] **Step 3: Run existing baseline verification**
-
-Run:
+- [ ] **Step 3: Run the existing full baseline**
 
 ```bash
 npm ci
@@ -232,17 +239,17 @@ npm run build
 npm run test:e2e
 ```
 
-Expected: PASS, or any pre-existing failure must be documented and investigated before V2 code starts.
+Expected: PASS. Any pre-existing failure is investigated before V2 implementation.
 
 - [ ] **Step 4: Commit nothing**
 
-This task is evidence only. Do not create a no-op baseline commit.
+No no-op baseline commit.
 
 ---
 
 ## Phase 1 — Integer grid authority
 
-### Task 1: Add `GridConfig`, integer cell types, topology, and restricted conversion APIs
+### Task 1: Add `GridConfig`, integer cell types, topology, and the conversion authority boundary
 
 **Files:**
 - Create: `src/game/grid-config.ts`
@@ -253,45 +260,33 @@ This task is evidence only. Do not create a no-op baseline commit.
 - Test: `tests/unit/grid-authority-boundary.test.ts`
 
 **Interfaces:**
-- Produces: `RULESET_ID`, `GridConfigInput`, `GridConfig`, `GRID_CONFIG`, `GridCell`, `GridDirection`, `GridFrame`, `TurnIntent`, `AxisVector`, `createGridConfig()`, `cellKey()`, `cellsEqual()`, `directionVector()`, `wrapCellAxis()`, `advanceGridStep()`, `cellToWorld()`, debug-only `worldToCell()`.
-- Later tasks must import world scale from `GRID_CONFIG.worldSize`, not from an independently mutable `WORLD_SIZE`.
+- Produces: `RULESET_ID`, `GridConfigInput`, `GridConfig`, `GRID_CONFIG`, `GridCell`, `GridDirection`, `GridFrame`, `TurnIntent`, `AxisVector`, `cellKey()`, `cellsEqual()`, `directionVector()`, `wrapCellAxis()`, `advanceGridStep()`, `cellToWorld()`, restricted `worldToCell()`.
 
-- [ ] **Step 1: Write failing `GridConfig` tests**
+- [ ] **Step 1: Write failing config tests**
 
-Test names/assertions:
-
-```ts
-it('derives worldSize and totalCells instead of accepting them as inputs')
-it('creates the approved 9^3 baseline as 3.6 world units and 729 cells')
-it('rejects non-integer or sub-2 resolution')
-it('rejects non-positive/non-finite cellSize and stepsPerSecond')
-it('rejects initialLength outside 1..totalCells')
-it('rejects negative/non-integer growthPerFood')
-```
-
-The approved baseline assertions are:
+Assertions:
 
 ```text
-resolution = 9
-cellSize = 0.40
-worldSize ~= 3.60
-totalCells = 729
-stepsPerSecond = 6
-initialLength = 6
-growthPerFood = 2
+baseline resolution = 9
+baseline cellSize = 0.40
+baseline worldSize ~= 3.60
+baseline totalCells = 729
+baseline stepsPerSecond = 6
+baseline initialLength = 6
+baseline growthPerFood = 2
 ```
 
-- [ ] **Step 2: Run config tests and verify RED**
+Also reject non-integer/sub-2 resolution, non-positive/non-finite `cellSize`/`stepsPerSecond`, `initialLength` outside `1..totalCells`, and negative/non-integer growth.
 
-Run:
+- [ ] **Step 2: Run config tests and verify RED**
 
 ```bash
 npm test -- tests/unit/grid-config.test.ts
 ```
 
-Expected: FAIL because `grid-config.ts` does not exist.
+Expected: FAIL because the module does not exist.
 
-- [ ] **Step 3: Implement the config factory and active V2 config**
+- [ ] **Step 3: Implement the config factory**
 
 Required signatures:
 
@@ -312,31 +307,29 @@ export function createGridConfig(input: GridConfigInput): GridConfig;
 export const GRID_CONFIG: GridConfig;
 ```
 
-Do not export any constructor/factory that accepts `worldSize`.
+`worldSize` and `totalCells` are derived only.
 
 - [ ] **Step 4: Write failing topology tests**
 
-Assertions must cover:
+Cover:
 
-- `cellKey()` uniqueness over all 729 baseline cells;
-- exact wrap `8 + 1 -> 0` and `0 - 1 -> 8` on each axis;
-- `advanceGridStep()` changes exactly one axis;
-- wrap metadata identifies the crossed axis and sign;
-- `cellToWorld({4,4,4}) == {0,0,0}` for baseline 9³;
-- adjacent cells differ by exactly one `CELL_SIZE` in world space;
-- `worldToCell()` round-trips cell centers for debug/test usage only.
+- `cellKey()` uniqueness across all baseline 729 cells;
+- exact wrap on positive/negative X/Y/Z;
+- `advanceGridStep()` changes one axis only;
+- returned wrap metadata identifies axis/sign;
+- baseline center `{4,4,4}` maps to world origin;
+- adjacent cells differ by exactly one `CELL_SIZE` in presentation space;
+- debug `worldToCell(cellToWorld(cell))` round-trip for cell centers.
 
 - [ ] **Step 5: Run topology tests and verify RED**
-
-Run:
 
 ```bash
 npm test -- tests/unit/grid-topology.test.ts
 ```
 
-Expected: FAIL because topology APIs do not exist.
+Expected: FAIL.
 
-- [ ] **Step 6: Implement grid types/topology**
+- [ ] **Step 6: Implement topology/conversion APIs**
 
 Required signatures:
 
@@ -350,7 +343,6 @@ export type GridFrame = Readonly<{
   right: GridDirection;
   up: GridDirection;
 }>;
-
 export type GridStep = Readonly<{
   from: GridCell;
   to: GridCell;
@@ -368,15 +360,11 @@ export function cellToWorld(cell: GridCell, config?: GridConfig): Vec3;
 export function worldToCell(world: Vec3, config?: GridConfig): GridCell; // debug/test/tooling only
 ```
 
-`worldToCell()` must live in a clearly marked debug/tooling export section or separate submodule re-export; gameplay modules must not import it.
+- [ ] **Step 7: Add the `worldToCell()` production-boundary test**
 
-- [ ] **Step 7: Add an architectural restriction test for `worldToCell()`**
+`grid-authority-boundary.test.ts` scans active production gameplay files and fails if `worldToCell` is referenced outside the defining debug/tooling location. Tests/tooling are excluded.
 
-`tests/unit/grid-authority-boundary.test.ts` scans production gameplay source files under `src/game/` and fails if modules other than the designated topology/debug implementation import/reference `worldToCell`. Exclude tests/tooling and the defining module itself.
-
-- [ ] **Step 8: Run the Phase 1 tests and typecheck**
-
-Run:
+- [ ] **Step 8: Run Phase 1 verification**
 
 ```bash
 npm test -- tests/unit/grid-config.test.ts tests/unit/grid-topology.test.ts tests/unit/grid-authority-boundary.test.ts
@@ -394,52 +382,49 @@ git commit -m "feat: add integer voxel grid authority"
 
 ---
 
-### Task 2: Implement deterministic `GridFrame` rotation math
+### Task 2: Implement deterministic `GridFrame` rotations
 
 **Files:**
 - Create: `src/game/grid-frame.ts`
 - Test: `tests/unit/grid-frame.test.ts`
 
 **Interfaces:**
-- Consumes: `GridDirection`, `GridFrame`, `TurnIntent`, `directionVector()`.
+- Consumes: grid direction/frame types.
 - Produces: `INITIAL_GRID_FRAME`, `rotateGridFrame()`, `isValidGridFrame()`.
 
-- [ ] **Step 1: Write failing frame-rotation tests**
+- [ ] **Step 1: Write failing baseline rotation tests**
 
-Required baseline assertions:
+Pin exactly:
 
 ```text
-INITIAL_GRID_FRAME = { forward:+Z, right:-X, up:+Y }
-left  => { forward:+X, right:+Z, up:+Y }
-right => { forward:-X, right:-Z, up:+Y }
-up    => { forward:+Y, right:-X, up:-Z }
-down  => { forward:-Y, right:-X, up:+Z }
+initial = { forward:+Z, right:-X, up:+Y }
+left    = { forward:+X, right:+Z, up:+Y }
+right   = { forward:-X, right:-Z, up:+Y }
+up      = { forward:+Y, right:-X, up:-Z }
+down    = { forward:-Y, right:-X, up:+Z }
 ```
 
-Parameterized tests must start from every valid forward axis and exercise all four turns, asserting:
+- [ ] **Step 2: Add exhaustive frame-invariant tests**
 
-- each frame contains three mutually perpendicular signed axes;
-- no two frame axes share the same absolute world axis;
+Generate all valid signed-axis frames and assert after each of four turns:
+
+- all three axes are perpendicular signed cardinal axes;
+- no absolute world axis is reused;
 - `right = cross(forward, up)`;
-- four repeated left rotations return to the original frame;
-- four repeated up rotations return to the original frame;
-- `left` followed by `right` returns to the original frame;
-- `up` followed by `down` returns to the original frame;
-- output never produces a 180° reversal relative to the current forward in a single turn.
+- four repeated left turns return to origin;
+- four repeated up turns return to origin;
+- left→right and up→down are inverses;
+- one turn never returns `-previous.forward`.
 
-- [ ] **Step 2: Run frame tests and verify RED**
-
-Run:
+- [ ] **Step 3: Run and verify RED**
 
 ```bash
 npm test -- tests/unit/grid-frame.test.ts
 ```
 
-Expected: FAIL because `grid-frame.ts` does not exist.
+Expected: FAIL.
 
-- [ ] **Step 3: Implement exact frame formulas**
-
-Required API:
+- [ ] **Step 4: Implement exact signed-axis formulas**
 
 ```ts
 export const INITIAL_GRID_FRAME: GridFrame;
@@ -447,32 +432,13 @@ export function rotateGridFrame(frame: GridFrame, intent: TurnIntent): GridFrame
 export function isValidGridFrame(frame: GridFrame): boolean;
 ```
 
-Normative formulas, using `(F,R,U)`:
+Use only the formulas fixed above; no gameplay quaternion/Euler math.
 
-```text
-left:   (-R,  F,  U)
-right:  ( R, -F,  U)
-up:     ( U,  R, -F)
-down:   (-U,  R,  F)
-none:   ( F,  R,  U)
-```
-
-Use signed-axis lookup operations, not float quaternion math.
-
-- [ ] **Step 4: Run frame tests and typecheck**
-
-Run:
+- [ ] **Step 5: Run and commit**
 
 ```bash
 npm test -- tests/unit/grid-frame.test.ts
 npm run typecheck
-```
-
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
 git add src/game/grid-frame.ts tests/unit/grid-frame.test.ts
 git commit -m "feat: add deterministic grid frame rotations"
 ```
@@ -481,7 +447,7 @@ git commit -m "feat: add deterministic grid frame rotations"
 
 ## Phase 2 — Discrete movement and input intent
 
-### Task 3: Add queued cell-step movement and discrete input adapters
+### Task 3: Add the turn queue, cell-step clock, and discrete keyboard/joystick adapters
 
 **Files:**
 - Create: `src/game/grid-movement.ts`
@@ -493,26 +459,23 @@ git commit -m "feat: add deterministic grid frame rotations"
 - Modify/Test: `tests/unit/joystick.test.ts`
 
 **Interfaces:**
-- Consumes: `GridCell`, `GridFrame`, `TurnIntent`, `GridStep`, `rotateGridFrame()`, `advanceGridStep()`, `GridConfig`.
-- Produces: `TurnIntentQueue`, `GridMovementClock`, `advanceGridMovement()`, keyboard discrete-intent drain API, joystick discrete-intent drain API.
+- Produces: capacity-2 FIFO `TurnIntentQueue`, `GridMovementClock`, `advanceGridMovement()`, edge-triggered keyboard `takeIntent()`, latched joystick `takeIntent()`.
 
-- [ ] **Step 1: Write failing logical movement tests**
+- [ ] **Step 1: Write failing movement tests**
 
-Required behavior:
+Pin:
 
-- neutral step moves from center `{4,4,4}` to `{4,4,5}` under initial `+Z` frame;
-- one queued `left` turns and moves to `{5,4,4}`;
-- no logical step changes more than one axis;
-- wrap is applied after an adjacent step;
-- at most one turn intent is consumed per logical step;
-- queued intents are FIFO;
-- queue capacity is exactly `2`; a third intent while full is ignored rather than replacing earlier intent;
-- `none` is never stored in the queue;
-- the movement clock emits the same number/order of logical steps for equivalent elapsed time split into different render-frame chunking.
+- center + initial frame + no turn moves `{4,4,4} -> {4,4,5}`;
+- one `left` moves `{4,4,4} -> {5,4,4}`;
+- no move changes more than one logical axis;
+- wrap happens after one adjacent step;
+- FIFO queue capacity is exactly `2`;
+- a third enqueue while full returns `false` and does not replace earlier inputs;
+- `none` is not stored;
+- at most one queued turn is consumed by each logical cell commit;
+- equivalent elapsed time split into different dt chunks produces the same number of cell-step callbacks and the same residual alpha.
 
-- [ ] **Step 2: Run movement tests and verify RED**
-
-Run:
+- [ ] **Step 2: Run and verify RED**
 
 ```bash
 npm test -- tests/unit/grid-movement.test.ts
@@ -520,27 +483,22 @@ npm test -- tests/unit/grid-movement.test.ts
 
 Expected: FAIL.
 
-- [ ] **Step 3: Implement movement queue/clock**
-
-Required API:
+- [ ] **Step 3: Implement movement primitives**
 
 ```ts
 export const TURN_QUEUE_CAPACITY = 2;
-
 export class TurnIntentQueue {
   enqueue(intent: Exclude<TurnIntent, 'none'>): boolean;
   shift(): TurnIntent;
   clear(): void;
   get size(): number;
 }
-
 export class GridMovementClock {
   constructor(readonly stepsPerSecond: number);
   consume(dtSeconds: number, onStep: () => void): number;
-  get alpha(): number; // normalized [0,1) progress toward next logical step
+  get alpha(): number; // [0,1)
   reset(): void;
 }
-
 export function advanceGridMovement(
   cell: GridCell,
   frame: GridFrame,
@@ -549,83 +507,68 @@ export function advanceGridMovement(
 ): Readonly<{ cell: GridCell; frame: GridFrame; step: GridStep }>;
 ```
 
-`GridMovementClock` is separate from the existing 60 Hz `FixedStepClock`: the outer clock provides bounded deterministic simulation time; this clock schedules cell commits at `stepsPerSecond` and exposes presentation alpha.
+The existing `FixedStepClock` remains the outer bounded time source. `GridMovementClock` schedules cell commits inside that deterministic time.
 
-- [ ] **Step 4: Write failing keyboard intent tests**
+- [ ] **Step 4: Rewrite keyboard tests around edge-triggered intents**
 
-Update keyboard tests so:
+Assert:
 
-- `ArrowLeft/A` emits `left` once on the edge;
-- `ArrowRight/D` emits `right` once;
-- `ArrowUp/W` emits `up` once;
-- `ArrowDown/S` emits `down` once;
-- key auto-repeat/duplicate `keydown` while pressed does not emit another intent;
-- release and press again emits a new intent;
-- `X` toggles camera exactly once per press and is not emitted as movement intent;
-- blur clears held-key state.
+- Left/A emits `left` once per press;
+- Right/D emits `right`;
+- Up/W emits `up`;
+- Down/S emits `down`;
+- repeated `keydown` while already held emits nothing new;
+- release then press emits again;
+- X toggles camera once per press and never becomes movement intent;
+- blur clears held state.
 
-- [ ] **Step 5: Implement keyboard discrete-intent API**
-
-Retain the existing camera-toggle callback. Replace continuous yaw/pitch authority with a drainable intent API such as:
+- [ ] **Step 5: Implement keyboard `takeIntent()`**
 
 ```ts
 export class KeyboardInput {
   takeIntent(): TurnIntent;
-  // existing attach/blur/camera-toggle lifecycle retained
+  // existing attach/blur/camera lifecycle retained
 }
 ```
 
-Internally queue no more than one not-yet-drained keyboard intent; global two-intent buffering belongs to `TurnIntentQueue` in the simulation layer.
+The adapter buffers at most one not-yet-drained edge intent; the authoritative two-item queue lives in RunState later.
 
-- [ ] **Step 6: Write failing joystick threshold/rearm tests**
+- [ ] **Step 6: Rewrite joystick tests around threshold/rearm**
 
-Assertions:
+Pin:
 
-- magnitude below `0.55` emits nothing;
-- dominant horizontal left/right maps to `left/right` using current established screen semantics;
-- dominant vertical up/down maps to `up/down`;
-- diagonal input resolves to dominant absolute axis only;
-- once activated, holding beyond threshold emits only one intent;
-- another intent is impossible until magnitude returns to `<= 0.25`;
-- pointer cancel/end/reset re-arms and returns to neutral;
-- resize/orientation change clears active pointer/latch.
+```text
+activation = 0.55
+rearm      = 0.25
+```
 
-- [ ] **Step 7: Implement joystick latch/rearm**
+Assert dominant-axis resolution, one emission per deflection, no repeated turns while held, rearm only after returning to `<=0.25`, and reset on pointer end/cancel/resize/orientation.
 
-Required constants/API:
+- [ ] **Step 7: Implement joystick `takeIntent()`**
 
 ```ts
 export const JOYSTICK_ACTIVATION_THRESHOLD = 0.55;
 export const JOYSTICK_REARM_THRESHOLD = 0.25;
 export class JoystickInput {
   takeIntent(): TurnIntent;
-  // pointer lifecycle methods retained
+  // pointer lifecycle retained
 }
 ```
 
-- [ ] **Step 8: Run movement/input tests**
-
-Run:
+- [ ] **Step 8: Verify and commit**
 
 ```bash
 npm test -- tests/unit/grid-movement.test.ts tests/unit/keyboard.test.ts tests/unit/joystick.test.ts
 npm run typecheck
-```
-
-Expected: PASS.
-
-- [ ] **Step 9: Commit**
-
-```bash
 git add src/game/grid-movement.ts src/input/input-state.ts src/input/keyboard.ts src/input/joystick.ts tests/unit/grid-movement.test.ts tests/unit/keyboard.test.ts tests/unit/joystick.test.ts
 git commit -m "feat: add discrete voxel movement input"
 ```
 
 ---
 
-## Phase 3 — Body, collision, food, and V2 run state
+## Phase 3 — Body, collision, food, and V2 run authority
 
-### Task 4: Replace trail authority with stable-ID occupied-cell snake state
+### Task 4: Replace continuous trail authority with stable-ID occupied-cell snake state
 
 **Files:**
 - Rewrite: `src/game/snake.ts`
@@ -634,20 +577,19 @@ git commit -m "feat: add discrete voxel movement input"
 - Test: `tests/unit/snake-grid.test.ts`
 - Rewrite/Test: `tests/unit/collision.test.ts`
 - Rewrite/Test: `tests/unit/food.test.ts`
-- Keep temporarily but stop importing from V2 gameplay: `src/game/trail.ts`
+- Keep temporarily but remove from active imports: `src/game/trail.ts`
 
 **Interfaces:**
-- Consumes: grid config/types/topology.
-- Produces: stable `SnakeSegment` IDs, `GridSnakeState`, exact occupancy helpers, planned-step collision, free-cell food spawn.
+- Produces: `SnakeSegment`, `GridSnakeState`, exact occupancy, `commitSnakeStep()`, `wouldSelfCollide()`, free-cell food APIs.
 
-- [ ] **Step 1: Write failing snake-state tests**
+- [ ] **Step 1: Write failing snake tests**
 
-Use a single chain representation with the head at `segments[0]`:
+Required state:
 
 ```ts
 export type SnakeSegment = Readonly<{ id: number; cell: GridCell }>;
 export type GridSnakeState = {
-  segments: SnakeSegment[];
+  segments: SnakeSegment[]; // segments[0] is head
   pendingGrowth: number;
   nextSegmentId: number;
 };
@@ -655,28 +597,27 @@ export type GridSnakeState = {
 
 Assertions:
 
-- initial snake contains exactly 6 unique occupied cells;
-- initial head is center cell `{4,4,4}` and body trails along `-Z` with toroidal-safe construction;
-- IDs are stable and unique;
-- a normal step moves each existing segment into its predecessor's previous cell;
-- without growth, the previous tail cell becomes free;
-- `addGrowth(state, 2)` does not immediately fabricate cells; it increments `pendingGrowth`;
-- each of the next two committed steps creates exactly one new stable-ID tail segment at the previous tail cell;
-- after two such steps, occupied length is exactly +2 and pending growth returns to zero.
+- initial chain has exactly 6 unique cells;
+- head starts at the baseline center cell `{4,4,4}`;
+- consecutive initial segments are face-adjacent and the initialization does not require a visual wrap discontinuity;
+- IDs are unique/stable;
+- on a normal step each existing segment moves into its predecessor's previous cell;
+- without growth the old tail becomes free;
+- `addGrowth(state,2)` increments pending growth but does not fabricate occupied cells immediately;
+- each of the next two committed steps births one new ID at the previous tail cell;
+- after those two steps length is exactly +2 and pending growth is zero.
 
-- [ ] **Step 2: Run snake tests and verify RED**
+Do not over-specify the exact six-cell startup path beyond these invariants; use a deterministic path generator centered in the grid.
 
-Run:
+- [ ] **Step 2: Run and verify RED**
 
 ```bash
 npm test -- tests/unit/snake-grid.test.ts
 ```
 
-Expected: FAIL against the current continuous snake implementation.
+Expected: FAIL against the continuous snake model.
 
 - [ ] **Step 3: Implement stable-ID grid snake**
-
-Required API:
 
 ```ts
 export type SnakeSegment = Readonly<{ id: number; cell: GridCell }>;
@@ -685,7 +626,6 @@ export type GridSnakeState = {
   pendingGrowth: number;
   nextSegmentId: number;
 };
-
 export function createGridSnake(config?: GridConfig): GridSnakeState;
 export function snakeHead(state: GridSnakeState): SnakeSegment;
 export function snakeTail(state: GridSnakeState): SnakeSegment;
@@ -699,22 +639,11 @@ export function commitSnakeStep(state: GridSnakeState, nextHead: GridCell): Read
 }>;
 ```
 
-The implementation may mutate `state` at commit time, but returned previous/current arrays must be immutable copies suitable for render-transition construction.
+- [ ] **Step 4: Write exact collision/tail-vacate tests**
 
-- [ ] **Step 4: Write failing tail-vacate/exact-collision tests**
+Cover occupied non-tail target, free target, legal entry into a tail that vacates, illegal entry into a retained tail when `pendingGrowth>0`, and wrapped target collision on X/Y/Z. No radius/exclusion constants participate.
 
-Required cases:
-
-- occupied non-tail target collides;
-- free target does not collide;
-- current tail target is legal when `pendingGrowth === 0`;
-- current tail target collides when `pendingGrowth > 0`;
-- wrapped next cell collision works across X/Y/Z without distance radii;
-- no near-head exclusion constant is needed.
-
-- [ ] **Step 5: Implement planned-cell collision**
-
-Required API:
+- [ ] **Step 5: Implement collision**
 
 ```ts
 export function wouldSelfCollide(
@@ -724,76 +653,62 @@ export function wouldSelfCollide(
 ): boolean;
 ```
 
-Collision must be decided before mutating the chain and must explicitly account for whether the old tail vacates.
+Decision occurs before mutation.
 
-- [ ] **Step 6: Write failing free-cell food tests**
+- [ ] **Step 6: Write free-cell food tests**
 
-Assertions:
+Cover deterministic free-cell selection, last free cell, full-world bounded failure, exact-cell collection, and absence of pickup-radius logic.
 
-- food always returns a canonical `GridCell` not occupied by the snake;
-- same seeded/index RNG selects the same free cell deterministically;
-- food may use the last remaining free cell;
-- fully occupied world returns `{ ok:false, reason:'no-free-cell' }` rather than looping;
-- collection is exact `cellsEqual(head, food)` only;
-- no pickup radius/head-exclusion/body-clearance constants participate.
-
-- [ ] **Step 7: Implement free-cell food selection**
-
-Required API:
+- [ ] **Step 7: Implement food APIs**
 
 ```ts
 export type FoodSpawnResult =
   | { ok: true; cell: GridCell }
   | { ok: false; reason: 'no-free-cell' };
-
 export function listFreeCells(state: GridSnakeState, config?: GridConfig): GridCell[];
-export function spawnGridFood(
-  state: GridSnakeState,
-  rng?: () => number,
-  config?: GridConfig
-): FoodSpawnResult;
+export function spawnGridFood(state: GridSnakeState, rng?: () => number, config?: GridConfig): FoodSpawnResult;
 export function isGridFoodCollected(head: GridCell, food: GridCell): boolean;
 ```
 
-- [ ] **Step 8: Run Phase 3 core tests**
-
-Run:
+- [ ] **Step 8: Verify and commit**
 
 ```bash
 npm test -- tests/unit/snake-grid.test.ts tests/unit/collision.test.ts tests/unit/food.test.ts
 npm run typecheck
-```
-
-Expected: PASS.
-
-- [ ] **Step 9: Commit**
-
-```bash
 git add src/game/snake.ts src/game/collision.ts src/game/food.ts tests/unit/snake-grid.test.ts tests/unit/collision.test.ts tests/unit/food.test.ts
 git commit -m "feat: add exact voxel snake occupancy"
 ```
 
 ---
 
-### Task 5: Rebuild `RunState` around cell commits, V2 score, and deterministic render transitions
+### Task 5: Rebuild `RunState` around queued intents, cell commits, V2 score, and immutable logical snapshots
 
 **Files:**
+- Create: `src/game/logical-transition.ts`
 - Rewrite: `src/game/run-state.ts`
-- Modify: `src/game/progress.ts` only for naming/score semantics if necessary; preserve target math.
-- Modify: `src/game/simulation.ts` only if a small alpha/catch-up hook is required; do not reintroduce continuous movement.
+- Modify: `src/game/progress.ts` only for terminology if needed; preserve 300-food math.
+- Keep: `src/game/simulation.ts` as the outer bounded fixed-step clock.
 - Test: `tests/integration/grid-run-state.test.ts`
 - Test: `tests/integration/grid-game-loop.test.ts`
-- Modify existing run-state/progress tests where they encode V1 movement arithmetic.
 
 **Interfaces:**
 - Consumes: Tasks 1–4.
-- Produces: active V2 `RunState`, `RunResult`, `stepRun()`, `renderTransition`, canonical score/length fields.
+- Produces: V2 `RunState`, `RunResult`, `queueTurnIntent()`, `stepRun()`, `LogicalTransition`.
 
-- [ ] **Step 1: Write failing V2 run-state tests**
-
-The new result contract is:
+- [ ] **Step 1: Define/write failing logical-transition and run-state tests**
 
 ```ts
+export type LogicalSnapshot = Readonly<{
+  segments: readonly SnakeSegment[];
+  frame: GridFrame;
+}>;
+export type LogicalTransition = Readonly<{
+  previous: LogicalSnapshot;
+  current: LogicalSnapshot;
+  headStep: GridStep;
+  bornSegmentId: number | null;
+}>;
+
 export type RunResult = Readonly<{
   rulesetId: 'pixel-flight-grid-v2';
   score: number;
@@ -804,109 +719,93 @@ export type RunResult = Readonly<{
 }>;
 ```
 
-The active run contains at minimum:
+`RunState` must own:
 
-```ts
-export type RunState = {
-  phase: 'ready' | 'playing' | 'game-over' | 'completed';
-  snake: GridSnakeState;
-  frame: GridFrame;
-  food: GridCell | null;
-  foodsCollected: number;
-  elapsedMs: number;
-  maxLength: number;
-  result: RunResult | null;
-  transition: RenderTransition | null;
-};
+```text
+snake
+frame
+food
+foodsCollected
+elapsedMs
+maxLength
+result
+turnQueue: TurnIntentQueue
+movementClock: GridMovementClock
+transition: LogicalTransition | null
+renderAlpha: number
 ```
 
 Assertions:
 
-- new run is centered, initial length 6, initial frame +Z/-X/+Y;
-- first food is a free cell;
-- logical step applies at 6 steps/s rather than every 60 Hz tick;
-- collecting food increments `foodsCollected` and therefore score by exactly 1;
-- growth schedules exactly +2 cells;
-- self-collision ends the run before mutating into an invalid duplicated occupancy state;
-- `300` foods still enters `completed` phase and no lower provisional target is introduced;
-- result carries exact V2 ruleset ID and score semantics;
-- elapsed time remains based on simulation time, not render frame count.
+- new run: length 6, center head, approved initial frame, free-cell food;
+- `queueTurnIntent()` honors capacity-2 FIFO;
+- logical cell commits occur at 6 steps/s, not every 60 Hz tick;
+- each commit consumes at most one queued turn;
+- food increments canonical score by exactly 1 and queues +2 growth;
+- collision finalizes game-over before invalid occupancy mutation;
+- score/length/maxLength semantics are distinct;
+- 300 foods remains the completion threshold;
+- result carries V2 ruleset ID;
+- `transition` is immutable and represents only fully committed before/after logical states.
 
-- [ ] **Step 2: Run run-state tests and verify RED**
-
-Run:
+- [ ] **Step 2: Run and verify RED**
 
 ```bash
 npm test -- tests/integration/grid-run-state.test.ts
 ```
 
-Expected: FAIL against continuous `RunState`.
+Expected: FAIL against current continuous RunState.
 
-- [ ] **Step 3: Implement V2 run orchestration**
-
-Required primary signatures remain intentionally close to the current app seam:
+- [ ] **Step 3: Implement the V2 run API**
 
 ```ts
 export function createRun(rng?: () => number, config?: GridConfig): RunState;
 export function startRun(state: RunState): RunState;
+export function queueTurnIntent(state: RunState, intent: TurnIntent): boolean;
 export function stepRun(
   state: RunState,
-  input: TurnIntent,
   dtSeconds: number,
   rng?: () => number,
   config?: GridConfig
 ): RunState;
 ```
 
-`stepRun()` may consume zero or multiple cell commits during bounded catch-up, but each commit must execute atomically in this order:
+`queueTurnIntent()` ignores `none`; adapters do not own the authoritative capacity-2 queue.
+
+Each `GridMovementClock` callback commits atomically in this order:
 
 ```text
-consume <=1 queued turn for this cell
--> rotate GridFrame
--> compute wrapped next cell
--> evaluate exact collision with tail-vacate rule
--> if collision: finalize game-over without invalid occupancy mutation
--> commit snake step
--> evaluate exact food-cell equality at new head
--> if food: increment score, queue +2 growth, spawn next free-cell food or complete if provisional target reached
--> construct immutable render transition from committed previous/current segment snapshots
--> update metrics/length/result state
+shift <=1 queued turn
+→ rotate GridFrame
+→ compute adjacent wrapped GridStep
+→ exact collision check with tail-vacate semantics
+→ on collision: finalize game-over without invalid chain mutation
+→ otherwise commit snake step
+→ test exact food equality at new head
+→ on food: foodsCollected++, score++, pendingGrowth += configured growth, then respawn free-cell food
+→ if foodsCollected reaches provisional target: finalize completed
+→ build immutable LogicalTransition from complete previous/current snapshots
+→ update maxLength/metrics-facing state
 ```
 
-- [ ] **Step 4: Write failing frame-chunk determinism tests**
+If food cannot respawn because no free cell exists under an experimental config, keep `food = null`; do not invent an alternative completion threshold. The run may continue until collision. This preserves the explicit 300-food contract during 8³ experiments.
 
-In `grid-game-loop.test.ts`, simulate the same input schedule with equivalent total time chunked as 60 Hz, 30 Hz, and irregular frame durations. Assert identical:
+- [ ] **Step 4: Write frame-chunk determinism tests**
 
-```text
-head cell
-GridFrame
-segment cells/IDs
-pendingGrowth
-foodsCollected
-phase
-```
+Run the same queued-input schedule with equivalent elapsed time chunked as 60 Hz, 30 Hz, and irregular dt. Assert identical head cell, frame, segment IDs/cells, pending growth, score, and phase.
 
-Also simulate a clamped large frame stall and assert no partially mutated transition and no out-of-order turn consumption.
+Also inject a bounded large frame stall through the existing outer `FixedStepClock` and assert queue ordering and transition atomicity remain intact.
 
-- [ ] **Step 5: Make outer fixed clock and grid clock cooperate deterministically**
+- [ ] **Step 5: Remove active continuous movement from RunState**
 
-Keep `FixedStepClock` as the bounded wall-clock adapter. Do not use old `advanceHead()` in active V2 code. Remove its import from `run-state.ts`; legacy function may remain temporarily until cleanup Task 12.
+`run-state.ts` must no longer import/use `advanceHead`, continuous steering, `TrailBuffer`, radius collision, or radius food collection.
 
-- [ ] **Step 6: Run Phase 3 integration tests**
-
-Run:
+- [ ] **Step 6: Verify and commit**
 
 ```bash
 npm test -- tests/integration/grid-run-state.test.ts tests/integration/grid-game-loop.test.ts
 npm run typecheck
-```
-
-Expected: PASS.
-
-- [ ] **Step 7: Commit**
-
-```bash
-git add src/game/run-state.ts src/game/progress.ts src/game/simulation.ts tests/integration/grid-run-state.test.ts tests/integration/grid-game-loop.test.ts
+git add src/game/logical-transition.ts src/game/run-state.ts src/game/progress.ts tests/integration/grid-run-state.test.ts tests/integration/grid-game-loop.test.ts
 git commit -m "feat: make voxel grid the run authority"
 ```
 
@@ -914,31 +813,51 @@ git commit -m "feat: make voxel grid the run authority"
 
 ## Phase 4 — Presentation-only interpolation
 
-### Task 6: Implement immutable stable-segment render transitions and normative wrap interpolation
+### Task 6: Implement stable-ID wrap interpolation and smooth presentation-frame rotation
 
 **Files:**
 - Create: `src/render/interpolation.ts`
 - Test: `tests/unit/interpolation.test.ts`
-- Modify: `src/game/run-state.ts` only if transition construction needs a narrow helper call.
 
 **Interfaces:**
-- Consumes: stable segment IDs/cells, `GridFrame`, `GridStep`, `GridConfig`, `cellToWorld()`.
-- Produces: `RenderTransition`, `SegmentRenderTransition`, `interpolateTransition()` and wrap-duplicate metadata.
+- Consumes: `LogicalTransition`, stable segment IDs, `cellToWorld()`, GridFrame.
+- Produces: `RenderTransition`, `interpolateTransition()`, `InterpolatedFrame` and per-segment display-wrap offsets/duplicates.
 
-- [ ] **Step 1: Write failing ordinary/wrap interpolation tests**
+- [ ] **Step 1: Write failing position interpolation tests**
 
-Required cases for head and a matched stable segment ID:
+Cover ordinary adjacency and `8→0` / `0→8` on X/Y/Z. Assert wrapped moves use virtual targets `9` or `-1` and never cross the cube interior. Clamp presentation alpha to `[0,1]`.
 
-- ordinary adjacent move interpolates one `CELL_SIZE` only;
-- `8 -> 0` uses virtual target `9`, never lerps `8 -> 0` through cube interior;
-- `0 -> 8` uses virtual target `-1`;
-- equivalent tests on X/Y/Z;
-- output alpha is rejected or clamped to `[0,1]` according to one consistent API contract; choose clamping for renderer resilience;
-- canonical displayed world position remains inside the toroidal render interval after wrap canonicalization.
+- [ ] **Step 2: Write failing stable-ID growth/tail tests**
 
-- [ ] **Step 2: Run interpolation tests and verify RED**
+Assert:
 
-Run:
+- existing segment IDs map only to their own previous/current cell;
+- a new tail ID starts from the previous tail cell;
+- tail removal does not shift correspondence;
+- born segment during a wrapped transition never originates from an unrelated region;
+- later snake mutation cannot mutate the already-built render transition.
+
+- [ ] **Step 3: Write failing presentation-frame tests**
+
+Derive presentation orientation from the planning basis:
+
+```text
+visual X = -GridFrame.right
+visual Y =  GridFrame.up
+visual Z =  GridFrame.forward
+```
+
+Assert:
+
+- approved initial frame produces identity orientation;
+- `alpha=0` equals previous frame basis;
+- `alpha=1` equals current frame basis;
+- an intermediate 90° turn is finite and smoothly normalized;
+- forward/up/right remain orthogonal within numeric tolerance after quaternion slerp.
+
+Quaternion math is render-only and may use Three.js in this module.
+
+- [ ] **Step 4: Run and verify RED**
 
 ```bash
 npm test -- tests/unit/interpolation.test.ts
@@ -946,9 +865,7 @@ npm test -- tests/unit/interpolation.test.ts
 
 Expected: FAIL.
 
-- [ ] **Step 3: Implement transition types and virtual-target algorithm**
-
-Required types/API:
+- [ ] **Step 5: Implement render-transition APIs**
 
 ```ts
 export type SegmentRenderTransition = Readonly<{
@@ -957,137 +874,99 @@ export type SegmentRenderTransition = Readonly<{
   to: GridCell;
   born: boolean;
 }>;
-
 export type RenderTransition = Readonly<{
   head: SegmentRenderTransition;
   body: readonly SegmentRenderTransition[];
   previousFrame: GridFrame;
   currentFrame: GridFrame;
 }>;
-
+export type InterpolatedFrame = Readonly<{
+  forward: Vec3;
+  right: Vec3;
+  up: Vec3;
+  quaternion: Readonly<{ x: number; y: number; z: number; w: number }>;
+}>;
 export type InterpolatedSegment = Readonly<{
   id: number;
   position: Vec3;
   born: boolean;
   birthAlpha: number;
+  displayWrapOffset: Vec3;
   duplicatePosition: Vec3 | null;
 }>;
-
-export function buildRenderTransition(
-  previousSegments: readonly SnakeSegment[],
-  currentSegments: readonly SnakeSegment[],
-  previousFrame: GridFrame,
-  currentFrame: GridFrame,
-  config?: GridConfig
-): RenderTransition;
-
+export function buildRenderTransition(logical: LogicalTransition, config?: GridConfig): RenderTransition;
 export function interpolateTransition(
   transition: RenderTransition,
   alpha: number,
   config?: GridConfig
-): Readonly<{ head: InterpolatedSegment; body: readonly InterpolatedSegment[] }>;
+): Readonly<{
+  head: InterpolatedSegment;
+  body: readonly InterpolatedSegment[];
+  frame: InterpolatedFrame;
+}>;
 ```
 
-Correspondence is by stable segment `id`, not array-index reconstruction. For a newly born tail ID with no previous segment, `from` is the previous tail cell and `born = true`. Removed tail IDs simply do not appear in current render output.
+`displayWrapOffset` is the world-space canonicalization offset actually applied at the current alpha (e.g. `-worldSize` after crossing +X). Camera uses this to relocate coherently at the same visual boundary crossing.
 
-- [ ] **Step 4: Add growth/tail/wrap correspondence tests**
-
-Assertions:
-
-- all pre-existing IDs map from their own previous cell to their own current cell;
-- a born tail starts at previous tail cell, not from another index;
-- a born tail on a wrapped chain never interpolates across the cube;
-- tail removal cannot shift IDs and produce cross-index popping;
-- render transition objects remain unchanged after later logical snake mutation.
-
-- [ ] **Step 5: Run interpolation suite**
-
-Run:
+- [ ] **Step 6: Verify and commit**
 
 ```bash
 npm test -- tests/unit/interpolation.test.ts tests/integration/grid-run-state.test.ts
 npm run typecheck
-```
-
-Expected: PASS.
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add src/render/interpolation.ts src/game/run-state.ts tests/unit/interpolation.test.ts
+git add src/render/interpolation.ts tests/unit/interpolation.test.ts
 git commit -m "feat: add wrap aware voxel interpolation"
 ```
 
 ---
 
-## Phase 5 — Voxel and low-resolution presentation
+## Phase 5 — Voxel and pixel presentation
 
-### Task 7: Replace sphere renderers with cell-scaled voxels and bind cube grid to `GRID_RESOLUTION`
+### Task 7: Replace sphere renderers with cell-scaled voxels and bind the cube grid to logical resolution
 
 **Files:**
 - Rewrite: `src/render/snake-renderer.ts`
 - Rewrite: `src/render/food-renderer.ts`
 - Modify: `src/render/scene.ts`
 - Modify/Test: `tests/unit/gameplay-presentation.test.ts`
-- Add: `tests/unit/voxel-renderer.test.ts`
+- Create/Test: `tests/unit/voxel-renderer.test.ts`
 
 **Interfaces:**
-- Consumes: interpolated world-space presentation snapshot and `GridConfig`.
-- Produces: voxel snake/food meshes and grid geometry whose scale/divisions derive from config.
+- Consumes: interpolated presentation data + GridConfig.
+- Produces: voxel snake/food and exactly `GRID_RESOLUTION` visual cells per face.
 
-- [ ] **Step 1: Write failing presentation contract tests**
+- [ ] **Step 1: Write failing presentation constants tests**
 
-Assert exported/observable presentation constants derive from config:
+Pin baseline:
 
 ```text
-CUBE_GRID_DIVISIONS = GRID_CONFIG.resolution = 9
-SNAKE_VOXEL_SIZE = CELL_SIZE * 0.80 = 0.32
-FOOD_VOXEL_SIZE = CELL_SIZE * 0.60 = 0.24
+CUBE_GRID_DIVISIONS = 9
+SNAKE_VOXEL_SIZE = 0.40 * 0.80 = 0.32
+FOOD_VOXEL_SIZE = 0.40 * 0.60 = 0.24
 ```
 
-Also assert old sphere-radius constants are no longer renderer authority.
+Old sphere radii cease to be authority.
 
 - [ ] **Step 2: Write failing renderer structure tests**
 
-Using a real `THREE.Scene` in Vitest where feasible, assert:
+Assert body uses `InstancedMesh` + `BoxGeometry`, head uses a box footprint close/equal to body, two eyes remain attached, food is a voxel, body count matches interpolated body count, and optional wrap duplicates are presentation-only.
 
-- body uses `InstancedMesh` + `BoxGeometry`;
-- head uses a box footprint close/equal to body footprint;
-- two eye meshes remain attached to the head and rotate with current discrete frame orientation;
-- body instance count equals interpolated body segment count;
-- food uses box/voxel geometry;
-- renderer accepts duplicate wrap presentation entries without adding logical segments.
-
-- [ ] **Step 3: Run presentation tests and verify RED**
-
-Run:
+- [ ] **Step 3: Run and verify RED**
 
 ```bash
 npm test -- tests/unit/gameplay-presentation.test.ts tests/unit/voxel-renderer.test.ts
 ```
 
-Expected: FAIL because renderers are still sphere-based and grid is 24 divisions.
+Expected: FAIL against sphere renderer/24-grid scene.
 
-- [ ] **Step 4: Implement voxel renderers and 9-cell scene grid**
+- [ ] **Step 4: Implement voxel renderers/grid**
 
-Renderer input should no longer accept logical `GridCell` arrays directly. It accepts presentation positions from `interpolateTransition()` plus frame/orientation data for head eyes.
+SnakeRenderer consumes interpolated positions and `InterpolatedFrame.quaternion`; it must not accept logical `GridCell` arrays as its normal render API. Eyes use the same presentation quaternion as the head.
 
-Use shared `BoxGeometry` and `InstancedMesh` for body. Preserve dynamic capacity growth only if still needed; 729 maximum cells bounds the absolute body count.
-
-- [ ] **Step 5: Run presentation tests and typecheck**
-
-Run:
+- [ ] **Step 5: Verify and commit**
 
 ```bash
 npm test -- tests/unit/gameplay-presentation.test.ts tests/unit/voxel-renderer.test.ts
 npm run typecheck
-```
-
-Expected: PASS.
-
-- [ ] **Step 6: Commit**
-
-```bash
 git add src/render/snake-renderer.ts src/render/food-renderer.ts src/render/scene.ts tests/unit/gameplay-presentation.test.ts tests/unit/voxel-renderer.test.ts
 git commit -m "feat: render snake and food as grid voxels"
 ```
@@ -1101,14 +980,11 @@ git commit -m "feat: render snake and food as grid voxels"
 - Modify: `src/render/scene.ts`
 - Modify: `src/styles.css`
 - Test: `tests/unit/pixel-resolution.test.ts`
-- Modify/Test: `tests/e2e/game.spec.ts` later for browser-level assertions; keep unit contract here.
 
 **Interfaces:**
-- Produces: `RENDER_SCALE`, `computeInternalRenderSize()`, scene resize behavior independent from gameplay/DPR.
+- Produces: `RENDER_SCALE`, `computeInternalRenderSize()`, AA-off scene resize contract independent of DPR.
 
 - [ ] **Step 1: Write failing backing-resolution tests**
-
-Required API/behavior:
 
 ```ts
 export const RENDER_SCALE = 0.50;
@@ -1119,16 +995,9 @@ export function computeInternalRenderSize(
 ): Readonly<{ width: number; height: number }>;
 ```
 
-Assertions:
+Pin `800×600 @ 0.5 → 400×300`, minimum `1×1`, invalid scale rejection, and DPR independence.
 
-- `800×600 @ 0.5 -> 400×300`;
-- dimensions clamp to at least `1×1`;
-- invalid/non-positive dimensions or scale use deterministic safe handling (reject invalid scale; clamp dimensions);
-- result is independent of `devicePixelRatio`.
-
-- [ ] **Step 2: Run pixel-resolution tests and verify RED**
-
-Run:
+- [ ] **Step 2: Run and verify RED**
 
 ```bash
 npm test -- tests/unit/pixel-resolution.test.ts
@@ -1136,59 +1005,43 @@ npm test -- tests/unit/pixel-resolution.test.ts
 
 Expected: FAIL.
 
-- [ ] **Step 3: Implement low-resolution renderer resize contract**
+- [ ] **Step 3: Implement scene resize/pixel contract**
 
-In `createScene()`:
+`WebGLRenderer({ antialias:false })`; renderer pixel ratio fixed to `1`; backing width/height from CSS dimensions × render scale; camera aspect remains CSS width/height; CSS canvas uses `image-rendering: pixelated`.
 
-- instantiate `WebGLRenderer({ antialias:false, ... })`;
-- keep camera `aspect = cssWidth/cssHeight`;
-- set renderer pixel ratio to `1`;
-- set backing size from `computeInternalRenderSize(cssWidth, cssHeight)` with `updateStyle=false`;
-- preserve CSS canvas size from layout, not backing pixels.
+- [ ] **Step 4: Add scene assertions for AA/aspect/backing behavior where testable**
 
-In CSS, add `image-rendering: pixelated` to the gameplay canvas with appropriate fallback declaration if needed.
+Do not attempt subjective pixel-art visual assertions in unit tests.
 
-- [ ] **Step 4: Add a scene-level test/mocked assertion that AA is disabled and aspect uses CSS dimensions**
-
-Do not assert browser-specific visual quality in unit tests; only assert deterministic renderer configuration where possible.
-
-- [ ] **Step 5: Run pixel/scene tests**
-
-Run:
+- [ ] **Step 5: Verify and commit**
 
 ```bash
 npm test -- tests/unit/pixel-resolution.test.ts tests/unit/gameplay-presentation.test.ts
 npm run typecheck
 npm run build
-```
-
-Expected: PASS.
-
-- [ ] **Step 6: Commit**
-
-```bash
 git add src/render/pixel-resolution.ts src/render/scene.ts src/styles.css tests/unit/pixel-resolution.test.ts tests/unit/gameplay-presentation.test.ts
 git commit -m "feat: add low resolution pixel render pipeline"
 ```
 
 ---
 
-## Phase 6 — Camera V2 and main-loop integration
+## Phase 6 — Camera V2 and integrated browser loop
 
-### Task 9: Replace close continuous chase framing with elevated GridFrame-aware chase camera
+### Task 9: Implement elevated chase camera and migrate front overview sizing to GridConfig
 
 **Files:**
 - Rewrite: `src/render/chase-camera.ts`
+- Modify: `src/render/overview-camera.ts`
 - Rewrite/Test: `tests/unit/chase-camera.test.ts`
-- Preserve: `src/render/overview-camera.ts`
+- Modify/Test: `tests/unit/compact-arena-overview.test.ts`
 
 **Interfaces:**
-- Consumes: interpolated head position, interpolated/discrete `GridFrame`, wrap-transition metadata, config cell size.
-- Produces: stable elevated camera pose; no gameplay feedback.
+- Consumes: interpolated head world position, interpolated presentation frame, display-wrap offset, GridConfig.
+- Produces: stable elevated chase pose and preserved front overview camera.
 
-- [ ] **Step 1: Write failing camera V2 tests**
+- [ ] **Step 1: Write failing chase-camera tests**
 
-Baseline camera constants in cell units:
+Pin cell-relative baseline:
 
 ```text
 CAMERA_DISTANCE_CELLS   = 4.0
@@ -1197,149 +1050,125 @@ CAMERA_LOOK_AHEAD_CELLS = 2.0
 CAMERA_FOV              = 60
 ```
 
-Required tests:
+Assert world offsets scale by `CELL_SIZE`, all six directions are finite, camera is behind `forward` and elevated along interpolated `up`, target is ahead, camera stays outside head voxel, rapid 90° sequences remain stable, and applying `displayWrapOffset` relocates camera instead of smoothing through the cube.
 
-- baseline physical offsets multiply by `CELL_SIZE` rather than hardcoded world units;
-- all six forward directions produce finite position/target;
-- camera is behind the local forward axis and elevated along local `up`;
-- local `up` comes from `GridFrame`, including forward `±Y` states;
-- target lies ahead of head along local forward;
-- camera-head distance stays outside the head voxel volume;
-- sequential 90° turns smooth without NaN/overshoot explosion;
-- wrap relocation never smooths camera through the whole cube;
-- FOV is 60° baseline.
-
-- [ ] **Step 2: Run camera tests and verify RED**
-
-Run:
+- [ ] **Step 2: Run and verify RED**
 
 ```bash
 npm test -- tests/unit/chase-camera.test.ts
 ```
 
-Expected: FAIL against the current continuous-forward camera constants/assumptions.
+Expected: FAIL against current camera.
 
-- [ ] **Step 3: Implement grid-frame-aware camera**
-
-Required snapshot shape:
+- [ ] **Step 3: Implement presentation-frame-aware chase camera**
 
 ```ts
 export type ChaseCameraSnapshot = Readonly<{
   headWorld: Vec3;
-  frame: GridFrame;
-  wrapDeltaWorld: Vec3;
+  forwardWorld: Vec3;
+  upWorld: Vec3;
+  displayWrapOffset: Vec3;
 }>;
 ```
 
-Preserve exponential damping and coherent wrap relocation, but derive desired position from local signed-axis vectors converted to world vectors. Do not restore the old world-Y clamp algorithm as authority.
+Desired pose:
 
-- [ ] **Step 4: Run camera tests**
-
-Run:
-
-```bash
-npm test -- tests/unit/chase-camera.test.ts
-npm run typecheck
+```text
+position = head - forward * (4.0*CELL_SIZE) + up * (2.8*CELL_SIZE)
+target   = head + forward * (2.0*CELL_SIZE)
 ```
 
-Expected: PASS.
+Preserve damping; remove the old world-Y-specific vertical clamp as authority.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 4: Update overview camera test/implementation**
+
+`applyOverviewCamera(camera, config = GRID_CONFIG)` remains centered directly in front of the cube and derives its distance from `config.worldSize`; it must not import legacy independent `WORLD_SIZE`.
+
+- [ ] **Step 5: Verify and commit**
 
 ```bash
-git add src/render/chase-camera.ts tests/unit/chase-camera.test.ts
+npm test -- tests/unit/chase-camera.test.ts tests/unit/compact-arena-overview.test.ts
+npm run typecheck
+git add src/render/chase-camera.ts src/render/overview-camera.ts tests/unit/chase-camera.test.ts tests/unit/compact-arena-overview.test.ts
 git commit -m "feat: add elevated voxel chase camera"
 ```
 
 ---
 
-### Task 10: Wire discrete input, logical stepping, render alpha, voxel renderers, and cameras in `main.ts`
+### Task 10: Wire discrete input, RunState queueing, interpolation, voxel renderers, and cameras in `main.ts`
 
 **Files:**
 - Rewrite relevant loop portions: `src/main.ts`
-- Modify: `src/app/runtime-lifecycle.ts` only if its clock hook needs a narrow adaptation.
+- Modify: `src/app/runtime-lifecycle.ts` only if a narrow clock hook is required.
 - Test: `tests/integration/grid-game-loop.test.ts`
 - Test: `tests/integration/runtime-lifecycle.test.ts`
 
 **Interfaces:**
-- Consumes: V2 `RunState`, discrete input adapters, `GridMovementClock`/`stepRun`, interpolation, voxel renderers, camera V2.
-- Produces: complete runtime path from browser frame to deterministic logical state to presentation snapshot.
+- Consumes: Tasks 1–9.
+- Produces: complete browser-frame → integer simulation → presentation interpolation → render/camera path.
 
-- [ ] **Step 1: Write/extend integration test for the frame pipeline**
+- [ ] **Step 1: Extend the loop integration test**
 
-Using test seams rather than WebGL, assert ordering:
+Assert ordering:
 
 ```text
-keyboard/joystick discrete intents
--> simulation TurnIntentQueue
--> bounded FixedStepClock consume
--> V2 stepRun logical commits
--> run.transition + movement alpha
--> interpolateTransition()
--> snake/food renderer snapshot
--> chase camera update from interpolated head/frame
+keyboard.takeIntent / joystick.takeIntent
+→ queueTurnIntent(run,...)
+→ bounded FixedStepClock
+→ stepRun(run, fixedDt)
+→ run.transition + run.renderAlpha
+→ build/interpolate RenderTransition
+→ voxel renderers
+→ chase camera from interpolated head/frame
 ```
 
-Assert no renderer position is ever converted back into `GridCell`.
+No render position is ever converted back to `GridCell`.
 
-- [ ] **Step 2: Refactor `main.ts` minimally around the V2 pipeline**
+- [ ] **Step 2: Define simultaneous-adapter ordering**
 
-Remove active reads of `run.headWrapped`, `run.bodyPositions`, `run.forward`, continuous yaw/pitch aggregation, and old `advanceHead` assumptions.
+If keyboard and joystick both produce an intent in the same browser frame, enqueue keyboard first, then joystick. Capacity-2 FIFO makes this deterministic. This is an input arbitration detail, not a gameplay-axis change.
 
-The runtime must:
+- [ ] **Step 3: Refactor the runtime loop**
 
-- drain keyboard/joystick intents into the shared capacity-2 queue;
-- pass at most the queued semantics expected by `stepRun`;
-- render from `run.transition` + current alpha;
-- render a stationary canonical snapshot before the first transition exists;
-- keep `X`/mobile camera toggle behavior;
-- update chase camera from the interpolated head; overview camera remains external/static behavior.
+Remove active continuous yaw/pitch aggregation and reads of `headWrapped/bodyPositions/forward`. Drain each adapter once per browser frame, enqueue non-`none` intents, let fixed simulation call `stepRun()`, then render from immutable logical transition + `renderAlpha`.
 
-- [ ] **Step 3: Run loop/lifecycle integration tests**
+Before the first committed transition, build/render a stationary presentation snapshot from the current snake state.
 
-Run:
+Keep `X`/mobile camera toggle; overview remains static/front-facing.
+
+- [ ] **Step 4: Verify and commit**
 
 ```bash
 npm test -- tests/integration/grid-game-loop.test.ts tests/integration/runtime-lifecycle.test.ts
 npm run typecheck
 npm run build
-```
-
-Expected: PASS.
-
-- [ ] **Step 4: Commit**
-
-```bash
 git add src/main.ts src/app/runtime-lifecycle.ts tests/integration/grid-game-loop.test.ts tests/integration/runtime-lifecycle.test.ts
 git commit -m "feat: integrate voxel simulation and render loop"
 ```
 
 ---
 
-## Phase 7 — Score persistence, UI semantics, and tuning evidence
+## Phase 7 — Score/persistence boundary and tuning evidence
 
-### Task 11: Separate V2 score/personal best from V1 and guard the legacy online ranking seam
+### Task 11: Isolate V2 score/personal best and add an explicit ranking-ruleset capability guard
 
 **Files:**
 - Modify: `src/app/identity.ts`
 - Modify: `src/app/app-controller.ts`
 - Modify: `src/app/app-state.ts`
-- Modify: `src/app/gateway-selection.ts`
-- Modify: `src/app/session-gateway.ts` only if needed for ruleset capability typing.
+- Modify: `src/app/session-gateway.ts`
+- Modify: `src/app/http-session-gateway.ts`
 - Modify: `src/ui/hud-view.ts`
 - Modify: `src/ui/game-over-view.ts`
 - Modify/Test: `tests/unit/identity.test.ts`
-- Modify/Test: `tests/unit/gateway-selection.test.ts`
+- Modify/Test: `tests/unit/http-session-gateway.test.ts`
 - Modify/Test: `tests/integration/app-flow.test.ts`
-- Preserve worker/backend V1 tests unless an explicit V2 backend project is separately approved.
+- Preserve Worker V1 validation/tests.
 
 **Interfaces:**
-- Consumes: V2 `RunResult`.
-- Produces: V2-local best by `foodsCollected`; historical V1 key remains untouched; no V2 result reaches the V1 HTTP validator.
+- Produces: V2 best keyed by V2 ruleset score; `SessionGateway.supportsRuleset()`; active V2 never submits to legacy HTTP validator.
 
-- [ ] **Step 1: Write failing identity migration/isolation tests**
-
-Required constants/API:
+- [ ] **Step 1: Write V2 local-best isolation tests**
 
 ```ts
 export const V2_LOCAL_BEST_KEY = 'snek.localBest.pixelGridV2';
@@ -1347,71 +1176,55 @@ export function loadPixelGridV2Best(storage: StorageLike): number;
 export function savePixelGridV2Best(storage: StorageLike, score: number): number;
 ```
 
-Assertions:
+Assert old `snek.localBest` remains unchanged, V2 best uses `foodsCollected`, lower later scores cannot overwrite, and username/player ID keys are unchanged.
 
-- existing `snek.localBest` value remains readable/unchanged after V2 saves;
-- V2 best starts at 0 independently;
-- V2 best stores max `foodsCollected` score only;
-- lower later V2 score cannot overwrite higher V2 score;
-- username/player ID keys remain unchanged.
+- [ ] **Step 2: Write score-based UI/AppController tests**
 
-- [ ] **Step 2: Write failing app/UI score-semantic tests**
+HUD shows `SCORE <foodsCollected>` and may show `LENGTH <occupiedCells>` secondarily. Local game-over `SCORE` comes from `result.score`, personal best from V2 storage, replay reuses username, completion remains 300 foods.
 
-Assertions:
+- [ ] **Step 3: Add explicit gateway capability typing**
 
-- HUD exposes `SCORE <foodsCollected>` and may also expose `LENGTH <occupiedCells>` as secondary information;
-- game over local view shows `SCORE` from `result.score` and `PERSONAL BEST` from V2 key, not `maxLength`;
-- completion still occurs at provisional 300 foods;
-- replay reuses username as before.
-
-- [ ] **Step 3: Add a ruleset capability guard for the preserved HTTP ranking path**
-
-Planning decision: V2 remains local-first in this implementation. Do **not** retrofit the current Worker validator to V2 in this plan.
-
-`createSessionGateway()` must receive/know the active `RULESET_ID`; for `pixel-flight-grid-v2`, it returns `LocalSessionGateway` even if a V1 ranking API base is configured, unless a future gateway explicitly declares V2 support. Unit-test this behavior.
-
-The preserved `HttpSessionGateway` and Worker V1 tests remain in the repository as the future seam; they must not be deleted merely because the active ruleset cannot use them.
-
-- [ ] **Step 4: Implement V2 persistence/UI/gateway guard**
-
-Update AppController to save/load V2 score. Keep local-first flow and completion view behavior intact.
-
-- [ ] **Step 5: Run app/persistence/ranking-seam tests**
-
-Run:
-
-```bash
-npm test -- tests/unit/identity.test.ts tests/unit/gateway-selection.test.ts tests/integration/app-flow.test.ts
-npm run test:worker
-npm run typecheck
+```ts
+export interface SessionGateway {
+  supportsRuleset(rulesetId: string): boolean;
+  // existing methods...
+}
 ```
 
-Expected: PASS. Worker V1 validation remains green and isolated.
+`LocalSessionGateway.supportsRuleset()` returns `true` because local persistence is ruleset-scoped by the app. The current unversioned `HttpSessionGateway.supportsRuleset()` returns `false` for explicit V2 rulesets until the backend is separately upgraded.
 
-- [ ] **Step 6: Commit**
+AppController checks `gateway.supportsRuleset(RULESET_ID)` before starting a ranked session. If false, it follows the normal local-first path; it does not call legacy start/submit APIs for the V2 run.
+
+This preserves the HTTP/Worker implementation and its direct unit/integration tests without pretending it validates V2.
+
+- [ ] **Step 4: Implement persistence/UI/capability guard**
+
+Do not add V2 backend validation in this plan.
+
+- [ ] **Step 5: Verify and commit**
 
 ```bash
-git add src/app src/ui/hud-view.ts src/ui/game-over-view.ts tests/unit/identity.test.ts tests/unit/gateway-selection.test.ts tests/integration/app-flow.test.ts
+npm test -- tests/unit/identity.test.ts tests/unit/http-session-gateway.test.ts tests/integration/app-flow.test.ts
+npm run test:worker
+npm run typecheck
+git add src/app src/ui/hud-view.ts src/ui/game-over-view.ts tests/unit/identity.test.ts tests/unit/http-session-gateway.test.ts tests/integration/app-flow.test.ts
 git commit -m "feat: isolate pixel grid score and persistence"
 ```
 
 ---
 
-### Task 12: Add deterministic pressure metrics and compare 8³ / 9³ / 10³ without changing product tuning
+### Task 12: Add pressure metrics and compare 8³/9³/10³ without silently changing product contracts
 
 **Files:**
 - Create: `src/game/metrics.ts`
 - Create: `tests/integration/grid-tuning-metrics.test.ts`
 - Create: `tests/metrics/grid-tuning.test.ts`
-- Modify: `package.json` to add a metrics-only command if useful, e.g. `test:tuning`.
-- No product config changes in this task.
+- Modify: `package.json` / `package-lock.json` only if adding `test:tuning` script requires it; no new runtime dependency is expected.
 
 **Interfaces:**
-- Produces: pure metric calculations and repeatable comparison harness; no automatic tuning mutation.
+- Produces: pure metrics + deterministic comparative harness; no automatic tuning mutation.
 
 - [ ] **Step 1: Write failing metric-definition tests**
-
-Required API:
 
 ```ts
 export type RunMetrics = Readonly<{
@@ -1421,23 +1234,25 @@ export type RunMetrics = Readonly<{
   firstPressureMs: number | null;
   firstConfinementMs: number | null;
 }>;
-
 export function occupancyRatio(state: GridSnakeState, config: GridConfig): number;
 export function safeMoveCount(state: GridSnakeState, frame: GridFrame, config: GridConfig): number;
+export class GridMetricsTracker {
+  observe(state: GridSnakeState, frame: GridFrame, elapsedMs: number, config: GridConfig): void;
+  snapshot(): RunMetrics;
+}
 ```
 
-Pin definitions:
+Definitions:
 
 ```text
 pressure    = safeMoveCount <= 2
 confinement = safeMoveCount <= 1
+near-body encounter = a committed, non-colliding head cell has at least one face-adjacent occupied body cell excluding the immediate neck
 ```
 
-`safeMoveCount` evaluates the current forward/left/right/up/down candidate moves permitted by the control contract, deduplicates equivalent wrapped target cells if a tiny synthetic grid causes overlap, and applies exact collision/tail-vacate semantics.
+`safeMoveCount` evaluates forward/left/right/up/down reachable next cells, deduplicates equivalent targets if a synthetic tiny grid wraps them together, and applies the same tail-vacate collision rule as gameplay.
 
-- [ ] **Step 2: Run metric tests and verify RED**
-
-Run:
+- [ ] **Step 2: Run and verify RED**
 
 ```bash
 npm test -- tests/integration/grid-tuning-metrics.test.ts
@@ -1445,23 +1260,31 @@ npm test -- tests/integration/grid-tuning-metrics.test.ts
 
 Expected: FAIL.
 
-- [ ] **Step 3: Implement pure metric helpers**
+- [ ] **Step 3: Implement pure metric helpers/tracker**
 
-Do not add speed changes, dynamic camera zoom, target changes, or hidden difficulty modifiers.
+No hidden speed/camera/difficulty changes.
 
-- [ ] **Step 4: Build a deterministic comparison harness**
+- [ ] **Step 4: Build a deterministic comparison policy**
 
-`tests/metrics/grid-tuning.test.ts` runs the same seeded RNG set and the same deterministic input policy against configs created with resolutions 8, 9, and 10 while holding `cellSize`, `stepsPerSecond`, initial length and growth contract explicitly controlled.
+`tests/metrics/grid-tuning.test.ts` runs the same fixed seed set (use 32 explicit seeds) against 8³, 9³, and 10³ configs.
 
-The harness records/prints, per configuration:
+Use one deterministic greedy policy for all configurations:
+
+1. enumerate currently legal forward/left/right/up/down actions;
+2. discard immediate self-collisions;
+3. choose the action minimizing toroidal Manhattan distance from next head cell to food;
+4. resolve ties with a fixed action order documented in the test;
+5. if no legal action exists, allow the deterministic terminal collision.
+
+This is a comparative autopilot, not a claim about human skill.
+
+Record per config/seed:
 
 ```text
-length @ 30s
-length @ 60s
-foods @ 30s
-foods @ 60s
+length @ 30s / 60s
+foods @ 30s / 60s
 occupancy @ 30s / 60s
-final foods score
+final food score
 final occupied length
 run duration
 cause of death
@@ -1470,86 +1293,86 @@ first pressure time
 first confinement time
 ```
 
-This harness is comparative evidence, not a human-skill simulator. Do not convert its output automatically into product config.
+- [ ] **Step 5: Add/run `test:tuning`**
 
-- [ ] **Step 5: Run 8³/9³/10³ comparison and preserve evidence in the PR/implementation review**
+Suggested script:
 
-Suggested command after adding script:
-
-```bash
-npm run test:tuning
+```json
+"test:tuning": "vitest run tests/metrics/grid-tuning.test.ts --reporter=verbose"
 ```
 
-Expected: deterministic repeated output for the same seeds.
+Run twice and confirm identical output for identical seeds.
 
-- [ ] **Step 6: Make an explicit Phase 7 tuning recommendation**
+- [ ] **Step 6: Produce the Phase 7 tuning recommendation**
 
-Based on deterministic metrics plus manual controlled play, recommend final resolution and whether the provisional 300-food target appears operationally viable.
+Combine deterministic comparison with controlled manual play. The spec authorizes tuning of values explicitly marked experimental/baseline (including final grid resolution) if changes are documented and tested. Any chosen change must be explicit in the PR and corresponding config/tests; never hide it inside unrelated commits.
 
-Hard gate:
+Hard product gate: if evidence recommends changing the provisional 300-food completion target/progress curve, stop and request an explicit spec amendment before applying that change.
 
-- if recommendation keeps 300 foods, continue;
-- if recommendation changes the 300-food target/progress curve, stop implementation of that product change and request explicit approval/spec amendment first.
+- [ ] **Step 7: If non-completion baseline tuning changes are selected, apply them in a separate TDD commit**
 
-- [ ] **Step 7: Commit metrics infrastructure only**
+First update the config/tuning expectation test to the selected values, verify RED, update `GRID_CONFIG`, rerun core tests/metrics, then commit with a message that names the tuning change. Skip this step if the approved baseline remains selected.
+
+- [ ] **Step 8: Commit metrics infrastructure separately**
 
 ```bash
 git add src/game/metrics.ts tests/integration/grid-tuning-metrics.test.ts tests/metrics/grid-tuning.test.ts package.json package-lock.json
 git commit -m "test: add voxel difficulty tuning metrics"
 ```
 
-Do not commit an unapproved completion-target change in this task.
+Do not include an unapproved completion-target change.
 
 ---
 
 ## Phase 8 — Responsive/browser verification and cleanup
 
-### Task 13: Expand Playwright for desktop, portrait, landscape, DPR, discrete input, pixel renderer, and camera switching
+### Task 13: Expand Playwright for desktop, portrait, landscape, DPR, discrete input, pixel rendering, and camera switching
 
 **Files:**
 - Modify: `playwright.config.ts`
 - Rewrite/extend: `tests/e2e/game.spec.ts`
-- Preserve: `tests/e2e/ranked.spec.ts` only for the legacy/preserved V1 ranking seam if its harness remains valid; do not make active V2 submit to V1 backend.
-- Modify: `src/styles.css` only for verified responsive defects.
+- Modify: `tests/e2e/ranked.spec.ts` to verify the preserved legacy seam and V2 non-submission contract rather than forcing a V2 score through V1 validation.
+- Modify: `src/styles.css` only for observed responsive defects.
 
 **Interfaces:**
-- Consumes: complete V2 runtime.
-- Produces: browser-level evidence for input/layout/render resize contracts.
+- Produces: browser evidence for the integrated V2 runtime.
 
-- [ ] **Step 1: Add an explicit mobile-landscape Playwright project**
+- [ ] **Step 1: Add an explicit mobile-landscape Chromium project**
 
-Use Chromium with a phone-like landscape viewport/device context. Keep existing desktop and portrait coverage.
+Keep desktop and portrait coverage.
 
 - [ ] **Step 2: Add V2 browser assertions**
 
-At minimum verify:
+Verify:
 
-- intro → username → game still works;
-- initial HUD length is 6 and score is 0;
-- progress bar remains visible;
-- `X` toggles chase/overview and back;
-- keyboard press produces one discrete turn, not a continuous yaw dataset contract;
-- mobile joystick is visible and can emit one discrete intent;
-- camera button works on mobile;
-- no horizontal overflow in portrait or landscape;
-- resize/orientation does not crash or leave stuck joystick input;
-- canvas backing dimensions are lower than CSS dimensions at baseline render scale;
-- representative DPR > 1 does not multiply backing dimensions back to native DPR scale;
-- app remains functional after resize.
+- intro → username → game;
+- initial `LENGTH 6` and `SCORE 0`;
+- progress bar visible;
+- X toggles chase/overview/back;
+- keyboard press emits one discrete intent, not continuous yaw;
+- mobile joystick emits one latched intent;
+- mobile camera button works;
+- no horizontal overflow in portrait/landscape;
+- resize/orientation does not crash or leave joystick latched;
+- canvas backing width/height are below CSS dimensions at `RENDER_SCALE=0.50`;
+- DPR > 1 does not multiply backing dimensions back to native DPR scale;
+- app remains playable after resize.
 
-Use test-only DOM datasets only for logical/input state that cannot otherwise be asserted; do not expose production debug UI.
+Use test-only datasets only where no user-visible assertion exists.
 
-- [ ] **Step 3: Run the browser suite and fix only observed responsive defects**
+- [ ] **Step 3: Update ranked browser coverage**
 
-Run:
+When the active ruleset is V2 and an HTTP API base is present, assert the app stays local because `HttpSessionGateway` does not advertise V2 support. Keep Worker/HTTP gateway tests as the preserved legacy ranking seam.
+
+- [ ] **Step 4: Run/fix only observed browser defects**
 
 ```bash
 npm run test:e2e
 ```
 
-Expected: PASS across desktop, portrait mobile, landscape mobile, and preserved legacy ranking project where applicable.
+Expected: PASS across desktop, portrait, landscape, and preserved ranking-seam coverage.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add playwright.config.ts tests/e2e/game.spec.ts tests/e2e/ranked.spec.ts src/styles.css
@@ -1558,22 +1381,21 @@ git commit -m "test: verify voxel game across responsive browsers"
 
 ---
 
-### Task 14: Remove obsolete V1 continuous gameplay authority and update active documentation
+### Task 14: Remove obsolete active V1 continuous authority and update active documentation
 
 **Files:**
-- Delete or stop exporting V1-only gameplay modules if now unused: `src/game/trail.ts`, continuous steering/motion portions of `src/game/steering.ts`, `advanceHead()` and old movement constants where safe.
+- Remove or stop exporting unused V1 gameplay authority from `src/game/trail.ts`, `src/game/steering.ts`, continuous portions of `src/game/simulation.ts`, and legacy constants where safe.
 - Modify: `src/game/constants.ts`
 - Modify: `README.md`
-- Modify relevant tests that are now historical-only.
-- Do **not** edit the historical V1 spec to pretend it described V2.
+- Extend: `tests/unit/grid-authority-boundary.test.ts`
+- Do not rewrite historical V1 spec.
 
 **Interfaces:**
-- Consumes: all prior green V2 tasks.
-- Produces: repository with one active gameplay authority and no accidental production dependency on continuous V1 movement.
+- Produces: one active spatial authority; preserved legacy backend seam remains isolated.
 
-- [ ] **Step 1: Prove dead/forbidden production dependencies before deletion**
+- [ ] **Step 1: Search active production dependencies**
 
-Search production imports/usages for:
+Classify every remaining use of:
 
 ```text
 TrailBuffer
@@ -1589,60 +1411,39 @@ FOOD_PICKUP_RADIUS
 SELF_COLLISION_RADIUS
 ```
 
-Expected: none in active V2 gameplay/runtime. Any remaining use must be classified as legacy-only test/tooling or migrated before deletion.
+Expected: none in active V2 runtime/gameplay.
 
-- [ ] **Step 2: Add/extend architecture tests**
+- [ ] **Step 2: Extend architecture tests**
 
-Assert active V2 gameplay does not import continuous trail/steering authority and does not depend on radius-based food/self-collision constants.
+Fail if active V2 gameplay imports continuous trail/steering authority or radius-based food/self-collision constants.
 
-- [ ] **Step 3: Remove obsolete active code/constants carefully**
+- [ ] **Step 3: Remove obsolete active code carefully**
 
-Delete modules only if no preserved backend/tooling path requires them. It is acceptable to retain legacy-only helpers under an explicit legacy namespace if removing them would unnecessarily break V1 backend tests; they must not be imported by active V2 runtime.
+Retain a legacy-only helper only if an existing preserved backend/test path truly needs it, and name/location must make that isolation explicit.
 
-- [ ] **Step 4: Update README active-game description**
+- [ ] **Step 4: Update README**
 
-Document:
+Document active Pixel Flight Grid V2, final selected tuning, score=foods, V2 best isolation, voxel/pixel rendering, toroidal integer grid + smooth presentation, both camera modes, and the fact that the preserved online backend is not V2-authoritative yet.
 
-- Pixel Flight Grid V2 as active ruleset;
-- 9³ baseline subject to Phase 7 tuning result;
-- score = foods collected;
-- V2 personal best isolation;
-- voxel/pixel presentation;
-- toroidal grid wrap;
-- discrete cell authority + smooth interpolation;
-- preserved `X` camera mode;
-- future online ranking seam currently not used for V2.
-
-- [ ] **Step 5: Run focused architecture/docs verification**
-
-Run:
+- [ ] **Step 5: Verify and commit**
 
 ```bash
 npm test -- tests/unit/grid-authority-boundary.test.ts
 npm run typecheck
 npm run build
-```
-
-Expected: PASS.
-
-- [ ] **Step 6: Commit**
-
-```bash
 git add -A src/game README.md tests/unit/grid-authority-boundary.test.ts
 git commit -m "refactor: retire continuous V1 gameplay authority"
 ```
 
 ---
 
-## Phase 9 — Final verification, review, and release gate
+## Phase 9 — Full verification, review, and release gate
 
-### Task 15: Execute full V2 verification on the exact candidate commit
+### Task 15: Verify the exact candidate SHA and prepare release evidence
 
-**Files:**
-- No source changes unless verification reveals a defect; any fix requires its own TDD cycle and commit before rerunning this task from the start.
+**Files:** No planned source changes. Any defect fix gets its own TDD commit and this task restarts.
 
-**Interfaces:**
-- Produces: fresh release evidence tied to one exact candidate SHA.
+**Interfaces:** Produces fresh evidence tied to one exact candidate commit.
 
 - [ ] **Step 1: Record candidate state**
 
@@ -1652,9 +1453,9 @@ git rev-parse HEAD
 git log -1 --oneline
 ```
 
-Expected: clean working tree.
+Expected: clean tree.
 
-- [ ] **Step 2: Run full repository gates**
+- [ ] **Step 2: Run all gates on the same SHA**
 
 ```bash
 npm audit --omit=dev --audit-level=moderate
@@ -1667,101 +1468,93 @@ npm run test:e2e
 npm run test:tuning
 ```
 
-Expected: all applicable commands PASS on the same SHA.
+Expected: PASS.
 
-- [ ] **Step 3: Review acceptance-criteria evidence against the approved spec**
+- [ ] **Step 3: Audit acceptance evidence**
 
 Explicitly confirm:
 
 ```text
 integer GridCell authority
-GridFrame rotation invariants
+GridFrame formulas/handedness
 exact occupied-cell collision
-tail-vacate semantics
+explicit tail-vacate rule
 free-cell food
-+2 growth
+approved/final growth value
 score = foodsCollected
 V2 ruleset persistence isolation
-no V2 -> V1 ranking submission
-normative head/body wrap interpolation
+no V2 submission to legacy validator
+stable-ID head/body wrap interpolation
+smooth render-only frame rotation
 voxel geometry
-9-cell visual/logical grid alignment
+visual/logical grid alignment
 AA off + reduced backing resolution
-elevated chase + overview toggle
+elevated chase + front overview
 desktop + portrait + landscape
-tuning comparison 8³/9³/10³
-300-food target unchanged unless separately approved
+8³/9³/10³ tuning comparison
+300-food target unchanged unless separately amended
 ```
 
-- [ ] **Step 4: Run final code review before merge**
+- [ ] **Step 4: Request final code review**
 
-Use `superpowers:requesting-code-review`. Review specifically for hidden reintroduction of floats as gameplay authority, stale V1 collision/movement imports, wrap interpolation edge cases, and score/ranking contamination.
+Use `superpowers:requesting-code-review`. Focus on accidental float authority, stale V1 imports, frame handedness, tail-vacate ordering, wrap interpolation/camera relocation, score/ranking contamination, and responsive renderer scaling.
 
-- [ ] **Step 5: If review is green, prepare PR/merge without bypassing `main` gates**
+- [ ] **Step 5: Prepare PR only after green review**
 
-PR description must include:
+PR body includes approved spec path, plan path, exact candidate SHA, verification evidence, 8³/9³/10³ summary, final tuning values, and explicit completion-target status.
 
-- approved spec path;
-- this plan path;
-- candidate SHA;
-- test/CI evidence;
-- 8³/9³/10³ tuning summary;
-- final chosen resolution/tuning values;
-- explicit statement that completion target stayed 300 or link to a separately approved amendment if it changed.
+- [ ] **Step 6: Merge only through the normal `main` gate**
 
-Do not merge a target change that lacks that amendment.
-
-- [ ] **Step 6: After merge, verify `main` CI and GitHub Pages deployment**
-
-Do not declare production updated from the merge event alone. Verify the post-merge `main` workflow and Pages deploy conclude successfully on the merged SHA.
+Do not bypass CI. After merge, verify `main` CI and GitHub Pages deployment on the merged SHA before declaring production updated.
 
 ---
 
 ## Dependency / Task Order
 
-The implementation is intentionally serial through the spatial core because later contracts depend on earlier type/identity decisions:
-
 ```text
-0 baseline
-  ↓
-1 GridConfig/topology
-  ↓
+0 baseline/worktree
+↓
+1 GridConfig + topology
+↓
 2 GridFrame
-  ↓
+↓
 3 movement + discrete input
-  ↓
-4 snake/collision/food
-  ↓
-5 run authority
-  ↓
-6 interpolation
-  ↓
-7 voxel renderer
-  ↓
-8 pixel pipeline
-  ↓
-9 camera V2
-  ↓
-10 main-loop integration
-  ↓
-11 score/persistence/ranking guard
-  ↓
+↓
+4 snake + collision + food
+↓
+5 RunState + logical snapshots
+↓
+6 render interpolation + frame slerp
+↓
+7 voxel renderer + logical grid visuals
+↓
+8 low-resolution pixel pipeline
+↓
+9 camera V2 + overview sizing
+↓
+10 integrated browser loop
+↓
+11 score/persistence/ranking capability guard
+↓
 12 tuning metrics + explicit tuning gate
-  ↓
+↓
 13 responsive/E2E
-  ↓
-14 V1 authority cleanup/docs
-  ↓
+↓
+14 legacy authority cleanup/docs
+↓
 15 full verification/review/release
 ```
 
-Do not parallelize Tasks 1–6: their interfaces are deliberately cumulative. After Task 10, Task 11 and the pure metric plumbing in Task 12 can be reviewed independently, but the Phase 7 tuning conclusion still requires the integrated runtime.
+Do not parallelize Tasks 1–6: their interfaces are cumulative and define the authoritative spatial model. After Task 10, persistence/ranking isolation and metric plumbing can be reviewed independently, but the tuning conclusion requires the integrated runtime.
 
 ## Plan Self-Review Result
 
-- **Spec coverage:** all approved V2 sections are mapped to Tasks 1–15; the provisional completion target has an explicit stop gate in Task 12.
-- **Closed decisions:** deterministic `GridFrame` formulas and derived `worldSize` factory are fixed in this plan and require no spec amendment.
-- **Type consistency:** active gameplay uses `GridCell`, `GridFrame`, stable `SnakeSegment.id`, `GridSnakeState`, `RenderTransition`, and V2 `RunResult` consistently across tasks.
-- **Authority boundary:** `worldToCell()` is explicitly restricted and protected by an architecture test; rendering never feeds logical state.
-- **Persistence boundary:** V1 best is preserved, V2 score is isolated, and V2 is prevented from entering the current V1 validator.
-- **Release discipline:** `main` remains untouched until the integrated branch is fully green, reviewed, and accepted.
+- **Spec coverage:** all approved V2 sections map to Tasks 1–15; the 300-food contract has an explicit stop gate.
+- **Closed decisions:** deterministic `GridFrame` rotation formulas and derived-only `worldSize` are fixed here with tests.
+- **Type consistency:** gameplay uses `GridCell`/`GridFrame`/stable `SnakeSegment.id`; simulation publishes `LogicalTransition`; render derives `RenderTransition`; renderer/camera consume presentation data only.
+- **Input consistency:** adapters emit edge/latch intents; RunState owns the only authoritative capacity-2 FIFO and consumes at most one turn per cell.
+- **Interpolation consistency:** stable IDs solve growth/tail correspondence; virtual cell targets solve wrap; presentation quaternion slerp smooths 90° visual turns without affecting gameplay.
+- **Camera consistency:** camera follows interpolated presentation frame and the exact display wrap offset, not raw logical jumps.
+- **Persistence boundary:** historical V1 best remains untouched; V2 best is food-score based; legacy HTTP ranking explicitly advertises no V2 capability.
+- **Tuning discipline:** 8³/9³/10³ use one deterministic greedy policy and fixed seeds; baseline values may change only explicitly, while 300-food completion requires a separate approval to change.
+- **Release discipline:** `main` remains untouched until the integrated branch is green, reviewed, accepted, and then post-merge Pages deployment is verified.
