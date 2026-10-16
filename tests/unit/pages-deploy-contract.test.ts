@@ -16,7 +16,7 @@ describe('GitHub Pages static V1 contract', () => {
     expect(workflow).toContain('branches: [main]');
     expect(workflow).toContain('actions/upload-pages-artifact@v3');
     expect(workflow).toContain('path: dist');
-    expect(workflow).toContain('actions/deploy-pages@v4');
+    expect(workflow).toContain('actions/deploy-pages@v5');
     expect(workflow).not.toContain('VITE_RANKING_API_BASE');
   });
 });
