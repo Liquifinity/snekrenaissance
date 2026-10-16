@@ -1,19 +1,24 @@
+import type { LeaderboardResponse, PlayerRankResponse } from '../shared/ranking-api';
 import type { RunResult } from '../game/run-state';
 import type { PlayerIdentity } from './identity';
 
-export type SessionStart = {
-  ranked: boolean;
-  sessionId: string | null;
-};
+export type SessionStart =
+  | { ranked: false; sessionId: null }
+  | { ranked: true; sessionId: string };
 
-export type SessionSubmission = {
-  ranked: boolean;
-  worldRank: number | null;
-};
+export type SessionSubmission =
+  | { ranked: false; worldRank: null }
+  | { ranked: true; worldRank: number };
 
 export interface SessionGateway {
   startRun(identity: PlayerIdentity): Promise<SessionStart>;
-  submitResult(identity: PlayerIdentity, result: RunResult): Promise<SessionSubmission>;
+  submitResult(
+    identity: PlayerIdentity,
+    sessionId: string,
+    result: RunResult
+  ): Promise<SessionSubmission>;
+  getLeaderboard(limit?: number): Promise<LeaderboardResponse>;
+  getPlayerRank(playerId: string): Promise<PlayerRankResponse | null>;
 }
 
 export class LocalSessionGateway implements SessionGateway {
@@ -21,7 +26,19 @@ export class LocalSessionGateway implements SessionGateway {
     return { ranked: false, sessionId: null };
   }
 
-  async submitResult(_identity: PlayerIdentity, _result: RunResult): Promise<SessionSubmission> {
+  async submitResult(
+    _identity: PlayerIdentity,
+    _sessionId: string,
+    _result: RunResult
+  ): Promise<SessionSubmission> {
     return { ranked: false, worldRank: null };
+  }
+
+  async getLeaderboard(_limit?: number): Promise<LeaderboardResponse> {
+    return { entries: [] };
+  }
+
+  async getPlayerRank(_playerId: string): Promise<PlayerRankResponse | null> {
+    return null;
   }
 }

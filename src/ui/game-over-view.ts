@@ -3,31 +3,60 @@ export type GameOverViewModel = {
   best: number;
   worldRank: number | null;
   ranked: boolean;
+  submissionStatus?: 'idle' | 'submitting' | 'accepted' | 'failed';
+  submissionError?: string | null;
 };
 
 export function renderGameOverView(
   container: HTMLElement,
   model: GameOverViewModel,
   onReplay: () => void,
-  onRank: () => void
+  onRank: () => void,
+  onRetryRank?: () => void
 ): void {
   container.replaceChildren();
 
+  const submissionStatus = model.submissionStatus ?? 'idle';
   const section = document.createElement('section');
   section.className = 'screen game-over';
   section.dataset.view = 'game-over';
+  section.dataset.submissionStatus = submissionStatus;
 
   const title = document.createElement('h1');
   title.textContent = 'GAME OVER';
 
   const metrics = document.createElement('div');
   metrics.className = 'result-metrics';
-  const world = model.ranked && model.worldRank !== null ? `#${model.worldRank}` : 'UNRANKED';
-  metrics.innerHTML = `
-    <p><span>LENGTH</span><strong>${model.length}</strong></p>
-    <p><span>BEST</span><strong>${model.best}</strong></p>
-    <p><span>WORLD</span><strong>${world}</strong></p>
-  `;
+
+  const world = model.ranked
+    ? model.worldRank !== null ? `#${model.worldRank}` : 'PENDING'
+    : 'UNRANKED';
+
+  const metricRows: Array<[string, string]> = [
+    ['LENGTH', String(model.length)],
+    ['BEST', String(model.best)],
+    ['WORLD', world]
+  ];
+
+  for (const [label, value] of metricRows) {
+    const row = document.createElement('p');
+    const name = document.createElement('span');
+    const strong = document.createElement('strong');
+    name.textContent = label;
+    strong.textContent = value;
+    row.append(name, strong);
+    metrics.append(row);
+  }
+
+  if (model.submissionError) {
+    const error = document.createElement('p');
+    error.className = 'form-error';
+    error.setAttribute('role', 'alert');
+    error.textContent = model.submissionError;
+    section.append(title, metrics, error);
+  } else {
+    section.append(title, metrics);
+  }
 
   const actions = document.createElement('div');
   actions.className = 'result-actions';
@@ -45,6 +74,16 @@ export function renderGameOverView(
   rank.addEventListener('click', onRank);
 
   actions.append(replay, rank);
-  section.append(title, metrics, actions);
+
+  if (submissionStatus === 'failed' && onRetryRank) {
+    const retry = document.createElement('button');
+    retry.type = 'button';
+    retry.dataset.action = 'retry-rank';
+    retry.textContent = 'RETRY RANK';
+    retry.addEventListener('click', onRetryRank);
+    actions.append(retry);
+  }
+
+  section.append(actions);
   container.append(section);
 }
