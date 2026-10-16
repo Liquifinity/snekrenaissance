@@ -1,90 +1,80 @@
 import { describe, expect, it } from 'vitest';
-import { WORLD_SIZE } from '../../src/game/constants';
-import { isFoodCollected, spawnFood } from '../../src/game/food';
+import { createGridConfig } from '../../src/game/grid-config';
+import {
+  isGridFoodCollected,
+  listFreeCells,
+  spawnGridFood
+} from '../../src/game/food';
+import type { GridCell } from '../../src/game/grid-types';
+import type { GridSnakeState } from '../../src/game/snake';
 
-function sequenceRng(values: number[]): () => number {
-  let index = 0;
-  return () => values[Math.min(index++, values.length - 1)];
+const SMALL_CONFIG = createGridConfig({
+  resolution: 2,
+  cellSize: 1,
+  stepsPerSecond: 6,
+  initialLength: 1,
+  growthPerFood: 2
+});
+
+function state(cells: GridCell[]): GridSnakeState {
+  return {
+    segments: cells.map((cell, id) => ({ id, cell })),
+    pendingGrowth: 0,
+    nextSegmentId: cells.length
+  };
 }
 
-describe('food spawning', () => {
-  const half = WORLD_SIZE / 2;
-  const quarter = WORLD_SIZE / 4;
+const ALL_2_CELLS: GridCell[] = [
+  { x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 },
+  { x: 0, y: 1, z: 0 }, { x: 1, y: 1, z: 0 },
+  { x: 0, y: 0, z: 1 }, { x: 1, y: 0, z: 1 },
+  { x: 0, y: 1, z: 1 }, { x: 1, y: 1, z: 1 }
+];
 
-  it('spawns inside canonical world bounds', () => {
-    const result = spawnFood({
-      head: { x: -half, y: -half, z: -half },
-      body: [],
-      rng: () => 0.5
-    });
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.position.x).toBeGreaterThanOrEqual(-half);
-    expect(result.position.x).toBeLessThan(half);
-    expect(result.position.y).toBeGreaterThanOrEqual(-half);
-    expect(result.position.y).toBeLessThan(half);
-    expect(result.position.z).toBeGreaterThanOrEqual(-half);
-    expect(result.position.z).toBeLessThan(half);
+describe('grid food spawning', () => {
+  it('enumerates only free cells in deterministic grid order', () => {
+    const free = listFreeCells(state([{ x: 0, y: 0, z: 0 }]), SMALL_CONFIG);
+    expect(free).toHaveLength(7);
+    expect(free).not.toContainEqual({ x: 0, y: 0, z: 0 });
+    expect(free[0]).toEqual({ x: 1, y: 0, z: 0 });
   });
 
-  it('retries when a candidate overlaps the snake body', () => {
-    const result = spawnFood({
-      head: { x: -half, y: -half, z: -half },
-      body: [{ x: 0, y: 0, z: 0 }],
-      rng: sequenceRng([0.5, 0.5, 0.5, 0.75, 0.75, 0.75]),
-      maxAttempts: 2
+  it('selects deterministically from the free-cell list', () => {
+    const snake = state([{ x: 0, y: 0, z: 0 }]);
+    expect(spawnGridFood(snake, () => 0, SMALL_CONFIG)).toEqual({
+      ok: true,
+      cell: { x: 1, y: 0, z: 0 }
     });
-
-    expect(result).toEqual({ ok: true, position: { x: quarter, y: quarter, z: quarter } });
+    expect(spawnGridFood(snake, () => 0.999999, SMALL_CONFIG)).toEqual({
+      ok: true,
+      cell: { x: 1, y: 1, z: 1 }
+    });
   });
 
-  it('retries when a candidate is too close to the head', () => {
-    const result = spawnFood({
-      head: { x: 0, y: 0, z: 0 },
-      body: [],
-      rng: sequenceRng([0.5, 0.5, 0.5, 0.75, 0.75, 0.75]),
-      maxAttempts: 2
-    });
-
-    expect(result).toEqual({ ok: true, position: { x: quarter, y: quarter, z: quarter } });
+  it('returns the last free cell when seven of eight cells are occupied', () => {
+    const last = { x: 1, y: 1, z: 1 };
+    const occupied = ALL_2_CELLS.filter((cell) =>
+      cell.x !== last.x || cell.y !== last.y || cell.z !== last.z
+    );
+    expect(spawnGridFood(state(occupied), () => 0.5, SMALL_CONFIG)).toEqual({ ok: true, cell: last });
   });
 
-  it('returns exactly one food position on success', () => {
-    const result = spawnFood({
-      head: { x: -half, y: -half, z: -half },
-      body: [],
-      rng: () => 0.75
+  it('returns a bounded no-free-cell failure for a full world', () => {
+    expect(spawnGridFood(state(ALL_2_CELLS), () => 0.5, SMALL_CONFIG)).toEqual({
+      ok: false,
+      reason: 'no-free-cell'
     });
-
-    expect(result).toEqual({ ok: true, position: { x: quarter, y: quarter, z: quarter } });
   });
 
-  it('returns an explicit bounded failure instead of looping forever', () => {
-    const result = spawnFood({
-      head: { x: 0, y: 0, z: 0 },
-      body: [{ x: 0, y: 0, z: 0 }],
-      rng: () => 0.5,
-      maxAttempts: 3
-    });
-
-    expect(result).toEqual({ ok: false, reason: 'no-valid-position' });
+  it('rejects non-finite RNG values', () => {
+    expect(() => spawnGridFood(state([{ x: 0, y: 0, z: 0 }]), () => Number.NaN, SMALL_CONFIG))
+      .toThrow('RNG');
   });
 });
 
-describe('food pickup', () => {
-  it('uses toroidal proximity across opposite faces with compact pickup tolerance', () => {
-    const half = WORLD_SIZE / 2;
-    expect(isFoodCollected(
-      { x: half - 0.08, y: 0, z: 0 },
-      { x: -half + 0.08, y: 0, z: 0 }
-    )).toBe(true);
-  });
-
-  it('does not collect spatially distant food', () => {
-    expect(isFoodCollected(
-      { x: 0, y: 0, z: 0 },
-      { x: 2, y: 0, z: 0 }
-    )).toBe(false);
+describe('grid food collection', () => {
+  it('collects only by exact cell equality', () => {
+    expect(isGridFoodCollected({ x: 4, y: 4, z: 4 }, { x: 4, y: 4, z: 4 })).toBe(true);
+    expect(isGridFoodCollected({ x: 4, y: 4, z: 4 }, { x: 5, y: 4, z: 4 })).toBe(false);
   });
 });
