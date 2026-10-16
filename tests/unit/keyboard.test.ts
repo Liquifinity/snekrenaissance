@@ -21,6 +21,19 @@ describe('KeyboardInput', () => {
     expect(input.state.pitch).toBe(-1);
   });
 
+  it('toggles camera once when X is pressed', () => {
+    let toggles = 0;
+    const input = new KeyboardInput({ onCameraToggle: () => { toggles += 1; } });
+
+    input.handleKeyDown('x');
+    input.handleKeyDown('x');
+    expect(toggles).toBe(1);
+
+    input.handleKeyUp('x');
+    input.handleKeyDown('x');
+    expect(toggles).toBe(2);
+  });
+
   it('releasing a key returns its axis toward neutral', () => {
     const input = new KeyboardInput();
     input.handleKeyDown('a');
