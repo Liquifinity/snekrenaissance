@@ -6,7 +6,7 @@ async function loadSmoke() {
   return import('../../scripts/smoke-production.mjs');
 }
 
-function response(body: string, init: ResponseInit = {}): Response {
+function response(body: BodyInit | null, init: ResponseInit = {}): Response {
   return new Response(body, init);
 }
 
@@ -36,7 +36,7 @@ function createFetch(options: { bundle?: string; healthOk?: boolean; cors?: stri
       });
     }
     if (url === `${workerUrl}/api/games` && method === 'OPTIONS') {
-      return response('', {
+      return response(null, {
         status: 204,
         headers: {
           'access-control-allow-origin': cors,
@@ -78,9 +78,11 @@ describe('production smoke verifier', () => {
   test('rejects unhealthy Worker responses or missing CORS', async () => {
     const { smokeProduction } = await loadSmoke();
 
+    const unhealthy = createFetch({ healthOk: false });
     await expect(smokeProduction({
-      ...createFetch({ healthOk: false }),
-      fetchImpl: createFetch({ healthOk: false }).fetchImpl
+      workerUrl: unhealthy.workerUrl,
+      pagesUrl: unhealthy.pagesUrl,
+      fetchImpl: unhealthy.fetchImpl
     })).rejects.toThrow();
 
     const noCors = createFetch({ cors: 'https://wrong.example' });
@@ -107,7 +109,7 @@ describe('production smoke verifier', () => {
   test('rejects a frontend bundle without the canonical meme copy', async () => {
     const { smokeProduction } = await loadSmoke();
     const fixture = createFetch({
-      bundle: `console.log("${'https://snekrenaissance-api.example.workers.dev'}")`
+      bundle: 'console.log("https://snekrenaissance-api.example.workers.dev")'
     });
 
     await expect(smokeProduction({
