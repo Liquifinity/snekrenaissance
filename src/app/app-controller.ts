@@ -111,7 +111,7 @@ export class AppController {
     }
 
     if (this.state.screen === 'game') {
-      renderHudView(this.ui, run.snake.segmentCount, run.foodEaten);
+      renderHudView(this.ui, run.snake.segments.length, run.foodEaten);
     }
   }
 
@@ -194,7 +194,7 @@ export class AppController {
   private startGameplay(): void {
     this.state.run = startGameRun(createGameRun());
     this.setScreen('game');
-    renderHudView(this.ui, this.state.run.snake.segmentCount, this.state.run.foodEaten);
+    renderHudView(this.ui, this.state.run.snake.segments.length, this.state.run.foodEaten);
   }
 
   private submitRankedResult(result: RunResult, attempt: number): void {
