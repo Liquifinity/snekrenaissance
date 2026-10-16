@@ -96,7 +96,7 @@ export class JoystickInput {
   }
 
   private updateFromPoint(x: number, y: number): void {
-    let yaw = (x - this.centerX) / this.radius;
+    let yaw = -(x - this.centerX) / this.radius;
     let pitch = -(y - this.centerY) / this.radius;
     const magnitude = Math.hypot(yaw, pitch);
 
