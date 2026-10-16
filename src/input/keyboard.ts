@@ -4,6 +4,11 @@ const LEFT_KEYS = new Set(['arrowleft', 'a']);
 const RIGHT_KEYS = new Set(['arrowright', 'd']);
 const UP_KEYS = new Set(['arrowup', 'w']);
 const DOWN_KEYS = new Set(['arrowdown', 's']);
+const CAMERA_TOGGLE_KEY = 'x';
+
+export type KeyboardInputOptions = {
+  onCameraToggle?: () => void;
+};
 
 function normalizeKey(key: string): string {
   return key.toLowerCase();
@@ -12,13 +17,23 @@ function normalizeKey(key: string): string {
 export class KeyboardInput {
   private readonly pressed = new Set<string>();
   private current: InputState = neutralInput();
+  private readonly onCameraToggle?: () => void;
+
+  constructor(options: KeyboardInputOptions = {}) {
+    this.onCameraToggle = options.onCameraToggle;
+  }
 
   get state(): InputState {
     return { ...this.current };
   }
 
   handleKeyDown(key: string): void {
-    this.pressed.add(normalizeKey(key));
+    const normalized = normalizeKey(key);
+    const wasPressed = this.pressed.has(normalized);
+    this.pressed.add(normalized);
+    if (normalized === CAMERA_TOGGLE_KEY && !wasPressed) {
+      this.onCameraToggle?.();
+    }
     this.recompute();
   }
 
@@ -62,7 +77,11 @@ export class KeyboardInput {
   }
 
   private isControlKey(key: string): boolean {
-    return LEFT_KEYS.has(key) || RIGHT_KEYS.has(key) || UP_KEYS.has(key) || DOWN_KEYS.has(key);
+    return key === CAMERA_TOGGLE_KEY
+      || LEFT_KEYS.has(key)
+      || RIGHT_KEYS.has(key)
+      || UP_KEYS.has(key)
+      || DOWN_KEYS.has(key);
   }
 
   private recompute(): void {
