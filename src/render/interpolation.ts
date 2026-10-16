@@ -56,6 +56,7 @@ function freezeSegmentTransition(
   return Object.freeze({ id, from: cloneCell(from), to: cloneCell(to), born });
 }
 
+// Before the first logical cell commit, presentation is stationary by construction.
 export function buildStationaryRenderTransition(
   segments: readonly SnakeSegment[],
   frame: GridFrame
