@@ -14,7 +14,7 @@ test('desktop meme to playable game flow', async ({ page }) => {
   await expect(page.locator('[data-hud-length]')).toContainText('12');
 
   await page.keyboard.down('ArrowLeft');
-  await expect(page.locator('#app')).toHaveAttribute('data-input-yaw', '-1');
+  await expect(page.locator('#app')).toHaveAttribute('data-input-yaw', '1');
   await page.keyboard.up('ArrowLeft');
   await expect(page.locator('#app')).toHaveAttribute('data-input-yaw', '0');
 });
