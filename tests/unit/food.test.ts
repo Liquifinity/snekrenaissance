@@ -15,7 +15,7 @@ describe('food spawning', () => {
     const result = spawnFood({
       head: { x: -half, y: -half, z: -half },
       body: [],
-      rng: () => 0.9
+      rng: () => 0.5
     });
 
     expect(result.ok).toBe(true);
