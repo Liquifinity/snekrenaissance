@@ -72,7 +72,7 @@ export class KeyboardInput {
     const down = [...DOWN_KEYS].some((key) => this.pressed.has(key)) ? 1 : 0;
 
     this.current = {
-      yaw: right - left,
+      yaw: left - right,
       pitch: up - down
     };
   }

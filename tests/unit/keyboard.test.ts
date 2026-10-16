@@ -2,15 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { KeyboardInput } from '../../src/input/keyboard';
 
 describe('KeyboardInput', () => {
-  it('maps arrows and WASD to expected yaw/pitch signs', () => {
+  it('maps arrows and WASD to camera-relative yaw/pitch signs', () => {
     const input = new KeyboardInput();
 
     input.handleKeyDown('ArrowLeft');
-    expect(input.state.yaw).toBe(-1);
+    expect(input.state.yaw).toBe(1);
     input.handleKeyUp('ArrowLeft');
 
     input.handleKeyDown('d');
-    expect(input.state.yaw).toBe(1);
+    expect(input.state.yaw).toBe(-1);
     input.handleKeyUp('d');
 
     input.handleKeyDown('w');
