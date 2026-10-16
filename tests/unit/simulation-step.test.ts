@@ -11,9 +11,10 @@ describe('head motion', () => {
   });
 
   it('wraps wall crossing without changing direction or logical continuity', () => {
-    const result = advanceHead({ x: 0, y: 0, z: 7.9 }, createInitialOrientation(), 0.1, 2, WORLD_SIZE);
-    expect(result.unwrappedPosition.z).toBeCloseTo(8.1);
-    expect(result.wrappedPosition.z).toBeCloseTo(-7.9);
+    const half = WORLD_SIZE / 2;
+    const result = advanceHead({ x: 0, y: 0, z: half - 0.1 }, createInitialOrientation(), 0.1, 2, WORLD_SIZE);
+    expect(result.unwrappedPosition.z).toBeCloseTo(half + 0.1);
+    expect(result.wrappedPosition.z).toBeCloseTo(-half + 0.1);
     expect(result.forward).toEqual({ x: 0, y: 0, z: 1 });
   });
 });
