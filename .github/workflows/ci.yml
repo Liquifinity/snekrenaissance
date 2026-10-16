@@ -16,9 +16,11 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
+      - run: npm audit --json
       - run: npm test
       - run: npm run test:worker
       - run: npm run typecheck
+      - run: npm run worker:build
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
