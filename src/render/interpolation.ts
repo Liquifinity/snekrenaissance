@@ -3,6 +3,7 @@ import { GRID_CONFIG, type GridConfig } from '../game/grid-config';
 import { cellToWorld, directionVector } from '../game/grid-topology';
 import type { GridCell, GridFrame } from '../game/grid-types';
 import type { LogicalTransition } from '../game/logical-transition';
+import type { SnakeSegment } from '../game/snake';
 import type { Vec3 } from '../game/types';
 
 export type SegmentRenderTransition = Readonly<{
@@ -53,6 +54,26 @@ function freezeSegmentTransition(
   born: boolean
 ): SegmentRenderTransition {
   return Object.freeze({ id, from: cloneCell(from), to: cloneCell(to), born });
+}
+
+export function buildStationaryRenderTransition(
+  segments: readonly SnakeSegment[],
+  frame: GridFrame
+): RenderTransition {
+  const mapped = segments.map((segment) => (
+    freezeSegmentTransition(segment.id, segment.cell, segment.cell, false)
+  ));
+  const head = mapped[0];
+  if (!head) {
+    throw new RangeError('Stationary render transition requires a head segment');
+  }
+
+  return Object.freeze({
+    head,
+    body: Object.freeze(mapped.slice(1)),
+    previousFrame: Object.freeze({ ...frame }),
+    currentFrame: Object.freeze({ ...frame })
+  });
 }
 
 export function buildRenderTransition(
