@@ -43,8 +43,8 @@ test('ranked browser flow uses Worker+D1 and survives leaderboard read failure',
   await expect(page.locator('[data-hud-length]')).toHaveCount(0);
 
   releaseStart();
-  await page.unroute('**/rank/api/games');
   await expect(page.locator('[data-hud-length]')).toContainText('12');
+  await page.unroute('**/rank/api/games');
 
   await page.evaluate(() => {
     const harness = (window as unknown as {
