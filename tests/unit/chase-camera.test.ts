@@ -1,10 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { ChaseCameraController } from '../../src/render/chase-camera';
+import {
+  CAMERA_DISTANCE,
+  CAMERA_HEIGHT,
+  CAMERA_LOOK_AHEAD,
+  ChaseCameraController
+} from '../../src/render/chase-camera';
 
 const forwardZ = { x: 0, y: 0, z: 1 };
 const zeroOffset = { x: 0, y: 0, z: 0 };
 
 describe('wrap-aware chase camera', () => {
+  it('uses a closer framing tuned for the compact snake scale', () => {
+    expect(CAMERA_DISTANCE).toBe(2.6);
+    expect(CAMERA_HEIGHT).toBe(0.75);
+    expect(CAMERA_LOOK_AHEAD).toBe(0.4);
+  });
+
   it('stays behind and slightly above the head', () => {
     const controller = new ChaseCameraController();
     const pose = controller.update({
@@ -16,6 +27,23 @@ describe('wrap-aware chase camera', () => {
     expect(pose.position.z).toBeLessThan(0);
     expect(pose.position.y).toBeGreaterThan(0);
     expect(pose.target.z).toBeGreaterThanOrEqual(0);
+  });
+
+  it('caps vertical camera displacement for steep climbs and dives', () => {
+    for (const forward of [
+      { x: 0, y: 1, z: 0 },
+      { x: 0, y: -1, z: 0 }
+    ]) {
+      const controller = new ChaseCameraController();
+      const head = { x: 0, y: 2, z: 0 };
+      const pose = controller.update({
+        headWrapped: head,
+        forward,
+        wrapOffset: zeroOffset
+      }, 1 / 60);
+
+      expect(Math.abs(pose.position.y - head.y)).toBeLessThanOrEqual(1.1);
+    }
   });
 
   it('smoothly converges toward a moved head without overshooting', () => {
