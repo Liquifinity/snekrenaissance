@@ -7,6 +7,7 @@ import {
 import { renderGameOverView } from '../ui/game-over-view';
 import { renderHudView } from '../ui/hud-view';
 import { renderIntroView } from '../ui/intro-view';
+import { renderLeaderboardView } from '../ui/leaderboard-view';
 import { renderLocalRankView } from '../ui/local-rank-view';
 import { renderUsernameView } from '../ui/username-view';
 import type { AppScreen, AppState } from './app-state';
@@ -37,6 +38,7 @@ export class AppController {
   private readonly ui: HTMLDivElement;
   private state: AppState;
   private runAttempt = 0;
+  private rankViewAttempt = 0;
 
   constructor({ root, storage = localStorage, gateway = new LocalSessionGateway() }: AppControllerOptions) {
     this.root = root;
@@ -140,6 +142,7 @@ export class AppController {
     }
 
     const attempt = ++this.runAttempt;
+    this.rankViewAttempt += 1;
     this.state.username = cleanUsername;
     saveUsername(this.storage, cleanUsername);
     this.state.ranked = false;
@@ -243,11 +246,47 @@ export class AppController {
   }
 
   private showRank(): void {
+    if (this.gateway instanceof LocalSessionGateway) {
+      this.setScreen('rank');
+      renderLocalRankView(this.ui, this.state.localBest, () => this.backFromRank());
+      return;
+    }
+
+    const request = ++this.rankViewAttempt;
     this.setScreen('rank');
-    renderLocalRankView(this.ui, this.state.localBest, () => {
-      if (this.state.run?.phase === 'game-over') this.renderGameOver();
-      else this.showIntro();
+    renderLeaderboardView(this.ui, { status: 'loading' }, { onBack: () => this.backFromRank() });
+
+    void Promise.all([
+      this.gateway.getLeaderboard(50),
+      this.gateway.getPlayerRank(this.state.playerId)
+    ]).then(([leaderboard, playerRank]) => {
+      if (request !== this.rankViewAttempt || this.state.screen !== 'rank') return;
+      if (leaderboard.entries.length === 0) {
+        renderLeaderboardView(this.ui, { status: 'empty' }, { onBack: () => this.backFromRank() });
+        return;
+      }
+      renderLeaderboardView(
+        this.ui,
+        { status: 'ready', entries: leaderboard.entries, playerRank },
+        { onBack: () => this.backFromRank() }
+      );
+    }).catch(() => {
+      if (request !== this.rankViewAttempt || this.state.screen !== 'rank') return;
+      renderLeaderboardView(
+        this.ui,
+        { status: 'error', message: 'leaderboard unavailable. try again later.' },
+        { onBack: () => this.backFromRank() }
+      );
     });
+  }
+
+  private backFromRank(): void {
+    this.rankViewAttempt += 1;
+    if (this.state.run?.phase === 'game-over') {
+      this.renderGameOver();
+    } else {
+      this.showIntro();
+    }
   }
 
   private identity(): PlayerIdentity {
