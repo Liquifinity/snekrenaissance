@@ -6,11 +6,15 @@ import { directionVector } from '../../src/game/grid-topology';
 const DIRECTIONS: GridDirection[] = ['+X', '-X', '+Y', '-Y', '+Z', '-Z'];
 const TURNS: Exclude<TurnIntent, 'none'>[] = ['left', 'right', 'up', 'down'];
 
+function canonicalAxis(value: number): -1 | 0 | 1 {
+  return (value === 0 ? 0 : value) as -1 | 0 | 1;
+}
+
 function cross(a: AxisVector, b: AxisVector): AxisVector {
   return {
-    x: (a.y * b.z - a.z * b.y) as AxisVector['x'],
-    y: (a.z * b.x - a.x * b.z) as AxisVector['y'],
-    z: (a.x * b.y - a.y * b.x) as AxisVector['z']
+    x: canonicalAxis(a.y * b.z - a.z * b.y),
+    y: canonicalAxis(a.z * b.x - a.x * b.z),
+    z: canonicalAxis(a.x * b.y - a.y * b.x)
   };
 }
 
