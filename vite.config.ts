@@ -1,6 +1,17 @@
 import { defineConfig } from 'vite';
 
-export default defineConfig({
-  server: { host: true },
+export default defineConfig(({ mode }) => ({
+  server: {
+    host: true,
+    proxy: mode === 'e2e-ranked'
+      ? {
+          '/rank': {
+            target: 'http://127.0.0.1:8787',
+            changeOrigin: true,
+            rewrite: (path) => path.replace(/^\/rank/, '')
+          }
+        }
+      : undefined
+  },
   build: { sourcemap: true }
-});
+}));
