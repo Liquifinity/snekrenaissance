@@ -14,6 +14,19 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 describe('HttpSessionGateway', () => {
+  test('invokes fetch with the global receiver required by browser-native implementations', async () => {
+    const fetchWithReceiver = function (this: typeof globalThis): Promise<Response> {
+      if (this !== globalThis) throw new TypeError('Illegal invocation');
+      return Promise.resolve(jsonResponse({ sessionId: 'session-1', startedAt: 123 }, 201));
+    } as typeof fetch;
+    const gateway = new HttpSessionGateway('/rank', fetchWithReceiver);
+
+    await expect(gateway.startRun({ playerId: 'player-1', username: 'ren' })).resolves.toEqual({
+      ranked: true,
+      sessionId: 'session-1'
+    });
+  });
+
   test('starts a run with POST JSON and normalizes the base URL', async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({
       sessionId: 'session-1',
