@@ -2,7 +2,7 @@ import './styles.css';
 import { AppController } from './app/app-controller';
 import { createSessionGateway } from './app/gateway-selection';
 import { RuntimeLifecycle } from './app/runtime-lifecycle';
-import { stepRun, type RunState } from './game/run-state';
+import { stepRun, type RunResult, type RunState } from './game/run-state';
 import { FixedStepClock } from './game/simulation';
 import { clampInputAxis, type InputState } from './input/input-state';
 import { JoystickInput } from './input/joystick';
@@ -48,6 +48,26 @@ app.append(runtimeError);
 const detachKeyboard = keyboard.attach(window);
 const detachJoystick = joystick.attach(joystickShell, window);
 controller.mount();
+
+if (import.meta.env.MODE === 'e2e-ranked') {
+  const testWindow = window as typeof window & {
+    __SNEK_TEST__?: {
+      apiBase: string;
+      forceGameOver: (result: RunResult) => void;
+    };
+  };
+  testWindow.__SNEK_TEST__ = {
+    apiBase: import.meta.env.VITE_RANKING_API_BASE ?? '',
+    forceGameOver: (result) => {
+      const run = controller.currentRun;
+      if (!run) throw new Error('No active run to finish.');
+      run.phase = 'game-over';
+      run.result = result;
+      run.maxLength = result.maxLength;
+      controller.handleRunState(run);
+    }
+  };
+}
 
 function resize(): void {
   const rect = canvas.getBoundingClientRect();
