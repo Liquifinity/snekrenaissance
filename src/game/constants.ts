@@ -17,4 +17,4 @@ export const FOOD_PICKUP_RADIUS = 0.18;
 export const FOOD_SPAWN_MAX_ATTEMPTS = 64;
 
 export const SELF_COLLISION_EXCLUSION_SEGMENTS = 8;
-export const SELF_COLLISION_RADIUS = 0.3 / 3;
+export const SELF_COLLISION_RADIUS = 0.1;
