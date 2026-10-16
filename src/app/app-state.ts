@@ -1,6 +1,6 @@
 import type { RunState } from '../game/run-state';
 
-export type AppScreen = 'intro' | 'username' | 'game' | 'game-over' | 'rank';
+export type AppScreen = 'intro' | 'username' | 'game' | 'game-over' | 'complete' | 'rank';
 export type SessionStatus = 'idle' | 'starting' | 'ranked' | 'unranked' | 'failed';
 export type SubmissionStatus = 'idle' | 'submitting' | 'accepted' | 'failed';
 
