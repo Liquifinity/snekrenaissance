@@ -8,6 +8,7 @@ import { FOOD_RADIUS } from '../../src/render/food-renderer';
 import * as sceneModule from '../../src/render/scene';
 import { BODY_RADIUS, HEAD_RADIUS } from '../../src/render/snake-renderer';
 
+// Approved V1 correction: smaller play objects, readable cube, camera-relative steering.
 describe('gameplay presentation contract', () => {
   it('renders snake and food at one third of the previous visual scale', () => {
     expect(BODY_RADIUS).toBeCloseTo(0.16 / 3, 8);
