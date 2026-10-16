@@ -2,13 +2,25 @@ import './styles.css';
 import { AppController } from './app/app-controller';
 import { createSessionGateway } from './app/gateway-selection';
 import { RuntimeLifecycle } from './app/runtime-lifecycle';
-import { stepRun, type RunResult, type RunState } from './game/run-state';
+import { cellToWorld } from './game/grid-topology';
+import {
+  queueTurnIntent,
+  stepRun,
+  type RunResult,
+  type RunState
+} from './game/run-state';
 import { FixedStepClock } from './game/simulation';
 import { clampInputAxis, type InputState } from './input/input-state';
 import { JoystickInput } from './input/joystick';
 import { KeyboardInput } from './input/keyboard';
 import { ChaseCameraController } from './render/chase-camera';
 import { FoodRenderer } from './render/food-renderer';
+import {
+  buildRenderTransition,
+  buildStationaryRenderTransition,
+  interpolateTransition,
+  type InterpolatedTransition
+} from './render/interpolation';
 import { applyOverviewCamera } from './render/overview-camera';
 import { createScene } from './render/scene';
 import { SnakeRenderer } from './render/snake-renderer';
@@ -34,18 +46,34 @@ type CameraMode = 'chase' | 'overview';
 let cameraMode: CameraMode = 'chase';
 app.dataset.cameraMode = cameraMode;
 
+function buildPresentation(run: RunState): InterpolatedTransition {
+  const renderTransition = run.transition
+    ? buildRenderTransition(run.transition, run.config)
+    : buildStationaryRenderTransition(run.snake.segments, run.frame);
+  return interpolateTransition(renderTransition, run.renderAlpha, run.config);
+}
+
+function updateChaseCamera(presentation: InterpolatedTransition, dtSeconds: number): void {
+  cameraController.update({
+    headWorld: presentation.head.position,
+    forwardWorld: presentation.frame.forward,
+    upWorld: presentation.frame.up,
+    displayWrapOffset: presentation.head.displayWrapOffset
+  }, dtSeconds);
+}
+
 function setCameraMode(mode: CameraMode): void {
   cameraMode = mode;
   app.dataset.cameraMode = mode;
   const run = controller.currentRun;
 
   if (mode === 'overview') {
-    applyOverviewCamera(scene.camera);
+    applyOverviewCamera(scene.camera, run?.config);
     return;
   }
 
   cameraController.reset();
-  if (run) cameraController.update(run, 0);
+  if (run) updateChaseCamera(buildPresentation(run), 0);
 }
 
 function toggleCamera(): void {
@@ -122,7 +150,8 @@ const lifecycle = new RuntimeLifecycle(fixedClock, {
   showError: showRuntimeError
 });
 
-function readInput(): InputState {
+// Presentation/debug only. Logical gameplay consumes takeIntent(), never these analog values.
+function readVisualInput(): InputState {
   const keyboardState = keyboard.state;
   const joystickState = joystick.state;
   return {
@@ -131,7 +160,7 @@ function readInput(): InputState {
   };
 }
 
-function exposeInput(input: InputState): void {
+function exposeVisualInput(input: InputState): void {
   app.dataset.inputYaw = String(input.yaw);
   app.dataset.inputPitch = String(input.pitch);
   joystickKnob.style.transform = `translate(${input.yaw * 28}px, ${-input.pitch * 28}px)`;
@@ -139,9 +168,9 @@ function exposeInput(input: InputState): void {
 
 function initializeRun(run: RunState): void {
   fixedClock.reset();
-  setCameraMode('chase');
   cameraController.reset();
-  cameraController.update(run, 0);
+  setCameraMode('chase');
+  updateChaseCamera(buildPresentation(run), 0);
 }
 
 let activeRun: RunState | null = null;
@@ -150,8 +179,11 @@ let frameId = 0;
 let rendererFailed = false;
 
 function frame(timestamp: number): void {
-  const input = readInput();
-  exposeInput(input);
+  const visualInput = readVisualInput();
+  exposeVisualInput(visualInput);
+
+  const keyboardIntent = keyboard.takeIntent();
+  const joystickIntent = joystick.takeIntent();
 
   const run = controller.currentRun;
   if (run !== activeRun) {
@@ -166,17 +198,19 @@ function frame(timestamp: number): void {
   lastTimestamp = timestamp;
 
   if (run?.phase === 'playing') {
+    queueTurnIntent(run, keyboardIntent);
+    queueTurnIntent(run, joystickIntent);
+
     lifecycle.consumeFrame(frameDeltaSeconds, (dt) => {
       const previousLength = run.snake.segments.length;
-      stepRun(run, input, dt);
-      if (cameraMode === 'chase') {
-        cameraController.update(run, dt);
-      }
+      const previousFoods = run.foodsCollected;
+      stepRun(run, dt);
 
       if (
         run.phase === 'game-over'
         || run.phase === 'completed'
         || run.snake.segments.length !== previousLength
+        || run.foodsCollected !== previousFoods
       ) {
         controller.handleRunState(run);
       }
@@ -184,12 +218,13 @@ function frame(timestamp: number): void {
   }
 
   if (run) {
-    snakeRenderer.render({
-      headWrapped: run.headWrapped,
-      bodyPositions: run.bodyPositions,
-      forward: run.forward
-    });
-    foodRenderer.render(run.food);
+    const presentation = buildPresentation(run);
+    snakeRenderer.render(presentation);
+    foodRenderer.render(run.food ? cellToWorld(run.food, run.config) : null);
+
+    if (cameraMode === 'chase') {
+      updateChaseCamera(presentation, frameDeltaSeconds);
+    }
   }
 
   if (!rendererFailed) {
@@ -211,12 +246,16 @@ function handleVisibilityChange(): void {
 
 function handleResize(): void {
   lifecycle.handleResize();
-  if (cameraMode === 'overview') applyOverviewCamera(scene.camera);
+  if (cameraMode === 'overview') {
+    applyOverviewCamera(scene.camera, controller.currentRun?.config);
+  }
 }
 
 function handleOrientationChange(): void {
   lifecycle.handleOrientationChange();
-  if (cameraMode === 'overview') applyOverviewCamera(scene.camera);
+  if (cameraMode === 'overview') {
+    applyOverviewCamera(scene.camera, controller.currentRun?.config);
+  }
 }
 
 canvas.addEventListener('webglcontextlost', (event) => {
