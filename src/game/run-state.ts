@@ -7,6 +7,7 @@ import {
 } from './constants';
 import { isSelfCollision } from './collision';
 import { isFoodCollected, spawnFood } from './food';
+import { COMPLETION_FOOD_TARGET } from './progress';
 import { advanceHead } from './simulation';
 import {
   applySteering,
@@ -23,7 +24,7 @@ import {
 import { TrailBuffer } from './trail';
 import type { Vec3 } from './types';
 
-export type RunPhase = 'ready' | 'playing' | 'game-over';
+export type RunPhase = 'ready' | 'playing' | 'game-over' | 'completed';
 
 export type RunResult = {
   maxLength: number;
@@ -62,6 +63,14 @@ function createInitialTrail(snake: SnakeState): TrailBuffer {
   }
 
   return trail;
+}
+
+function buildResult(state: RunState): RunResult {
+  return {
+    maxLength: state.maxLength,
+    foodEaten: state.foodEaten,
+    durationMs: Math.round(state.elapsedMs)
+  };
 }
 
 export function createRun(rng: () => number = Math.random): RunState {
@@ -147,6 +156,14 @@ export function stepRun(
     state.snake = growSnake(state.snake, GROWTH_PER_FOOD);
     state.maxLength = Math.max(state.maxLength, state.snake.segmentCount);
     state.bodyPositions = sampleBodyPositions(state.snake, state.trail);
+
+    if (state.foodEaten >= COMPLETION_FOOD_TARGET) {
+      state.food = null;
+      state.phase = 'completed';
+      state.result = buildResult(state);
+      return state;
+    }
+
     respawnFood(state, rng);
   } else if (!state.food) {
     respawnFood(state, rng);
@@ -154,11 +171,7 @@ export function stepRun(
 
   if (isSelfCollision(state.headWrapped, state.bodyPositions)) {
     state.phase = 'game-over';
-    state.result = {
-      maxLength: state.maxLength,
-      foodEaten: state.foodEaten,
-      durationMs: Math.round(state.elapsedMs)
-    };
+    state.result = buildResult(state);
   }
 
   return state;

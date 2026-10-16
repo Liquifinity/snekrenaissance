@@ -17,9 +17,8 @@ describe('approved render proportions', () => {
     expect(HEAD_RADIUS / BODY_RADIUS).toBeLessThanOrEqual(1.15);
   });
 
-  it('keeps food close to body scale', () => {
-    expect(FOOD_RADIUS / BODY_RADIUS).toBeGreaterThanOrEqual(0.8);
-    expect(FOOD_RADIUS / BODY_RADIUS).toBeLessThanOrEqual(1.2);
+  it('renders food at twice the compact body radius', () => {
+    expect(FOOD_RADIUS / BODY_RADIUS).toBeCloseTo(2, 8);
   });
 
   it('uses a readable blue tinted grid cube', () => {

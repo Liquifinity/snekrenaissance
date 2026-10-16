@@ -73,14 +73,51 @@ describe('meme-first application flow', () => {
     expect(root.querySelector('[role="alert"]')?.textContent).toContain('username');
   });
 
-  it('starts a run with a valid username and stores it locally', () => {
+  it('starts a run with a valid username, progress bar, and stored identity', () => {
     const { root, controller } = setup();
     enterUsernameAndPlay(root, 'snekboi');
 
     expect(controller.screen).toBe('game');
     expect(controller.currentRun?.phase).toBe('playing');
     expect(root.querySelector('[data-hud-length]')?.textContent).toContain('12');
+    expect(root.querySelector('[data-progress-track]')).not.toBeNull();
+    expect(root.querySelector<HTMLElement>('[data-progress-fill]')?.style.width).toBe('0%');
+    expect(root.querySelector('[data-progress-label]')?.textContent).toBe('0.0%');
     expect(localStorage.getItem('snek.username')).toBe('snekboi');
+  });
+
+  it('updates progress only in completed groups of ten foods', () => {
+    const { root, controller } = setup();
+    enterUsernameAndPlay(root, 'ren');
+    const run = controller.currentRun;
+    if (!run) throw new Error('missing run');
+
+    run.foodEaten = 9;
+    controller.handleRunState(run);
+    expect(root.querySelector('[data-progress-label]')?.textContent).toBe('0.0%');
+
+    run.foodEaten = 10;
+    controller.handleRunState(run);
+    expect(root.querySelector('[data-progress-label]')?.textContent).toBe('3.3%');
+  });
+
+  it('shows the supplied water image instead of game over when the run reaches 100%', () => {
+    const { root, controller } = setup();
+    enterUsernameAndPlay(root, 'ren');
+    const run = controller.currentRun;
+    if (!run) throw new Error('missing run');
+
+    (run as unknown as { phase: string }).phase = 'completed';
+    run.foodEaten = 300;
+    run.result = { maxLength: run.maxLength, foodEaten: 300, durationMs: 1000 };
+    controller.handleRunState(run);
+
+    expect(controller.screen).toBe('complete');
+    expect(root.textContent).toContain('YOUR IMAGE IS COMPLETED');
+    const image = root.querySelector<HTMLImageElement>('[data-completion-image]');
+    expect(image).not.toBeNull();
+    expect(image?.getAttribute('src')).toContain('completed-water');
+    expect(root.textContent).not.toContain('GAME OVER');
   });
 
   it('shows only SCORE and PERSONAL BEST for a local game over', () => {

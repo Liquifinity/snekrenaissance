@@ -139,7 +139,8 @@ button {
 
 .username-form button,
 .result-actions button,
-.local-rank button {
+.local-rank button,
+.completion-screen button {
   min-height: 46px;
   border: 1px solid #d1d5db;
   border-radius: 10px;
@@ -148,7 +149,8 @@ button {
   background: #ffffff;
 }
 
-.username-form button {
+.username-form button,
+.completion-screen button {
   border-color: #3b82f6;
   color: #ffffff;
   background: #3b82f6;
@@ -164,14 +166,81 @@ button {
 .game-hud {
   align-self: start;
   justify-self: stretch;
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: max(16px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) 0 max(18px, env(safe-area-inset-left));
+  display: grid;
+  gap: 8px;
+  padding: max(14px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) 0 max(18px, env(safe-area-inset-left));
   font-size: 12px;
   letter-spacing: 0.08em;
   color: #374151;
   pointer-events: none;
+}
+
+.progress-shell {
+  width: min(760px, calc(100vw - 120px));
+  justify-self: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 52px;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border: 1px solid rgba(147, 197, 253, 0.42);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(8px);
+}
+
+.progress-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.progress-fill {
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: #3b82f6;
+  transition: width 180ms ease-out;
+}
+
+.progress-label {
+  text-align: right;
+  color: #2563eb;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.hud-metrics {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.camera-hint {
+  opacity: 0.7;
+}
+
+.camera-toggle {
+  position: absolute;
+  right: max(18px, env(safe-area-inset-right));
+  top: max(62px, calc(env(safe-area-inset-top) + 54px));
+  z-index: 4;
+  display: none;
+  min-height: 34px;
+  border: 1px solid rgba(59, 130, 246, 0.28);
+  border-radius: 999px;
+  padding: 0 12px;
+  color: #2563eb;
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(8px);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+#app[data-screen="game"] .camera-toggle {
+  display: block;
 }
 
 .game-over,
@@ -181,10 +250,25 @@ button {
 }
 
 .game-over h1,
-.local-rank h1 {
+.local-rank h1,
+.completion-screen h1 {
   margin: 0;
   font-size: clamp(28px, 5vw, 52px);
   letter-spacing: -0.04em;
+}
+
+.completion-screen {
+  z-index: 6;
+  background: #ffffff;
+  gap: 18px;
+}
+
+.completion-image {
+  display: block;
+  width: min(560px, 78vw);
+  max-height: 62vh;
+  object-fit: contain;
+  border-radius: 18px;
 }
 
 .result-metrics {
@@ -276,6 +360,14 @@ button {
   #app[data-screen="game"] .joystick-shell {
     display: block;
   }
+
+  .camera-hint {
+    display: none;
+  }
+
+  .camera-toggle {
+    top: max(64px, calc(env(safe-area-inset-top) + 56px));
+  }
 }
 
 @media (max-width: 640px) {
@@ -286,6 +378,16 @@ button {
 
   .game-hud {
     font-size: 11px;
+  }
+
+  .progress-shell {
+    width: calc(100vw - 36px);
+    grid-template-columns: minmax(0, 1fr) 46px;
+  }
+
+  .completion-image {
+    width: min(520px, 88vw);
+    max-height: 55vh;
   }
 
   .result-actions {

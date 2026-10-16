@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GROWTH_PER_FOOD, INITIAL_BODY_SEGMENTS } from '../../src/game/constants';
+import { GROWTH_PER_FOOD, INITIAL_BODY_SEGMENTS, WORLD_SIZE } from '../../src/game/constants';
 import {
   createRun,
   startRun,
@@ -24,7 +24,7 @@ function armSelfCollision(state: RunState): RunState {
   state.headUnwrapped = { x: 0, y: 0, z: 0 };
   state.headWrapped = { x: 0, y: 0, z: 0 };
   state.trail = collisionTrail();
-  state.food = { x: 4, y: 4, z: 4 };
+  state.food = { x: 3, y: 3, z: 3 };
   return state;
 }
 
@@ -50,14 +50,27 @@ describe('run state machine', () => {
 
   it('crossing a wall wraps but never causes game over', () => {
     let run = startRun(createRun(stableRng));
-    run.headUnwrapped = { x: 0, y: 0, z: 7.95 };
-    run.headWrapped = { x: 0, y: 0, z: 7.95 };
+    const half = WORLD_SIZE / 2;
+    run.headUnwrapped = { x: 0, y: 0, z: half - 0.05 };
+    run.headWrapped = { x: 0, y: 0, z: half - 0.05 };
 
     run = stepRun(run, neutral, 0.1, stableRng);
 
     expect(run.phase).toBe('playing');
-    expect(run.headUnwrapped.z).toBeGreaterThan(8);
-    expect(run.headWrapped.z).toBeLessThan(-7);
+    expect(run.headUnwrapped.z).toBeGreaterThan(half);
+    expect(run.headWrapped.z).toBeLessThan(-half + 1);
+  });
+
+  it('the 300th food completes the run instead of showing game over', () => {
+    let run = startRun(createRun(stableRng));
+    run.foodEaten = 299;
+    run.food = { ...run.headWrapped };
+
+    run = stepRun(run, neutral, 0, stableRng);
+
+    expect(run.foodEaten).toBe(300);
+    expect(run.phase).toBe('completed');
+    expect(run.result?.foodEaten).toBe(300);
   });
 
   it('self-collision transitions to game-over exactly once', () => {
