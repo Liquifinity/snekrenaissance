@@ -37,9 +37,9 @@ test('ranked browser flow uses Worker+D1 and survives leaderboard read failure',
   await page.locator('[data-action="play"]').click();
 
   await expect(page.locator('#app')).toHaveAttribute('data-screen', 'username');
+  await expect(page.locator('[data-view="username"]')).toHaveAttribute('data-session-status', 'starting');
   await expect.poll(() => apiRequests.join('\n')).toContain('/api/games');
   await expect.poll(() => startRouteHit).toBe(true);
-  await expect(page.locator('[data-session-status="starting"]')).toBeVisible();
   await expect(page.locator('[data-hud-length]')).toHaveCount(0);
 
   releaseStart();
