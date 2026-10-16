@@ -68,15 +68,6 @@ jobs:
       - name: Production Worker config dry-run
         run: npx wrangler deploy --dry-run --config .wrangler.production.jsonc
 
-      - name: Inspect production D1 migrations
-        run: npx wrangler d1 migrations list snekrenaissance-leaderboard --remote --config .wrangler.production.jsonc
-
-      - name: Apply production D1 migrations
-        run: npx wrangler d1 migrations apply snekrenaissance-leaderboard --remote --config .wrangler.production.jsonc
-
-      - name: Deploy ranking Worker
-        run: npx wrangler deploy --config .wrangler.production.jsonc
-
       - name: Resolve Worker production origin
         shell: bash
         run: |
@@ -98,15 +89,6 @@ jobs:
           appendFileSync(process.env.GITHUB_ENV, `WORKER_URL=${workerUrl}\n`);
           NODE
 
-      - name: Build ranked frontend
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -n "${WORKER_URL:-}" || { echo "WORKER_URL is empty"; exit 1; }
-          export VITE_RANKING_API_BASE="$WORKER_URL"
-          npm run build
-          grep -R -F "$WORKER_URL" dist/assets >/dev/null || { echo "Ranked Worker origin was not compiled into dist"; exit 1; }
-
       - name: Ensure Pages project exists
         shell: bash
         run: |
@@ -126,6 +108,24 @@ jobs:
             echo "Unexpected Pages project state: $PROJECT_STATE"
             exit 1
           fi
+
+      - name: Inspect production D1 migrations
+        run: npx wrangler d1 migrations list snekrenaissance-leaderboard --remote --config .wrangler.production.jsonc
+
+      - name: Apply production D1 migrations
+        run: npx wrangler d1 migrations apply snekrenaissance-leaderboard --remote --config .wrangler.production.jsonc
+
+      - name: Deploy ranking Worker
+        run: npx wrangler deploy --config .wrangler.production.jsonc
+
+      - name: Build ranked frontend
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${WORKER_URL:-}" || { echo "WORKER_URL is empty"; exit 1; }
+          export VITE_RANKING_API_BASE="$WORKER_URL"
+          npm run build
+          grep -R -F "$WORKER_URL" dist/assets >/dev/null || { echo "Ranked Worker origin was not compiled into dist"; exit 1; }
 
       - name: Deploy Pages production
         shell: bash
