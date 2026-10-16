@@ -53,11 +53,13 @@ if (import.meta.env.MODE === 'e2e-ranked') {
   const testWindow = window as typeof window & {
     __SNEK_TEST__?: {
       apiBase: string;
+      gatewayKind: string;
       forceGameOver: (result: RunResult) => void;
     };
   };
   testWindow.__SNEK_TEST__ = {
     apiBase: import.meta.env.VITE_RANKING_API_BASE ?? '',
+    gatewayKind: sessionGateway.constructor.name,
     forceGameOver: (result) => {
       const run = controller.currentRun;
       if (!run) throw new Error('No active run to finish.');
