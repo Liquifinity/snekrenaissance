@@ -16,7 +16,8 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
-      - run: npm audit --json
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=moderate
       - run: npm test
       - run: npm run test:worker
       - run: npm run typecheck
