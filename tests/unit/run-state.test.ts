@@ -12,10 +12,10 @@ const neutral = { yaw: 0, pitch: 0 };
 const stableRng = () => 0.75;
 
 function collisionTrail(): TrailBuffer {
-  const trail = new TrailBuffer({ x: 0, y: 0, z: 0.03 });
-  trail.push({ x: 1, y: 0, z: 0.03 });
-  trail.push({ x: 1, y: 0, z: 1 });
-  trail.push({ x: 0, y: 0, z: 1 });
+  const trail = new TrailBuffer({ x: 0, y: 0, z: 0.04 });
+  trail.push({ x: 0.28, y: 0, z: 0.04 });
+  trail.push({ x: 0.28, y: 0, z: 0.28 });
+  trail.push({ x: 0, y: 0, z: 0.28 });
   trail.push({ x: 0, y: 0, z: 0 });
   return trail;
 }
