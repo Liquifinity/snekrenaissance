@@ -137,6 +137,27 @@ jobs:
       - name: Smoke production
         run: node scripts/smoke-production.mjs
 
+      - name: Capture rollback evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler versions list --name snekrenaissance-api --json > worker-versions.json
+          npx wrangler pages deployment list --project-name snekrenaissance --environment production --json > pages-deployments.json
+          node --input-type=module <<'NODE'
+          import { appendFileSync, readFileSync } from 'node:fs';
+
+          const normalizeList = (payload) => Array.isArray(payload) ? payload : (payload?.result ?? payload?.versions ?? payload?.deployments ?? []);
+          const idOf = (item) => item?.id ?? item?.Id ?? item?.version_id ?? item?.versionId ?? item?.deployment_id ?? item?.deploymentId;
+
+          const workerVersions = normalizeList(JSON.parse(readFileSync('worker-versions.json', 'utf8')));
+          const pagesDeployments = normalizeList(JSON.parse(readFileSync('pages-deployments.json', 'utf8')));
+          const workerVersionId = idOf(workerVersions[0]);
+          const pagesDeploymentId = idOf(pagesDeployments[0]);
+          if (!workerVersionId) throw new Error('Unable to capture the deployed Worker version ID.');
+          if (!pagesDeploymentId) throw new Error('Unable to capture the Pages production deployment ID.');
+          appendFileSync(process.env.GITHUB_ENV, `WORKER_VERSION_ID=${workerVersionId}\nPAGES_DEPLOYMENT_ID=${pagesDeploymentId}\n`);
+          NODE
+
       - name: Publish release summary
         if: always()
         shell: bash
@@ -146,5 +167,7 @@ jobs:
             echo ""
             echo "Release SHA: ${RELEASE_SHA:-unknown}"
             echo "Worker: ${WORKER_URL:-not-resolved}"
+            echo "Worker version: ${WORKER_VERSION_ID:-not-captured}"
             echo "Pages: ${PAGES_URL:-not-resolved}"
+            echo "Pages deployment: ${PAGES_DEPLOYMENT_ID:-not-captured}"
           } >> "$GITHUB_STEP_SUMMARY"
