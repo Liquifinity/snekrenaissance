@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { JoystickInput } from '../../src/input/joystick';
 
 describe('JoystickInput', () => {
-  it('maps pointer displacement to normalized yaw and pitch', () => {
+  it('maps pointer displacement to camera-relative normalized yaw and pitch', () => {
     const joystick = new JoystickInput();
     joystick.begin(7, 100, 100, 100, 100, 50);
     joystick.move(7, 125, 75);
 
-    expect(joystick.state.yaw).toBeCloseTo(0.5);
+    expect(joystick.state.yaw).toBeCloseTo(-0.5);
     expect(joystick.state.pitch).toBeCloseTo(0.5);
   });
 
