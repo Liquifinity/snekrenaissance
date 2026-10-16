@@ -2,9 +2,9 @@ import type { PerspectiveCamera } from 'three';
 import { WORLD_SIZE } from '../game/constants';
 
 export const OVERVIEW_CAMERA_POSITION = {
-  x: WORLD_SIZE * 0.9,
-  y: WORLD_SIZE * 0.75,
-  z: -WORLD_SIZE * 1.05
+  x: 0,
+  y: 0,
+  z: -WORLD_SIZE * 1.8
 } as const;
 
 export function applyOverviewCamera(camera: PerspectiveCamera): void {
