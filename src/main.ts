@@ -9,6 +9,7 @@ import { JoystickInput } from './input/joystick';
 import { KeyboardInput } from './input/keyboard';
 import { ChaseCameraController } from './render/chase-camera';
 import { FoodRenderer } from './render/food-renderer';
+import { applyOverviewCamera } from './render/overview-camera';
 import { createScene } from './render/scene';
 import { SnakeRenderer } from './render/snake-renderer';
 
@@ -27,8 +28,32 @@ const cameraController = new ChaseCameraController(scene.camera);
 const sessionGateway = createSessionGateway(import.meta.env.VITE_RANKING_API_BASE);
 const controller = new AppController({ root: app, gateway: sessionGateway });
 const fixedClock = new FixedStepClock();
-const keyboard = new KeyboardInput();
 const joystick = new JoystickInput();
+
+type CameraMode = 'chase' | 'overview';
+let cameraMode: CameraMode = 'chase';
+app.dataset.cameraMode = cameraMode;
+
+function setCameraMode(mode: CameraMode): void {
+  cameraMode = mode;
+  app.dataset.cameraMode = mode;
+  const run = controller.currentRun;
+
+  if (mode === 'overview') {
+    applyOverviewCamera(scene.camera);
+    return;
+  }
+
+  cameraController.reset();
+  if (run) cameraController.update(run, 0);
+}
+
+function toggleCamera(): void {
+  if (controller.screen !== 'game') return;
+  setCameraMode(cameraMode === 'chase' ? 'overview' : 'chase');
+}
+
+const keyboard = new KeyboardInput({ onCameraToggle: toggleCamera });
 
 const joystickShell = document.createElement('div');
 joystickShell.className = 'joystick-shell';
@@ -38,6 +63,15 @@ const joystickKnob = document.createElement('div');
 joystickKnob.className = 'joystick-knob';
 joystickShell.append(joystickKnob);
 app.append(joystickShell);
+
+const cameraToggle = document.createElement('button');
+cameraToggle.type = 'button';
+cameraToggle.className = 'camera-toggle';
+cameraToggle.dataset.cameraToggle = '';
+cameraToggle.textContent = 'X CAMERA';
+cameraToggle.setAttribute('aria-label', 'Change camera');
+cameraToggle.addEventListener('click', toggleCamera);
+app.append(cameraToggle);
 
 const runtimeError = document.createElement('div');
 runtimeError.className = 'runtime-error';
@@ -105,6 +139,7 @@ function exposeInput(input: InputState): void {
 
 function initializeRun(run: RunState): void {
   fixedClock.reset();
+  setCameraMode('chase');
   cameraController.reset();
   cameraController.update(run, 0);
 }
@@ -134,16 +169,26 @@ function frame(timestamp: number): void {
     lifecycle.consumeFrame(frameDeltaSeconds, (dt) => {
       const previousLength = run.snake.segmentCount;
       stepRun(run, input, dt);
-      cameraController.update(run, dt);
+      if (cameraMode === 'chase') {
+        cameraController.update(run, dt);
+      }
 
-      if (run.phase === 'game-over' || run.snake.segmentCount !== previousLength) {
+      if (
+        run.phase === 'game-over'
+        || run.phase === 'completed'
+        || run.snake.segmentCount !== previousLength
+      ) {
         controller.handleRunState(run);
       }
     });
   }
 
   if (run) {
-    snakeRenderer.render(run);
+    snakeRenderer.render({
+      headWrapped: run.headWrapped,
+      bodyPositions: run.bodyPositions,
+      forward: run.forward
+    });
     foodRenderer.render(run.food);
   }
 
@@ -166,10 +211,12 @@ function handleVisibilityChange(): void {
 
 function handleResize(): void {
   lifecycle.handleResize();
+  if (cameraMode === 'overview') applyOverviewCamera(scene.camera);
 }
 
 function handleOrientationChange(): void {
   lifecycle.handleOrientationChange();
+  if (cameraMode === 'overview') applyOverviewCamera(scene.camera);
 }
 
 canvas.addEventListener('webglcontextlost', (event) => {
@@ -189,6 +236,7 @@ window.addEventListener('pagehide', () => {
   cancelAnimationFrame(frameId);
   detachKeyboard();
   detachJoystick();
+  cameraToggle.removeEventListener('click', toggleCamera);
   document.removeEventListener('visibilitychange', handleVisibilityChange);
   window.removeEventListener('resize', handleResize);
   window.removeEventListener('orientationchange', handleOrientationChange);
