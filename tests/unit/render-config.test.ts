@@ -22,13 +22,13 @@ describe('approved render proportions', () => {
     expect(FOOD_RADIUS / BODY_RADIUS).toBeLessThanOrEqual(1.2);
   });
 
-  it('uses line-based translucent cube walls', () => {
-    expect(CUBE_WALL_STYLE).toBe('edges');
-    expect(CUBE_GUIDE_OPACITY).toBeGreaterThan(0);
-    expect(CUBE_GUIDE_OPACITY).toBeLessThan(0.5);
+  it('uses a readable blue tinted grid cube', () => {
+    expect(CUBE_WALL_STYLE).toBe('tinted-grid');
+    expect(CUBE_GUIDE_OPACITY).toBeGreaterThanOrEqual(0.45);
+    expect(CUBE_GUIDE_OPACITY).toBeLessThanOrEqual(0.7);
   });
 
-  it('exports a near-white background, restrained gray guides, and blue accent', () => {
+  it('exports a near-white background and blue guides/accent', () => {
     expect(PALETTE.background).toMatch(/^#[0-9a-f]{6}$/i);
     expect(PALETTE.guides).toMatch(/^#[0-9a-f]{6}$/i);
     expect(PALETTE.accent).toMatch(/^#[0-9a-f]{6}$/i);
@@ -37,6 +37,9 @@ describe('approved render proportions', () => {
     expect(hexChannel(bg, 1)).toBeGreaterThanOrEqual(245);
     expect(hexChannel(bg, 3)).toBeGreaterThanOrEqual(245);
     expect(hexChannel(bg, 5)).toBeGreaterThanOrEqual(245);
+
+    const guides = PALETTE.guides;
+    expect(hexChannel(guides, 5)).toBeGreaterThan(hexChannel(guides, 1));
 
     const accent = PALETTE.accent;
     const r = hexChannel(accent, 1);
