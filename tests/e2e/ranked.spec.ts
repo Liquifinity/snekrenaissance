@@ -3,8 +3,15 @@ import { expect, test } from '@playwright/test';
 test('ranked browser flow uses Worker+D1 and survives leaderboard read failure', async ({ page }) => {
   let releaseStart!: () => void;
   let startRouteHit = false;
+  const apiRequests: string[] = [];
   const holdStart = new Promise<void>((resolve) => {
     releaseStart = resolve;
+  });
+
+  page.on('request', (request) => {
+    if (request.url().includes('/api/')) {
+      apiRequests.push(`${request.method()} ${request.url()}`);
+    }
   });
 
   await page.route('**/rank/api/games', async (route) => {
@@ -26,6 +33,7 @@ test('ranked browser flow uses Worker+D1 and survives leaderboard read failure',
   await page.locator('input[name="username"]').fill('ranked-e2e');
   await page.locator('[data-action="play"]').click();
 
+  await expect.poll(() => apiRequests.join('\n')).toContain('/api/games');
   await expect.poll(() => startRouteHit).toBe(true);
   await expect(page.locator('[data-session-status="starting"]')).toBeVisible();
   await expect(page.locator('[data-hud-length]')).toHaveCount(0);
