@@ -1,37 +1,63 @@
 import { describe, expect, it } from 'vitest';
-import { SELF_COLLISION_EXCLUSION_SEGMENTS } from '../../src/game/constants';
-import { isSelfCollision } from '../../src/game/collision';
+import { wouldSelfCollide } from '../../src/game/collision';
+import { advanceGridStep } from '../../src/game/grid-topology';
+import type { GridCell, GridDirection } from '../../src/game/grid-types';
+import type { GridSnakeState } from '../../src/game/snake';
 
-function distantBody(length: number) {
-  return Array.from({ length }, (_, index) => ({ x: 0, y: 4, z: index + 2 }));
+function state(cells: GridCell[], pendingGrowth = 0): GridSnakeState {
+  return {
+    segments: cells.map((cell, id) => ({ id, cell })),
+    pendingGrowth,
+    nextSegmentId: cells.length
+  };
 }
 
-describe('toroidal self collision', () => {
-  it('ignores body segments immediately behind the head', () => {
-    const body = distantBody(SELF_COLLISION_EXCLUSION_SEGMENTS + 2);
-    body[0] = { x: 0, y: 0, z: 0 };
-
-    expect(isSelfCollision({ x: 0, y: 0, z: 0 }, body)).toBe(false);
+describe('exact voxel self collision', () => {
+  it('collides with an occupied non-tail cell', () => {
+    const snake = state([
+      { x: 4, y: 4, z: 4 },
+      { x: 4, y: 4, z: 3 },
+      { x: 4, y: 3, z: 3 },
+      { x: 4, y: 2, z: 3 }
+    ]);
+    expect(wouldSelfCollide(snake, { x: 4, y: 3, z: 3 })).toBe(true);
   });
 
-  it('collides with a later body segment inside the compact collision radius', () => {
-    const body = distantBody(SELF_COLLISION_EXCLUSION_SEGMENTS + 2);
-    body[SELF_COLLISION_EXCLUSION_SEGMENTS] = { x: 0.08, y: 0, z: 0 };
-
-    expect(isSelfCollision({ x: 0, y: 0, z: 0 }, body)).toBe(true);
+  it('does not collide with a free cell', () => {
+    const snake = state([
+      { x: 4, y: 4, z: 4 },
+      { x: 4, y: 4, z: 3 },
+      { x: 4, y: 4, z: 2 }
+    ]);
+    expect(wouldSelfCollide(snake, { x: 5, y: 4, z: 4 })).toBe(false);
   });
 
-  it('detects compact collision through opposite cube faces', () => {
-    const body = distantBody(SELF_COLLISION_EXCLUSION_SEGMENTS + 2);
-    body[SELF_COLLISION_EXCLUSION_SEGMENTS] = { x: -7.96, y: 0, z: 0 };
-
-    expect(isSelfCollision({ x: 7.96, y: 0, z: 0 }, body)).toBe(true);
+  it('allows entry into the current tail only when it vacates this step', () => {
+    const cells = [
+      { x: 4, y: 4, z: 4 },
+      { x: 4, y: 4, z: 3 },
+      { x: 4, y: 4, z: 2 }
+    ];
+    expect(wouldSelfCollide(state(cells, 0), { x: 4, y: 4, z: 2 })).toBe(false);
+    expect(wouldSelfCollide(state(cells, 1), { x: 4, y: 4, z: 2 })).toBe(true);
   });
 
-  it('does not collide when paths only appear to cross but are separated in depth', () => {
-    const body = distantBody(SELF_COLLISION_EXCLUSION_SEGMENTS + 2);
-    body[SELF_COLLISION_EXCLUSION_SEGMENTS] = { x: 0, y: 0, z: 1.5 };
-
-    expect(isSelfCollision({ x: 0, y: 0, z: 0 }, body)).toBe(false);
+  it.each([
+    ['+X', { x: 8, y: 4, z: 4 }, { x: 0, y: 4, z: 4 }],
+    ['-X', { x: 0, y: 4, z: 4 }, { x: 8, y: 4, z: 4 }],
+    ['+Y', { x: 4, y: 8, z: 4 }, { x: 4, y: 0, z: 4 }],
+    ['-Y', { x: 4, y: 0, z: 4 }, { x: 4, y: 8, z: 4 }],
+    ['+Z', { x: 4, y: 4, z: 8 }, { x: 4, y: 4, z: 0 }],
+    ['-Z', { x: 4, y: 4, z: 0 }, { x: 4, y: 4, z: 8 }]
+  ] as const)('detects collision after %s toroidal wrap', (direction, head, wrappedTarget) => {
+    const step = advanceGridStep(head, direction as GridDirection);
+    expect(step.to).toEqual(wrappedTarget);
+    const snake = state([
+      head,
+      { x: 3, y: 3, z: 3 },
+      wrappedTarget,
+      { x: 2, y: 2, z: 2 }
+    ]);
+    expect(wouldSelfCollide(snake, step.to)).toBe(true);
   });
 });
