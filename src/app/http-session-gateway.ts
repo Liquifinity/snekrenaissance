@@ -115,6 +115,11 @@ export class HttpSessionGateway implements SessionGateway {
     )) as typeof fetch;
   }
 
+  /** The current HTTP API is the historical unversioned V1 validator. */
+  supportsRuleset(_rulesetId: string): boolean {
+    return false;
+  }
+
   async startRun(identity: PlayerIdentity): Promise<SessionStart> {
     const response = await this.request('/api/games', {
       method: 'POST',

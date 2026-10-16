@@ -1,6 +1,6 @@
 import { completionProgress, completionProgressLabel } from '../game/progress';
 
-export function renderHudView(container: HTMLElement, length: number, foodEaten = 0): void {
+export function renderHudView(container: HTMLElement, score: number, length: number): void {
   container.replaceChildren();
 
   const hud = document.createElement('section');
@@ -16,7 +16,7 @@ export function renderHudView(container: HTMLElement, length: number, foodEaten 
   progressTrack.setAttribute('role', 'progressbar');
   progressTrack.setAttribute('aria-valuemin', '0');
   progressTrack.setAttribute('aria-valuemax', '100');
-  const percent = completionProgress(foodEaten);
+  const percent = completionProgress(score);
   progressTrack.setAttribute('aria-valuenow', percent.toFixed(1));
 
   const progressFill = document.createElement('div');
@@ -28,23 +28,28 @@ export function renderHudView(container: HTMLElement, length: number, foodEaten 
   const progressLabel = document.createElement('span');
   progressLabel.className = 'progress-label';
   progressLabel.dataset.progressLabel = '';
-  progressLabel.textContent = completionProgressLabel(foodEaten);
+  progressLabel.textContent = completionProgressLabel(score);
 
   progress.append(progressTrack, progressLabel);
 
   const metrics = document.createElement('div');
   metrics.className = 'hud-metrics';
 
-  const metric = document.createElement('div');
-  metric.className = 'hud-metric';
-  metric.dataset.hudLength = '';
-  metric.textContent = `LENGTH ${length}`;
+  const scoreMetric = document.createElement('div');
+  scoreMetric.className = 'hud-metric';
+  scoreMetric.dataset.hudScore = '';
+  scoreMetric.textContent = `SCORE ${score}`;
+
+  const lengthMetric = document.createElement('div');
+  lengthMetric.className = 'hud-metric';
+  lengthMetric.dataset.hudLength = '';
+  lengthMetric.textContent = `LENGTH ${length}`;
 
   const hint = document.createElement('div');
   hint.className = 'hud-metric camera-hint';
   hint.textContent = 'PRESS X TO CHANGE CAMERA';
 
-  metrics.append(metric, hint);
+  metrics.append(scoreMetric, lengthMetric, hint);
   hud.append(progress, metrics);
   container.append(hud);
 }

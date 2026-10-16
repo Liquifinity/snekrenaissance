@@ -4,6 +4,7 @@ import {
   type RunResult,
   type RunState
 } from '../game/run-state';
+import { RULESET_ID } from '../game/grid-config';
 import { renderCompletionView } from '../ui/completion-view';
 import { renderGameOverView } from '../ui/game-over-view';
 import { renderHudView } from '../ui/hud-view';
@@ -14,9 +15,9 @@ import { renderUsernameView } from '../ui/username-view';
 import type { AppScreen, AppState } from './app-state';
 import {
   getOrCreatePlayerId,
-  loadLocalBest,
+  loadPixelGridV2Best,
   loadUsername,
-  saveLocalBest,
+  savePixelGridV2Best,
   saveUsername,
   type PlayerIdentity,
   type StorageLike
@@ -56,7 +57,7 @@ export class AppController {
       screen: 'intro',
       playerId: getOrCreatePlayerId(this.storage),
       username: loadUsername(this.storage),
-      localBest: loadLocalBest(this.storage),
+      localBest: loadPixelGridV2Best(this.storage),
       worldRank: null,
       ranked: false,
       activeSessionId: null,
@@ -87,7 +88,7 @@ export class AppController {
     this.state.run = run;
 
     if (run.phase === 'completed' && run.result) {
-      this.state.localBest = saveLocalBest(this.storage, run.result.maxLength);
+      this.state.localBest = savePixelGridV2Best(this.storage, run.result.score);
       this.state.screen = 'complete';
       this.setScreen('complete');
       renderCompletionView(this.ui, () => this.beginGame());
@@ -95,13 +96,14 @@ export class AppController {
     }
 
     if (run.phase === 'game-over' && run.result) {
-      this.state.localBest = saveLocalBest(this.storage, run.result.maxLength);
+      this.state.localBest = savePixelGridV2Best(this.storage, run.result.score);
       this.state.screen = 'game-over';
 
       if (
         this.state.ranked
         && this.state.activeSessionId
         && this.state.submissionStatus === 'idle'
+        && this.gateway.supportsRuleset?.(run.result.rulesetId) !== false
       ) {
         this.submitRankedResult(run.result, this.runAttempt);
       } else {
@@ -111,7 +113,7 @@ export class AppController {
     }
 
     if (this.state.screen === 'game') {
-      renderHudView(this.ui, run.snake.segments.length, run.foodEaten);
+      renderHudView(this.ui, run.score, run.snake.segments.length);
     }
   }
 
@@ -161,7 +163,10 @@ export class AppController {
     this.state.submissionError = null;
     this.state.run = null;
 
-    if (this.gateway instanceof LocalSessionGateway) {
+    if (
+      this.gateway instanceof LocalSessionGateway
+      || this.gateway.supportsRuleset?.(RULESET_ID) === false
+    ) {
       this.state.sessionStatus = 'unranked';
       this.startGameplay();
       return;
@@ -194,12 +199,12 @@ export class AppController {
   private startGameplay(): void {
     this.state.run = startGameRun(createGameRun());
     this.setScreen('game');
-    renderHudView(this.ui, this.state.run.snake.segments.length, this.state.run.foodEaten);
+    renderHudView(this.ui, this.state.run.score, this.state.run.snake.segments.length);
   }
 
   private submitRankedResult(result: RunResult, attempt: number): void {
     const sessionId = this.state.activeSessionId;
-    if (!sessionId) return;
+    if (!sessionId || this.gateway.supportsRuleset?.(result.rulesetId) === false) return;
 
     const identity = this.identity();
     this.state.submissionStatus = 'submitting';
@@ -241,6 +246,7 @@ export class AppController {
     renderGameOverView(
       this.ui,
       {
+        score: result.score,
         length: result.maxLength,
         best: this.state.localBest,
         worldRank: this.state.worldRank,
@@ -255,7 +261,10 @@ export class AppController {
   }
 
   private showRank(): void {
-    if (this.gateway instanceof LocalSessionGateway) {
+    if (
+      this.gateway instanceof LocalSessionGateway
+      || this.gateway.supportsRuleset?.(RULESET_ID) === false
+    ) {
       this.setScreen('rank');
       renderLocalRankView(this.ui, this.state.localBest, () => this.backFromRank());
       return;

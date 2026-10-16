@@ -1,4 +1,5 @@
 export type GameOverViewModel = {
+  score: number;
   length: number;
   best: number;
   worldRank: number | null;
@@ -30,12 +31,13 @@ export function renderGameOverView(
 
   const metricRows: Array<[string, string]> = model.ranked
     ? [
+        ['SCORE', String(model.score)],
         ['LENGTH', String(model.length)],
         ['BEST', String(model.best)],
         ['WORLD', model.worldRank !== null ? `#${model.worldRank}` : 'PENDING']
       ]
     : [
-        ['SCORE', String(model.length)],
+        ['SCORE', String(model.score)],
         ['PERSONAL BEST', String(model.best)]
       ];
 
