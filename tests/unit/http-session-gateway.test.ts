@@ -4,7 +4,15 @@ import type { PlayerIdentity } from '../../src/app/identity';
 import type { RunResult } from '../../src/game/run-state';
 
 const identity: PlayerIdentity = { playerId: 'player/with space', username: 'Ren <b>ato</b>' };
-const result: RunResult = { maxLength: 20, foodEaten: 2, durationMs: 4_000 };
+const result: RunResult = {
+  rulesetId: 'pixel-flight-grid-v2',
+  score: 2,
+  foodsCollected: 2,
+  length: 20,
+  maxLength: 20,
+  foodEaten: 2,
+  durationMs: 4_000
+};
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
