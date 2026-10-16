@@ -18,14 +18,14 @@ describe('gameplay presentation contract', () => {
     expect(SEGMENT_SPACING).toBeCloseTo(0.42 / 3, 8);
   });
 
-  it('shrinks self collision while keeping extra food pickup tolerance', () => {
+  it('shrinks self collision while keeping the larger food pickup tolerance', () => {
     expect(SELF_COLLISION_RADIUS).toBeCloseTo(0.3 / 3, 8);
-    expect(FOOD_PICKUP_RADIUS).toBeCloseTo(0.18, 8);
+    expect(FOOD_PICKUP_RADIUS).toBeCloseTo(0.3, 8);
     expect(FOOD_PICKUP_RADIUS).toBeGreaterThan(HEAD_RADIUS + FOOD_RADIUS);
   });
 
-  it('compresses the cube to half size and makes the six-face grid denser', () => {
-    expect(WORLD_SIZE).toBe(8);
+  it('compresses the cube to half the previous size and keeps the six-face grid dense', () => {
+    expect(WORLD_SIZE).toBe(4);
     expect(sceneModule.CUBE_WALL_STYLE).toBe('tinted-grid');
     expect(sceneModule.PALETTE.guides).toBe('#93c5fd');
     expect(sceneModule.CUBE_GUIDE_OPACITY).toBeGreaterThanOrEqual(0.45);
