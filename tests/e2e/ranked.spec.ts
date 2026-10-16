@@ -30,7 +30,7 @@ test('ranked browser flow uses Worker+D1 and survives leaderboard read failure',
   expect(runtime).toEqual({ apiBase: '/rank', gatewayKind: 'HttpSessionGateway' });
 
   await expect(page.locator('[data-copy-line]').nth(0)).toHaveText('just because ChatGPT');
-  await expect(page.locator('[data-copy-line]').nth(1)).toHaveText("didn't complete my image.");
+  await expect(page.locator('[data-copy-line]').nth(1)).toHaveText('didnt complete my image.');
 
   await page.locator('[data-action="continue"]').click();
   await page.locator('input[name="username"]').fill('ranked-e2e');

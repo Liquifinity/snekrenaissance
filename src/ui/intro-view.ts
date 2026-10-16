@@ -1,6 +1,6 @@
 export const CANONICAL_COPY = [
   'just because ChatGPT',
-  "didn't complete my image."
+  'didnt complete my image.'
 ] as const;
 
 export function renderIntroView(container: HTMLElement, onContinue: () => void): void {

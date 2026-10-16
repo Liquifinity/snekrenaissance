@@ -14,7 +14,7 @@ function createFetch(options: { bundle?: string; healthOk?: boolean; cors?: stri
   const workerUrl = 'https://snekrenaissance-api.example.workers.dev';
   const pagesUrl = 'https://snekrenaissance.pages.dev';
   const calls: FetchCall[] = [];
-  const bundle = options.bundle ?? `console.log("just because ChatGPT", "didn't complete my image.", "${workerUrl}")`;
+  const bundle = options.bundle ?? `console.log("just because ChatGPT", "didnt complete my image.", "${workerUrl}")`;
   const healthOk = options.healthOk ?? true;
   const cors = options.cors ?? '*';
 
@@ -96,7 +96,7 @@ describe('production smoke verifier', () => {
   test('rejects a frontend bundle that silently falls back to unranked', async () => {
     const { smokeProduction } = await loadSmoke();
     const fixture = createFetch({
-      bundle: 'console.log("just because ChatGPT", "didn\'t complete my image.")'
+      bundle: 'console.log("just because ChatGPT", "didnt complete my image.")'
     });
 
     await expect(smokeProduction({

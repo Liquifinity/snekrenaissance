@@ -4,7 +4,7 @@ test('desktop meme to playable game flow', async ({ page }) => {
   await page.goto('/');
 
   await expect(page.locator('[data-copy-line]').nth(0)).toHaveText('just because ChatGPT');
-  await expect(page.locator('[data-copy-line]').nth(1)).toHaveText("didn't complete my image.");
+  await expect(page.locator('[data-copy-line]').nth(1)).toHaveText('didnt complete my image.');
 
   await page.locator('[data-action="continue"]').click();
   await page.locator('input[name="username"]').fill('e2e-snek');
