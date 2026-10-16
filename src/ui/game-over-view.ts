@@ -28,17 +28,16 @@ export function renderGameOverView(
   const metrics = document.createElement('div');
   metrics.className = 'result-metrics';
 
-  const metricRows: Array<[string, string]> = [
-    ['SCORE', String(model.length)],
-    ['PERSONAL BEST', String(model.best)]
-  ];
-
-  if (model.ranked) {
-    metricRows.push([
-      'WORLD',
-      model.worldRank !== null ? `#${model.worldRank}` : 'PENDING'
-    ]);
-  }
+  const metricRows: Array<[string, string]> = model.ranked
+    ? [
+        ['LENGTH', String(model.length)],
+        ['BEST', String(model.best)],
+        ['WORLD', model.worldRank !== null ? `#${model.worldRank}` : 'PENDING']
+      ]
+    : [
+        ['SCORE', String(model.length)],
+        ['PERSONAL BEST', String(model.best)]
+      ];
 
   for (const [label, value] of metricRows) {
     const row = document.createElement('p');
