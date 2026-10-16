@@ -5,9 +5,9 @@ import { advanceHead, FixedStepClock } from '../../src/game/simulation';
 
 describe('head motion', () => {
   it('advances at constant configured speed', () => {
-    const result = advanceHead({ x: 0, y: 0, z: 0 }, createInitialOrientation(), 0.5, 4, WORLD_SIZE);
-    expect(result.unwrappedPosition).toEqual({ x: 0, y: 0, z: 2 });
-    expect(result.wrappedPosition).toEqual({ x: 0, y: 0, z: 2 });
+    const result = advanceHead({ x: 0, y: 0, z: 0 }, createInitialOrientation(), 0.25, 4, WORLD_SIZE);
+    expect(result.unwrappedPosition).toEqual({ x: 0, y: 0, z: 1 });
+    expect(result.wrappedPosition).toEqual({ x: 0, y: 0, z: 1 });
   });
 
   it('wraps wall crossing without changing direction or logical continuity', () => {
