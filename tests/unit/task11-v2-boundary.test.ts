@@ -22,6 +22,7 @@ describe('V2 persistence/ranking boundary', () => {
     storage.setItem(LOCAL_BEST_KEY, '68');
 
     expect(savePixelGridV2Best(storage, 7)).toBe(7);
+    expect(savePixelGridV2Best(storage, 4)).toBe(7);
     expect(loadPixelGridV2Best(storage)).toBe(7);
     expect(storage.getItem(V2_LOCAL_BEST_KEY)).toBe('7');
     expect(storage.getItem(LOCAL_BEST_KEY)).toBe('68');
