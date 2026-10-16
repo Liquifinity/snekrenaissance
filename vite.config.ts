@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig(({ mode }) => ({
+  base: mode === 'production' ? '/snekrenaissance/' : '/',
   server: {
     host: true,
     proxy: mode === 'e2e-ranked'
