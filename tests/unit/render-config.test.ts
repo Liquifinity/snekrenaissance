@@ -5,7 +5,9 @@ import {
   CUBE_GRID_DIVISIONS,
   CUBE_GUIDE_OPACITY,
   CUBE_WALL_STYLE,
-  PALETTE
+  PALETTE,
+  RENDERER_ANTIALIAS,
+  RENDERER_PIXEL_RATIO
 } from '../../src/render/scene';
 import { HEAD_VOXEL_SIZE, SNAKE_VOXEL_SIZE } from '../../src/render/snake-renderer';
 
@@ -28,6 +30,11 @@ describe('approved V2 render proportions', () => {
     expect(CUBE_WALL_STYLE).toBe('tinted-grid');
     expect(CUBE_GUIDE_OPACITY).toBeGreaterThanOrEqual(0.45);
     expect(CUBE_GUIDE_OPACITY).toBeLessThanOrEqual(0.7);
+  });
+
+  it('uses AA-off and a logical pixel ratio of one for the low-resolution pipeline', () => {
+    expect(RENDERER_ANTIALIAS).toBe(false);
+    expect(RENDERER_PIXEL_RATIO).toBe(1);
   });
 
   it('exports a near-white background and blue guides/accent', () => {
