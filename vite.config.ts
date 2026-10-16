@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig(({ mode }) => ({
-  base: mode === 'production' ? '/snekrenaissance/' : '/',
+  base: process.env.VITE_BASE_PATH ?? '/',
   server: {
     host: true,
     proxy: mode === 'e2e-ranked'
