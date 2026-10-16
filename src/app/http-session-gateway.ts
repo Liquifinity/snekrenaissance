@@ -110,7 +110,9 @@ export class HttpSessionGateway implements SessionGateway {
 
   constructor(baseUrl: string, fetchImpl: typeof fetch = fetch) {
     this.baseUrl = baseUrl.replace(/\/+$/, '');
-    this.fetchImpl = fetchImpl;
+    this.fetchImpl = ((input: RequestInfo | URL, init?: RequestInit) => (
+      fetchImpl.call(globalThis, input, init)
+    )) as typeof fetch;
   }
 
   async startRun(identity: PlayerIdentity): Promise<SessionStart> {
