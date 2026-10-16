@@ -1,36 +1,40 @@
 import { describe, expect, it } from 'vitest';
+import { GRID_CONFIG } from '../../src/game/grid-config';
 import {
-  FOOD_PICKUP_RADIUS,
-  SEGMENT_SPACING,
-  SELF_COLLISION_RADIUS,
-  WORLD_SIZE
-} from '../../src/game/constants';
-import { FOOD_RADIUS } from '../../src/render/food-renderer';
+  FOOD_VOXEL_FILL,
+  FOOD_VOXEL_SIZE
+} from '../../src/render/food-renderer';
 import * as sceneModule from '../../src/render/scene';
-import { BODY_RADIUS, HEAD_RADIUS } from '../../src/render/snake-renderer';
+import {
+  HEAD_VOXEL_SIZE,
+  SNAKE_VOXEL_FILL,
+  SNAKE_VOXEL_SIZE
+} from '../../src/render/snake-renderer';
 
-// Approved presentation correction: compact play objects, denser arena grid, compressed cube.
-describe('gameplay presentation contract', () => {
-  it('keeps the compact snake but doubles the current food size', () => {
-    expect(BODY_RADIUS).toBeCloseTo(0.16 / 3, 8);
-    expect(HEAD_RADIUS).toBeCloseTo(0.17 / 3, 8);
-    expect(FOOD_RADIUS).toBeCloseTo((0.16 / 3) * 2, 8);
-    expect(SEGMENT_SPACING).toBeCloseTo(0.42 / 3, 8);
+describe('Pixel Flight Grid V2 presentation contract', () => {
+  it('derives voxel footprints directly from GridConfig cell size', () => {
+    expect(SNAKE_VOXEL_FILL).toBe(0.8);
+    expect(FOOD_VOXEL_FILL).toBe(0.6);
+    expect(SNAKE_VOXEL_SIZE).toBeCloseTo(GRID_CONFIG.cellSize * 0.8, 8);
+    expect(HEAD_VOXEL_SIZE).toBeCloseTo(SNAKE_VOXEL_SIZE, 8);
+    expect(FOOD_VOXEL_SIZE).toBeCloseTo(GRID_CONFIG.cellSize * 0.6, 8);
+    expect(SNAKE_VOXEL_SIZE).toBeCloseTo(0.32, 8);
+    expect(FOOD_VOXEL_SIZE).toBeCloseTo(0.24, 8);
   });
 
-  it('shrinks self collision while keeping the larger food pickup tolerance', () => {
-    expect(SELF_COLLISION_RADIUS).toBeCloseTo(0.3 / 3, 8);
-    expect(FOOD_PICKUP_RADIUS).toBeCloseTo(0.3, 8);
-    expect(FOOD_PICKUP_RADIUS).toBeGreaterThan(HEAD_RADIUS + FOOD_RADIUS);
-  });
-
-  it('compresses the cube to half the previous size and keeps the six-face grid dense', () => {
-    expect(WORLD_SIZE).toBe(4);
-    expect(sceneModule.CUBE_WALL_STYLE).toBe('tinted-grid');
-    expect(sceneModule.PALETTE.guides).toBe('#93c5fd');
-    expect(sceneModule.CUBE_GUIDE_OPACITY).toBeGreaterThanOrEqual(0.45);
+  it('binds the visible cube grid exactly to the logical grid resolution', () => {
+    expect(GRID_CONFIG.resolution).toBe(9);
+    expect(GRID_CONFIG.worldSize).toBeCloseTo(3.6, 8);
+    expect(sceneModule.CUBE_GRID_DIVISIONS).toBe(GRID_CONFIG.resolution);
     expect(sceneModule.CUBE_GRID_FACE_COUNT).toBe(6);
-    expect(sceneModule.CUBE_GRID_DIVISIONS).toBeGreaterThanOrEqual(24);
+    expect(sceneModule.CUBE_WALL_STYLE).toBe('tinted-grid');
+  });
+
+  it('preserves the approved blue-white legibility language', () => {
+    expect(sceneModule.PALETTE.background).toBe('#ffffff');
+    expect(sceneModule.PALETTE.guides).toBe('#93c5fd');
+    expect(sceneModule.PALETTE.accent).toBe('#3b82f6');
+    expect(sceneModule.CUBE_GUIDE_OPACITY).toBeGreaterThanOrEqual(0.45);
     expect(sceneModule.CUBE_FACE_TINT_OPACITY).toBeGreaterThan(0);
   });
 });
