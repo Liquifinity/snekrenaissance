@@ -2,7 +2,7 @@ import { pathToFileURL } from 'node:url';
 
 const CANONICAL_COPY = [
   'just because ChatGPT',
-  "didn't complete my image."
+  'didnt complete my image.'
 ];
 
 function normalizeOrigin(value, label) {
