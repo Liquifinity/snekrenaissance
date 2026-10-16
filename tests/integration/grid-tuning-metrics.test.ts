@@ -39,7 +39,7 @@ describe('grid tuning metrics', () => {
       [2, 1, 1],
       [0, 1, 1],
       [1, 2, 1]
-    ]);
+    ], 1);
     expect(safeMoveCount(constrained, INITIAL_GRID_FRAME, config)).toBe(2);
   });
 
@@ -59,7 +59,7 @@ describe('grid tuning metrics', () => {
       [2, 1, 1],
       [0, 1, 1],
       [1, 2, 1]
-    ]);
+    ], 1);
     tracker.observe(pressured, INITIAL_GRID_FRAME, 500, config);
     const first = tracker.snapshot();
     expect(first.safeMoveCount).toBe(2);
@@ -74,7 +74,7 @@ describe('grid tuning metrics', () => {
       [0, 1, 1],
       [1, 2, 1],
       [1, 0, 1]
-    ]);
+    ], 1);
     tracker.observe(confined, INITIAL_GRID_FRAME, 900, config);
     const second = tracker.snapshot();
     expect(second.safeMoveCount).toBe(1);
