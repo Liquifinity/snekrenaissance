@@ -85,10 +85,10 @@ The workflow:
 1. checks out canonical `main` and validates all required secrets;
 2. runs production dependency audit, frontend tests, Worker tests, typecheck and neutral build gates;
 3. renders and dry-runs the production Worker config;
-4. lists and applies remote D1 migrations;
-5. deploys `snekrenaissance-api`;
-6. resolves the live `workers.dev` origin and rebuilds the frontend with `VITE_RANKING_API_BASE` set to it;
-7. creates the `snekrenaissance` Pages project only when it does not already exist;
+4. validates the account Workers subdomain and exact Pages project before D1 mutation;
+5. lists and applies remote D1 migrations;
+6. deploys `snekrenaissance-api`;
+7. rebuilds the frontend with `VITE_RANKING_API_BASE` set to the live Worker origin;
 8. deploys `dist/` to Pages;
 9. runs production smoke verification;
 10. records the release SHA, public URLs, Worker version ID and Pages deployment ID in the Actions summary.
