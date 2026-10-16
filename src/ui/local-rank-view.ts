@@ -10,15 +10,11 @@ export function renderLocalRankView(
   section.dataset.view = 'rank';
 
   const title = document.createElement('h1');
-  title.textContent = 'RANK';
-
-  const status = document.createElement('p');
-  status.className = 'rank-status';
-  status.textContent = 'UNRANKED — public leaderboard comes with the server layer.';
+  title.textContent = 'PERSONAL BEST';
 
   const bestLine = document.createElement('p');
   bestLine.className = 'rank-best';
-  bestLine.textContent = `BEST ${best}`;
+  bestLine.textContent = String(best);
 
   const back = document.createElement('button');
   back.type = 'button';
@@ -26,6 +22,6 @@ export function renderLocalRankView(
   back.textContent = 'BACK';
   back.addEventListener('click', onBack);
 
-  section.append(title, status, bestLine, back);
+  section.append(title, bestLine, back);
   container.append(section);
 }
