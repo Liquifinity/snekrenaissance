@@ -21,10 +21,13 @@ test('ranked browser flow uses Worker+D1 and survives leaderboard read failure',
   });
 
   await page.goto('/');
-  const apiBase = await page.evaluate(() => (
-    window as unknown as { __SNEK_TEST__?: { apiBase: string } }
-  ).__SNEK_TEST__?.apiBase ?? null);
-  expect(apiBase).toBe('/rank');
+  const runtime = await page.evaluate(() => {
+    const harness = (window as unknown as {
+      __SNEK_TEST__?: { apiBase: string; gatewayKind: string };
+    }).__SNEK_TEST__;
+    return harness ? { apiBase: harness.apiBase, gatewayKind: harness.gatewayKind } : null;
+  });
+  expect(runtime).toEqual({ apiBase: '/rank', gatewayKind: 'HttpSessionGateway' });
 
   await expect(page.locator('[data-copy-line]').nth(0)).toHaveText('just because ChatGPT');
   await expect(page.locator('[data-copy-line]').nth(1)).toHaveText("didn't complete my image.");
@@ -33,6 +36,7 @@ test('ranked browser flow uses Worker+D1 and survives leaderboard read failure',
   await page.locator('input[name="username"]').fill('ranked-e2e');
   await page.locator('[data-action="play"]').click();
 
+  await expect(page.locator('#app')).toHaveAttribute('data-screen', 'username');
   await expect.poll(() => apiRequests.join('\n')).toContain('/api/games');
   await expect.poll(() => startRouteHit).toBe(true);
   await expect(page.locator('[data-session-status="starting"]')).toBeVisible();
