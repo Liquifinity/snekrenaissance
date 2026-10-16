@@ -71,10 +71,10 @@ describe('food spawning', () => {
 });
 
 describe('food pickup', () => {
-  it('uses toroidal proximity across opposite faces', () => {
+  it('uses toroidal proximity across opposite faces with compact pickup tolerance', () => {
     expect(isFoodCollected(
-      { x: 7.9, y: 0, z: 0 },
-      { x: -7.9, y: 0, z: 0 }
+      { x: 7.92, y: 0, z: 0 },
+      { x: -7.92, y: 0, z: 0 }
     )).toBe(true);
   });
 
