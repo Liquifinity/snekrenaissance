@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GRID_CONFIG, type GridConfig } from '../game/grid-config';
+import { computeInternalRenderSize } from './pixel-resolution';
 
 export const PALETTE = {
   background: '#ffffff',
@@ -15,6 +16,8 @@ export const CUBE_GRID_FACE_COUNT = 6;
 export const CUBE_GRID_DIVISIONS = GRID_CONFIG.resolution;
 export const CUBE_FACE_GRID_OPACITY = 0.22;
 export const CUBE_FACE_TINT_OPACITY = 0.05;
+export const RENDERER_ANTIALIAS = false;
+export const RENDERER_PIXEL_RATIO = 1;
 
 export type SceneContext = {
   scene: THREE.Scene;
@@ -71,11 +74,12 @@ export function createScene(
 
   const renderer = new THREE.WebGLRenderer({
     canvas,
-    antialias: true,
+    antialias: RENDERER_ANTIALIAS,
     alpha: false,
     powerPreference: 'high-performance'
   });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.setPixelRatio(RENDERER_PIXEL_RATIO);
 
   const ambient = new THREE.HemisphereLight(0xffffff, 0xdbe3ef, 1.55);
   scene.add(ambient);
@@ -127,11 +131,13 @@ export function createScene(
     camera,
     renderer,
     render: () => renderer.render(scene, camera),
-    resize: (width, height, pixelRatio = window.devicePixelRatio || 1) => {
+    resize: (width, height, _pixelRatio = window.devicePixelRatio || 1) => {
       const safeWidth = Math.max(1, Math.floor(width));
       const safeHeight = Math.max(1, Math.floor(height));
-      renderer.setPixelRatio(Math.min(2, Math.max(1, pixelRatio)));
-      renderer.setSize(safeWidth, safeHeight, false);
+      const internal = computeInternalRenderSize(safeWidth, safeHeight);
+
+      renderer.setPixelRatio(RENDERER_PIXEL_RATIO);
+      renderer.setSize(internal.width, internal.height, false);
       camera.aspect = safeWidth / safeHeight;
       camera.updateProjectionMatrix();
     },
