@@ -1,5 +1,6 @@
 import './styles.css';
 import { AppController } from './app/app-controller';
+import { createSessionGateway } from './app/gateway-selection';
 import { RuntimeLifecycle } from './app/runtime-lifecycle';
 import { stepRun, type RunState } from './game/run-state';
 import { FixedStepClock } from './game/simulation';
@@ -23,7 +24,8 @@ const scene = createScene(canvas);
 const snakeRenderer = new SnakeRenderer(scene.scene);
 const foodRenderer = new FoodRenderer(scene.scene);
 const cameraController = new ChaseCameraController(scene.camera);
-const controller = new AppController({ root: app });
+const sessionGateway = createSessionGateway(import.meta.env.VITE_RANKING_API_BASE);
+const controller = new AppController({ root: app, gateway: sessionGateway });
 const fixedClock = new FixedStepClock();
 const keyboard = new KeyboardInput();
 const joystick = new JoystickInput();
