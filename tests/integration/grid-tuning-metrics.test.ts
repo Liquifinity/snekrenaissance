@@ -81,4 +81,11 @@ describe('grid tuning metrics', () => {
     expect(second.firstPressureMs).toBe(500);
     expect(second.firstConfinementMs).toBe(900);
   });
+
+  it('rejects invalid observation time instead of contaminating tuning evidence', () => {
+    const tracker = new GridMetricsTracker();
+    const state = snake([[1, 1, 1], [1, 1, 0]]);
+    expect(() => tracker.observe(state, INITIAL_GRID_FRAME, -1, config)).toThrow('elapsedMs');
+    expect(() => tracker.observe(state, INITIAL_GRID_FRAME, Number.NaN, config)).toThrow('elapsedMs');
+  });
 });
