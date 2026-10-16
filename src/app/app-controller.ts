@@ -4,6 +4,7 @@ import {
   type RunResult,
   type RunState
 } from '../game/run-state';
+import { renderCompletionView } from '../ui/completion-view';
 import { renderGameOverView } from '../ui/game-over-view';
 import { renderHudView } from '../ui/hud-view';
 import { renderIntroView } from '../ui/intro-view';
@@ -85,6 +86,14 @@ export class AppController {
   handleRunState(run: RunState): void {
     this.state.run = run;
 
+    if (run.phase === 'completed' && run.result) {
+      this.state.localBest = saveLocalBest(this.storage, run.result.maxLength);
+      this.state.screen = 'complete';
+      this.setScreen('complete');
+      renderCompletionView(this.ui, () => this.beginGame());
+      return;
+    }
+
     if (run.phase === 'game-over' && run.result) {
       this.state.localBest = saveLocalBest(this.storage, run.result.maxLength);
       this.state.screen = 'game-over';
@@ -102,7 +111,7 @@ export class AppController {
     }
 
     if (this.state.screen === 'game') {
-      renderHudView(this.ui, run.snake.segmentCount);
+      renderHudView(this.ui, run.snake.segmentCount, run.foodEaten);
     }
   }
 
@@ -185,7 +194,7 @@ export class AppController {
   private startGameplay(): void {
     this.state.run = startGameRun(createGameRun());
     this.setScreen('game');
-    renderHudView(this.ui, this.state.run.snake.segmentCount);
+    renderHudView(this.ui, this.state.run.snake.segmentCount, this.state.run.foodEaten);
   }
 
   private submitRankedResult(result: RunResult, attempt: number): void {
