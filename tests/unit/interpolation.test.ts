@@ -25,8 +25,8 @@ function logicalTransition(
   const from = previous[0].cell;
   const to = current[0].cell;
   return Object.freeze({
-    previous: Object.freeze({ segments: Object.freeze(previous), frame: previousFrame }),
-    current: Object.freeze({ segments: Object.freeze(current), frame: currentFrame }),
+    previous: Object.freeze({ segments: Object.freeze([...previous]), frame: previousFrame }),
+    current: Object.freeze({ segments: Object.freeze([...current]), frame: currentFrame }),
     headStep: headStep ?? Object.freeze({
       from,
       to,
