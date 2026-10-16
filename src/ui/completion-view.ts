@@ -14,7 +14,7 @@ export function renderCompletionView(
   const image = document.createElement('img');
   image.className = 'completion-image';
   image.dataset.completionImage = '';
-  image.src = `${import.meta.env.BASE_URL}completed-water.webp`;
+  image.src = `${import.meta.env.BASE_URL}completed-water.jpg`;
   image.alt = 'A glass of water';
 
   const replay = document.createElement('button');
