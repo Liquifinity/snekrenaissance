@@ -1,9 +1,10 @@
 import type { PerspectiveCamera } from 'three';
 import type { Vec3 } from '../game/types';
 
-export const CAMERA_DISTANCE = 4.2;
-export const CAMERA_HEIGHT = 1.35;
-export const CAMERA_LOOK_AHEAD = 0.6;
+export const CAMERA_DISTANCE = 2.6;
+export const CAMERA_HEIGHT = 0.75;
+export const CAMERA_LOOK_AHEAD = 0.4;
+export const CAMERA_MAX_VERTICAL_OFFSET = 1.1;
 export const CAMERA_SMOOTHING = 8;
 
 export type ChaseCameraSnapshot = {
@@ -40,14 +41,24 @@ function add(a: Vec3, b: Vec3): Vec3 {
   return { x: a.x + b.x, y: a.y + b.y, z: a.z + b.z };
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
 function desiredPose(snapshot: ChaseCameraSnapshot): CameraPose {
   const forward = normalize(snapshot.forward);
   const up = normalize(snapshot.up ?? { x: 0, y: 1, z: 0 });
+  const rawVerticalOffset = -forward.y * CAMERA_DISTANCE + up.y * CAMERA_HEIGHT;
+  const verticalOffset = clamp(
+    rawVerticalOffset,
+    -CAMERA_MAX_VERTICAL_OFFSET,
+    CAMERA_MAX_VERTICAL_OFFSET
+  );
 
   return {
     position: {
       x: snapshot.headWrapped.x - forward.x * CAMERA_DISTANCE + up.x * CAMERA_HEIGHT,
-      y: snapshot.headWrapped.y - forward.y * CAMERA_DISTANCE + up.y * CAMERA_HEIGHT,
+      y: snapshot.headWrapped.y + verticalOffset,
       z: snapshot.headWrapped.z - forward.z * CAMERA_DISTANCE + up.z * CAMERA_HEIGHT
     },
     target: {
