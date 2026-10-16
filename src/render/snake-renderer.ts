@@ -4,8 +4,8 @@ import { wrapVec3 } from '../game/torus';
 import type { Vec3 } from '../game/types';
 import { PALETTE } from './scene';
 
-export const BODY_RADIUS = 0.16;
-export const HEAD_RADIUS = 0.17;
+export const BODY_RADIUS = 0.16 / 3;
+export const HEAD_RADIUS = 0.17 / 3;
 export const DEFAULT_RENDER_CAPACITY = 128;
 
 export type SnakeRenderSnapshot = {
