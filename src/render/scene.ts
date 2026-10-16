@@ -10,11 +10,11 @@ export const PALETTE = {
 } as const;
 
 export const CUBE_WALL_STYLE = 'tinted-grid' as const;
-export const CUBE_GUIDE_OPACITY = 0.55;
+export const CUBE_GUIDE_OPACITY = 0.58;
 export const CUBE_GRID_FACE_COUNT = 6;
-export const CUBE_GRID_DIVISIONS = 16;
-export const CUBE_FACE_GRID_OPACITY = 0.18;
-export const CUBE_FACE_TINT_OPACITY = 0.045;
+export const CUBE_GRID_DIVISIONS = 24;
+export const CUBE_FACE_GRID_OPACITY = 0.22;
+export const CUBE_FACE_TINT_OPACITY = 0.05;
 
 export type SceneContext = {
   scene: THREE.Scene;
