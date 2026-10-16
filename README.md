@@ -48,7 +48,7 @@ npx playwright install --with-deps chromium
 npm run test:e2e
 ```
 
-The canonical CI gate installs from the lockfile, audits deployable production dependencies, runs frontend and Worker tests, validates TypeScript, performs a Worker deployment dry-run, builds the production frontend, and executes Playwright desktop/mobile/ranked browser tests.
+The canonical CI gate installs from the lockfile, audits deployable production dependencies, runs frontend and Worker tests, validates TypeScript, performs both neutral and rendered-production Worker dry-runs, builds the production frontend, and executes Playwright desktop/mobile/ranked browser tests.
 
 The full dependency-audit triage, including known development-only Vitest advisories, is recorded under `docs/security/`.
 
@@ -90,10 +90,41 @@ The workflow:
 6. resolves the live `workers.dev` origin and rebuilds the frontend with `VITE_RANKING_API_BASE` set to it;
 7. creates the `snekrenaissance` Pages project only when it does not already exist;
 8. deploys `dist/` to Pages;
-9. runs production smoke verification and records the public URLs in the Actions summary.
+9. runs production smoke verification;
+10. records the release SHA, public URLs, Worker version ID and Pages deployment ID in the Actions summary.
 
 The workflow never creates or deletes D1.
 
 ### Rollback model
 
-Worker and Pages code can be rolled back independently. The production D1 database is never deleted as part of rollback. An already-applied schema migration is treated as forward-only: correct it with a new migration rather than recreating the database. Exact Worker/Pages rollback commands and production evidence are maintained with the release workflow and production smoke gate.
+Worker and Pages code can be rolled back independently. The production D1 database is never deleted as part of rollback. An already-applied schema migration is forward-only: correct it with a new migration rather than recreating the database.
+
+Inspect Worker versions before selecting a rollback target:
+
+```bash
+npx wrangler versions list --name snekrenaissance-api --json
+```
+
+Rollback the Worker to a known prior version:
+
+```bash
+npx wrangler rollback <VERSION_ID> --name snekrenaissance-api --message "production rollback"
+```
+
+Inspect production Pages deployments:
+
+```bash
+npx wrangler pages deployment list --project-name snekrenaissance --environment production --json
+```
+
+Pages production can be rolled back from the Cloudflare Pages Deployments UI, or by calling the Pages rollback API for the chosen previous deployment ID:
+
+```bash
+curl -fsS -X POST \
+  "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/snekrenaissance/deployments/${DEPLOYMENT_ID}/rollback" \
+  -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+  -H "Content-Type: application/json" \
+  --data '{}'
+```
+
+After any Worker or Pages rollback, rerun `node scripts/smoke-production.mjs` with `WORKER_URL` and `PAGES_URL` set to the live origins. Do not roll back or delete D1 as a code-recovery action.
