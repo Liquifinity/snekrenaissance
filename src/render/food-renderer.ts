@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { Vec3 } from '../game/types';
 import { PALETTE } from './scene';
 
-export const FOOD_RADIUS = 0.16 / 3;
+export const FOOD_RADIUS = (0.16 / 3) * 2;
 
 export class FoodRenderer {
   private readonly geometry = new THREE.SphereGeometry(FOOD_RADIUS, 16, 12);
