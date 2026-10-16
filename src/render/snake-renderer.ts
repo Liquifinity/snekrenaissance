@@ -6,24 +6,33 @@ import { PALETTE } from './scene';
 
 export const BODY_RADIUS = 0.16 / 3;
 export const HEAD_RADIUS = 0.17 / 3;
+export const EYE_RADIUS = 0.009;
 export const DEFAULT_RENDER_CAPACITY = 128;
 
 export type SnakeRenderSnapshot = {
   headWrapped: Vec3;
   bodyPositions: readonly Vec3[];
+  forward?: Vec3;
+  up?: Vec3;
 };
 
 export class SnakeRenderer {
   private readonly bodyGeometry = new THREE.SphereGeometry(BODY_RADIUS, 14, 10);
   private readonly headGeometry = new THREE.SphereGeometry(HEAD_RADIUS, 16, 12);
+  private readonly eyeGeometry = new THREE.SphereGeometry(EYE_RADIUS, 10, 8);
   private readonly material = new THREE.MeshStandardMaterial({
     color: PALETTE.accent,
     roughness: 0.5,
     metalness: 0.02
   });
+  private readonly eyeMaterial = new THREE.MeshBasicMaterial({ color: PALETTE.dark });
   private bodyMesh: THREE.InstancedMesh;
   private readonly headMesh: THREE.Mesh;
+  private readonly leftEye: THREE.Mesh;
+  private readonly rightEye: THREE.Mesh;
   private readonly transform = new THREE.Object3D();
+  private readonly defaultForward = new THREE.Vector3(0, 0, 1);
+  private readonly headForward = new THREE.Vector3();
   private instanceCapacity: number;
 
   constructor(private readonly scene: THREE.Scene, initialCapacity = DEFAULT_RENDER_CAPACITY) {
@@ -33,6 +42,16 @@ export class SnakeRenderer {
     this.instanceCapacity = initialCapacity;
     this.bodyMesh = this.createBodyMesh(initialCapacity);
     this.headMesh = new THREE.Mesh(this.headGeometry, this.material);
+
+    this.leftEye = new THREE.Mesh(this.eyeGeometry, this.eyeMaterial);
+    this.leftEye.name = 'snake-eye-left';
+    this.leftEye.position.set(-0.021, 0.012, HEAD_RADIUS * 0.87);
+
+    this.rightEye = new THREE.Mesh(this.eyeGeometry, this.eyeMaterial);
+    this.rightEye.name = 'snake-eye-right';
+    this.rightEye.position.set(0.021, 0.012, HEAD_RADIUS * 0.87);
+
+    this.headMesh.add(this.leftEye, this.rightEye);
     this.scene.add(this.bodyMesh, this.headMesh);
   }
 
@@ -51,6 +70,15 @@ export class SnakeRenderer {
       snapshot.headWrapped.z
     );
 
+    const forward = snapshot.forward ?? { x: 0, y: 0, z: 1 };
+    this.headForward.set(forward.x, forward.y, forward.z);
+    if (this.headForward.lengthSq() < 1e-8) {
+      this.headForward.copy(this.defaultForward);
+    } else {
+      this.headForward.normalize();
+    }
+    this.headMesh.quaternion.setFromUnitVectors(this.defaultForward, this.headForward);
+
     this.ensureCapacity(snapshot.bodyPositions.length);
     const count = snapshot.bodyPositions.length;
     this.bodyMesh.count = count;
@@ -68,11 +96,14 @@ export class SnakeRenderer {
   }
 
   dispose(): void {
+    this.headMesh.remove(this.leftEye, this.rightEye);
     this.scene.remove(this.bodyMesh, this.headMesh);
     this.bodyMesh.dispose();
     this.bodyGeometry.dispose();
     this.headGeometry.dispose();
+    this.eyeGeometry.dispose();
     this.material.dispose();
+    this.eyeMaterial.dispose();
   }
 
   private createBodyMesh(capacity: number): THREE.InstancedMesh {
