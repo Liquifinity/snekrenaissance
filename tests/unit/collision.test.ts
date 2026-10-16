@@ -14,18 +14,18 @@ describe('toroidal self collision', () => {
     expect(isSelfCollision({ x: 0, y: 0, z: 0 }, body)).toBe(false);
   });
 
-  it('collides with a later body segment', () => {
+  it('collides with a later body segment inside the compact collision radius', () => {
     const body = distantBody(SELF_COLLISION_EXCLUSION_SEGMENTS + 2);
-    body[SELF_COLLISION_EXCLUSION_SEGMENTS] = { x: 0.1, y: 0, z: 0 };
+    body[SELF_COLLISION_EXCLUSION_SEGMENTS] = { x: 0.08, y: 0, z: 0 };
 
     expect(isSelfCollision({ x: 0, y: 0, z: 0 }, body)).toBe(true);
   });
 
-  it('detects collision through opposite cube faces', () => {
+  it('detects compact collision through opposite cube faces', () => {
     const body = distantBody(SELF_COLLISION_EXCLUSION_SEGMENTS + 2);
-    body[SELF_COLLISION_EXCLUSION_SEGMENTS] = { x: -7.9, y: 0, z: 0 };
+    body[SELF_COLLISION_EXCLUSION_SEGMENTS] = { x: -7.96, y: 0, z: 0 };
 
-    expect(isSelfCollision({ x: 7.9, y: 0, z: 0 }, body)).toBe(true);
+    expect(isSelfCollision({ x: 7.96, y: 0, z: 0 }, body)).toBe(true);
   });
 
   it('does not collide when paths only appear to cross but are separated in depth', () => {
