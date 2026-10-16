@@ -1,4 +1,4 @@
-export const WORLD_SIZE = 16;
+export const WORLD_SIZE = 8;
 export const SNAKE_SPEED = 3.2;
 export const STEERING_RATE = Math.PI * 0.9;
 export const MAX_PITCH = Math.PI * (80 / 180);
