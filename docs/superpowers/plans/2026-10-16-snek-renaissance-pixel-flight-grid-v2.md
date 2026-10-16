@@ -1558,3 +1558,159 @@ Do not parallelize Tasks 1–6: their interfaces are cumulative and define the a
 - **Persistence boundary:** historical V1 best remains untouched; V2 best is food-score based; legacy HTTP ranking explicitly advertises no V2 capability.
 - **Tuning discipline:** 8³/9³/10³ use one deterministic greedy policy and fixed seeds; baseline values may change only explicitly, while 300-food completion requires a separate approval to change.
 - **Release discipline:** `main` remains untouched until the integrated branch is green, reviewed, accepted, and then post-merge Pages deployment is verified.
+
+---
+
+## Plan Amendment R1 — branch-green legacy test migration and bounded tuning horizon
+
+This amendment is normative. Where it conflicts with earlier task wording, this section overrides the earlier wording. It does not change the approved design spec; it only closes execution sequencing and benchmark termination so the implementation branch can remain green task-by-task.
+
+### R1.1 Task-level green invariant
+
+Every implementation task that ends in a commit must finish with the affected targeted tests green **and** a green full frontend/unit/integration suite:
+
+```bash
+npm test
+```
+
+The task-specific verification commands remain required in addition to this full-suite gate. `npm run typecheck` remains mandatory wherever already listed. A task may intentionally observe RED during its TDD cycle, but no known broken legacy test may be committed or deferred to a later cleanup task.
+
+When an API is replaced, every test that imports or asserts the replaced API must be rewritten, migrated, or removed in the same task. Temporary production compatibility exports are allowed only when a later task still has an unmigrated runtime consumer; no V2 test may depend on those compatibility exports, and they must be deleted immediately when the last runtime consumer migrates.
+
+### R1.2 Task 4 override — retire V1 snake tests when `snake.ts` authority changes
+
+Task 4 additionally owns these legacy-test actions:
+
+- remove `tests/unit/snake-growth.test.ts`; its V1 assertions (`12` segments, `+4`, `SEGMENT_SPACING`, `TrailBuffer`) are superseded by `tests/unit/snake-grid.test.ts`;
+- rewrite `tests/unit/trail-scale.test.ts` so it no longer imports `createSnakeState`, `growSnake`, or `sampleBodyPositions` from `src/game/snake.ts`; while `trail.ts` is temporarily retained, this test may cover only `TrailBuffer`-specific batching/trimming behavior;
+- search the test tree for any other direct dependency on the old `snake.ts` API and migrate/remove it in Task 4 rather than postponing it;
+- if `run-state.ts` still needs a narrow V1 snake/collision/food compatibility export until Task 5, keep that export explicitly temporary and production-only; the new V2 tests must exercise only the grid APIs.
+
+Task 4's final gate becomes:
+
+```bash
+npm test -- tests/unit/snake-grid.test.ts tests/unit/collision.test.ts tests/unit/food.test.ts tests/unit/trail-scale.test.ts
+npm test
+npm run typecheck
+```
+
+The Task 4 commit must include the deletion/migration of those legacy tests.
+
+### R1.3 Task 5 override — replace all tests bound to continuous `RunState`
+
+Task 5 owns the retirement/replacement of every test whose contract is the V1 continuous `RunState` API. In the same commit that rewrites `src/game/run-state.ts`:
+
+- remove `tests/unit/run-state.test.ts`; its `headWrapped`, `headUnwrapped`, yaw/pitch, `TrailBuffer`, V1 growth arithmetic, and V1 result-shape assertions are superseded by `tests/integration/grid-run-state.test.ts`;
+- remove `tests/integration/game-loop.test.ts`; its `12 + foods × 4`, stationary continuous pickup, `SEGMENT_SPACING`, and `WORLD_SIZE` assertions are superseded by `tests/integration/grid-game-loop.test.ts` and the V2 run-state tests;
+- remove `tests/integration/long-run.test.ts`; its trail-retention/memory contract is no longer an active V2 gameplay invariant and must not keep `TrailBuffer` as authority;
+- after the V2 RunState is connected, remove any temporary V1 snake/collision/food compatibility exports retained solely for the old RunState, unless another explicitly named production consumer still requires them.
+
+Task 5's final gate becomes:
+
+```bash
+npm test -- tests/integration/grid-run-state.test.ts tests/integration/grid-game-loop.test.ts
+npm test
+npm run typecheck
+```
+
+No test asserting V1 RunState fields or continuous movement may remain red or be left for Task 14.
+
+### R1.4 Tasks 7 and 8 override — migrate renderer/config tests with the renderer contract
+
+Task 7 additionally owns the old renderer/config tests that encode spherical geometry or the decorative 24-division grid:
+
+- rewrite `tests/unit/gameplay-presentation.test.ts` to assert the V2 voxel sizes, logical `9`-division grid baseline, and retained palette/legibility rules; remove assertions for `BODY_RADIUS`, `HEAD_RADIUS`, `FOOD_RADIUS`, `SEGMENT_SPACING`, pickup radius, self-collision radius, or `WORLD_SIZE = 4`;
+- rewrite `tests/unit/render-config.test.ts` to preserve still-valid palette/grid readability assertions while replacing sphere-radius relationships with voxel/grid relationships;
+- remove `tests/unit/snake-renderer-scale.test.ts` after porting its still-valid capacity-growth and two-eye assertions into `tests/unit/voxel-renderer.test.ts` using the V2 renderer input contract.
+
+Task 7's final gate becomes:
+
+```bash
+npm test -- tests/unit/gameplay-presentation.test.ts tests/unit/render-config.test.ts tests/unit/voxel-renderer.test.ts
+npm test
+npm run typecheck
+```
+
+Task 8 must re-run the migrated presentation/config tests together with the new backing-resolution tests so scene resize and low-resolution changes cannot resurrect stale DPR/AA assumptions:
+
+```bash
+npm test -- tests/unit/pixel-resolution.test.ts tests/unit/gameplay-presentation.test.ts tests/unit/render-config.test.ts tests/unit/voxel-renderer.test.ts
+npm test
+npm run typecheck
+npm run build
+```
+
+Before either Task 7 or Task 8 commits, search the unit tests for stale V1 render constants (`BODY_RADIUS`, `HEAD_RADIUS`, `FOOD_RADIUS`, `CUBE_GRID_DIVISIONS` asserted as `24`, or independent `WORLD_SIZE = 4`) and migrate/remove any remaining dependency in the task that invalidates it.
+
+### R1.5 Task 14 override — explicitly retire continuous-only tests and preserve only valid clock coverage
+
+Task 14's file/actions list additionally includes:
+
+- remove `tests/unit/steering.test.ts`;
+- remove `tests/unit/trail.test.ts`;
+- remove `tests/unit/trail-scale.test.ts` (which may have been temporarily reduced to TrailBuffer-only coverage in Task 4);
+- rewrite `tests/unit/simulation-step.test.ts` to remove the continuous `advanceHead` / steering / continuous wrap tests and preserve only the `FixedStepClock` coverage that remains valid for V2.
+
+The rewritten `simulation-step.test.ts` must continue to prove bounded catch-up and deterministic accumulation for `FixedStepClock`; it must not import `createInitialOrientation`, `advanceHead`, `SNAKE_SPEED`, or legacy continuous `WORLD_SIZE` movement authority.
+
+Task 14's final gate becomes:
+
+```bash
+npm test -- tests/unit/grid-authority-boundary.test.ts tests/unit/simulation-step.test.ts
+npm test
+npm run typecheck
+npm run build
+```
+
+Task 14 is therefore cleanup of already-green legacy authority, not the first point at which broken V1 tests are repaired.
+
+### R1.6 Task 12 override — deterministic benchmark horizon
+
+The 8³/9³/10³ harness must have a semantic termination bound independent of Vitest's process timeout.
+
+Use exactly:
+
+```ts
+export const TUNING_MAX_STEPS = 10_000;
+
+export type TuningTerminalCause =
+  | 'self-collision'
+  | 'completed'
+  | 'horizon-exhausted';
+```
+
+For every one of the same 32 seeds and for every 8³/9³/10³ configuration, the benchmark loop stops at the first of:
+
+1. the run reaches real `self-collision`;
+2. the run reaches real `completed`;
+3. exactly `TUNING_MAX_STEPS` logical cell commits have been evaluated without either real terminal state.
+
+If condition 3 occurs, record `cause = 'horizon-exhausted'`. This is a **censored benchmark result**, not a gameplay game-over: do not mutate the run to `game-over`, do not create a fake collision, and do not alter production completion rules. The same `10_000`-logical-step horizon applies to every grid and seed.
+
+The per-config/seed output therefore records terminal cause using only:
+
+```text
+self-collision
+completed
+horizon-exhausted
+```
+
+and still records the existing score/length/duration/pressure/confinement metrics at the censoring boundary. `run duration` for `horizon-exhausted` is the simulated duration reached after those logical steps under that config's `stepsPerSecond`.
+
+Add harness assertions that:
+
+- a deliberately cycling synthetic policy terminates as `horizon-exhausted` at exactly `10_000` logical steps;
+- `horizon-exhausted` leaves gameplay phase non-terminal rather than fabricating `game-over`;
+- identical seed/config pairs produce identical terminal cause, step count, and metrics on repeated runs;
+- no benchmark case uses a Vitest timeout as its semantic termination mechanism.
+
+`npm run test:tuning` must therefore always be algorithmically bounded even when the greedy autopilot cycles forever without collision or food progress.
+
+### R1.7 Amendment self-review
+
+The two operational defects identified during plan review are closed as follows:
+
+- legacy tests are retired/migrated in the same task that invalidates their API, with `npm test` green before every task commit; Task 14 no longer acts as a deferred repair bucket;
+- the tuning harness has a fixed `10_000`-logical-step horizon and explicit censored `horizon-exhausted` terminal reporting, so benchmark completion is deterministic and independent of Vitest timeout behavior.
+
+No design-spec contract is amended by R1.
