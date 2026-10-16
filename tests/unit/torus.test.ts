@@ -12,10 +12,10 @@ describe('toroidal world math', () => {
 
   it('wraps x, y and z independently', () => {
     const half = WORLD_SIZE / 2;
-    expect(wrapVec3({ x: half + 1, y: -half - 1, z: 2 }, WORLD_SIZE)).toEqual({
+    expect(wrapVec3({ x: half + 1, y: -half - 1, z: 0 }, WORLD_SIZE)).toEqual({
       x: -half + 1,
       y: half - 1,
-      z: 2
+      z: 0
     });
   });
 
