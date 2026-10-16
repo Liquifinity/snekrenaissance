@@ -8,16 +8,18 @@ function sequenceRng(values: number[]): () => number {
 }
 
 describe('food spawning', () => {
+  const half = WORLD_SIZE / 2;
+  const quarter = WORLD_SIZE / 4;
+
   it('spawns inside canonical world bounds', () => {
     const result = spawnFood({
-      head: { x: -4, y: -4, z: -4 },
+      head: { x: -half, y: -half, z: -half },
       body: [],
       rng: () => 0.9
     });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    const half = WORLD_SIZE / 2;
     expect(result.position.x).toBeGreaterThanOrEqual(-half);
     expect(result.position.x).toBeLessThan(half);
     expect(result.position.y).toBeGreaterThanOrEqual(-half);
@@ -28,13 +30,13 @@ describe('food spawning', () => {
 
   it('retries when a candidate overlaps the snake body', () => {
     const result = spawnFood({
-      head: { x: -4, y: -4, z: -4 },
+      head: { x: -half, y: -half, z: -half },
       body: [{ x: 0, y: 0, z: 0 }],
       rng: sequenceRng([0.5, 0.5, 0.5, 0.75, 0.75, 0.75]),
       maxAttempts: 2
     });
 
-    expect(result).toEqual({ ok: true, position: { x: 4, y: 4, z: 4 } });
+    expect(result).toEqual({ ok: true, position: { x: quarter, y: quarter, z: quarter } });
   });
 
   it('retries when a candidate is too close to the head', () => {
@@ -45,17 +47,17 @@ describe('food spawning', () => {
       maxAttempts: 2
     });
 
-    expect(result).toEqual({ ok: true, position: { x: 4, y: 4, z: 4 } });
+    expect(result).toEqual({ ok: true, position: { x: quarter, y: quarter, z: quarter } });
   });
 
   it('returns exactly one food position on success', () => {
     const result = spawnFood({
-      head: { x: -4, y: -4, z: -4 },
+      head: { x: -half, y: -half, z: -half },
       body: [],
       rng: () => 0.75
     });
 
-    expect(result).toEqual({ ok: true, position: { x: 4, y: 4, z: 4 } });
+    expect(result).toEqual({ ok: true, position: { x: quarter, y: quarter, z: quarter } });
   });
 
   it('returns an explicit bounded failure instead of looping forever', () => {
@@ -72,9 +74,10 @@ describe('food spawning', () => {
 
 describe('food pickup', () => {
   it('uses toroidal proximity across opposite faces with compact pickup tolerance', () => {
+    const half = WORLD_SIZE / 2;
     expect(isFoodCollected(
-      { x: 7.92, y: 0, z: 0 },
-      { x: -7.92, y: 0, z: 0 }
+      { x: half - 0.08, y: 0, z: 0 },
+      { x: -half + 0.08, y: 0, z: 0 }
     )).toBe(true);
   });
 
