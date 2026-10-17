@@ -76,6 +76,32 @@ describe('toroidal continuous voxel traversal', () => {
     )).toEqual([{ x: 1, y: 0, z: 0 }]);
   });
 
+  it('does not emit the same entered cell twice across consecutive floating-point 0.1-cell segments', () => {
+    const entries: Array<{ x: number; y: number; z: number }> = [];
+    let from = { x: 4.5, y: 4.5, z: 4.5 };
+
+    for (let tick = 0; tick < 10; tick += 1) {
+      const to = { x: from.x, y: from.y, z: from.z + 0.1 };
+      entries.push(...cells(from, to));
+      from = to;
+    }
+
+    expect(entries).toEqual([{ x: 4, y: 4, z: 5 }]);
+  });
+
+  it('does not emit the same entered cell twice when moving negative across a floating-point boundary', () => {
+    const entries: Array<{ x: number; y: number; z: number }> = [];
+    let from = { x: 4.5, y: 4.5, z: 5.5 };
+
+    for (let tick = 0; tick < 10; tick += 1) {
+      const to = { x: from.x, y: from.y, z: from.z - 0.1 };
+      entries.push(...cells(from, to));
+      from = to;
+    }
+
+    expect(entries).toEqual([{ x: 4, y: 4, z: 4 }]);
+  });
+
   it('does not tunnel through intermediate cells at high speed', () => {
     expect(cells(
       { x: 7.5, y: 1.5, z: 1.5 },
