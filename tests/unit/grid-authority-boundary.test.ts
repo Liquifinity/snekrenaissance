@@ -3,7 +3,8 @@ import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const SRC_ROOT = join(process.cwd(), 'src');
-const DEFINITION = 'game/grid-topology.ts';
+const WORLD_TO_CELL_DEFINITION = 'game/grid-topology.ts';
+const FORBIDDEN_V1_AUTHORITY = /\b(TrailBuffer|sampleBodyPositions|advanceHead|applySteering|forwardVector|SNAKE_SPEED|STEERING_RATE|MAX_PITCH|SEGMENT_SPACING|FOOD_PICKUP_RADIUS|SELF_COLLISION_RADIUS)\b/;
 
 async function listTypeScriptFiles(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -22,10 +23,22 @@ describe('grid authority boundary', () => {
 
     for (const file of await listTypeScriptFiles(SRC_ROOT)) {
       const repoRelative = relative(SRC_ROOT, file).replaceAll('\\', '/');
-      if (repoRelative === DEFINITION) continue;
+      if (repoRelative === WORLD_TO_CELL_DEFINITION) continue;
 
       const source = await readFile(file, 'utf8');
       if (/\bworldToCell\b/.test(source)) violations.push(repoRelative);
+    }
+
+    expect(violations).toEqual([]);
+  });
+
+  it('contains no active continuous V1 gameplay authority', async () => {
+    const violations: string[] = [];
+
+    for (const file of await listTypeScriptFiles(SRC_ROOT)) {
+      const repoRelative = relative(SRC_ROOT, file).replaceAll('\\', '/');
+      const source = await readFile(file, 'utf8');
+      if (FORBIDDEN_V1_AUTHORITY.test(source)) violations.push(repoRelative);
     }
 
     expect(violations).toEqual([]);
