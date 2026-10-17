@@ -3,20 +3,29 @@ import { describe, expect, it } from 'vitest';
 
 const source = readFileSync(new URL('../../src/main.ts', import.meta.url), 'utf8');
 
-describe('browser main loop V2 authority boundary', () => {
-  it('drains discrete intents and renders from interpolated logical transitions', () => {
-    expect(source).toContain('keyboard.takeIntent()');
-    expect(source).toContain('joystick.takeIntent()');
-    expect(source).toContain('queueTurnIntent(');
-    expect(source).toContain('buildStationaryRenderTransition(');
-    expect(source).toContain('buildRenderTransition(');
-    expect(source).toContain('interpolateTransition(');
+describe('browser main loop V2.1 authority boundary', () => {
+  it('samples continuous steering and advances RunState directly at fixed-step cadence', () => {
+    expect(source).toContain('readSteeringInput()');
+    expect(source).toContain('stepRun(run, steering, dt)');
+    expect(source).toContain('fixedClock.alpha');
+    expect(source).not.toContain('keyboard.takeIntent()');
+    expect(source).not.toContain('joystick.takeIntent()');
+    expect(source).not.toContain('queueTurnIntent(');
   });
 
-  it('does not feed continuous V1 presentation state back into gameplay/rendering', () => {
-    expect(source).not.toContain('stepRun(run, input, dt)');
-    expect(source).not.toContain('headWrapped: run.headWrapped');
-    expect(source).not.toContain('bodyPositions: run.bodyPositions');
-    expect(source).not.toContain('forward: run.forward');
+  it('renders from continuous FlightPresentation and render-only FlightTrail', () => {
+    expect(source).toContain('interpolateFlightPresentation(');
+    expect(source).toContain('new FlightTrail()');
+    expect(source).toContain('flightTrail.sampleBehind(');
+    expect(source).toContain('displayWorldForGridPoint(');
+    expect(source).not.toContain('buildStationaryRenderTransition(');
+    expect(source).not.toContain('buildRenderTransition(');
+    expect(source).not.toContain('interpolateTransition(');
+  });
+
+  it('exposes continuous yaw/pitch telemetry instead of cardinal head-forward state', () => {
+    expect(source).toContain('app.dataset.headYaw');
+    expect(source).toContain('app.dataset.headPitch');
+    expect(source).not.toContain('app.dataset.headForward');
   });
 });

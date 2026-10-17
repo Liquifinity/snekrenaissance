@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   LOCAL_BEST_KEY,
   V2_LOCAL_BEST_KEY,
+  V2_1_LOCAL_BEST_KEY,
   getOrCreatePlayerId,
   loadPixelGridV2Best,
+  loadPixelGridV2_1Best,
   loadUsername,
   savePixelGridV2Best,
+  savePixelGridV2_1Best,
   saveUsername,
   type StorageLike
 } from '../../src/app/identity';
@@ -54,6 +57,19 @@ describe('anonymous player identity', () => {
     expect(savePixelGridV2Best(storage, 4)).toBe(7);
     expect(loadPixelGridV2Best(storage)).toBe(7);
     expect(storage.getItem(V2_LOCAL_BEST_KEY)).toBe('7');
+    expect(storage.getItem(LOCAL_BEST_KEY)).toBe('68');
+  });
+
+  it('stores V2.1 best independently from both V1 and V2 history', () => {
+    const storage = new MemoryStorage();
+    storage.setItem(LOCAL_BEST_KEY, '68');
+    storage.setItem(V2_LOCAL_BEST_KEY, '19');
+
+    expect(savePixelGridV2_1Best(storage, 11)).toBe(11);
+    expect(savePixelGridV2_1Best(storage, 8)).toBe(11);
+    expect(loadPixelGridV2_1Best(storage)).toBe(11);
+    expect(storage.getItem(V2_1_LOCAL_BEST_KEY)).toBe('11');
+    expect(storage.getItem(V2_LOCAL_BEST_KEY)).toBe('19');
     expect(storage.getItem(LOCAL_BEST_KEY)).toBe('68');
   });
 });

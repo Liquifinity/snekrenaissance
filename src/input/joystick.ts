@@ -1,27 +1,16 @@
-import type { TurnIntent } from '../game/grid-types';
 import { neutralInput, type InputState } from './input-state';
 
-export const JOYSTICK_ACTIVATION_THRESHOLD = 0.55;
-export const JOYSTICK_REARM_THRESHOLD = 0.25;
+export const JOYSTICK_DEADZONE = 0.15;
 
 export class JoystickInput {
   private current: InputState = neutralInput();
-  private pendingIntent: TurnIntent = 'none';
-  private armed = true;
   private pointerId: number | null = null;
   private centerX = 0;
   private centerY = 0;
   private radius = 1;
 
-  /** Temporary V1 compatibility surface. V2 consumes takeIntent(). */
   get state(): InputState {
     return { ...this.current };
-  }
-
-  takeIntent(): TurnIntent {
-    const intent = this.pendingIntent;
-    this.pendingIntent = 'none';
-    return intent;
   }
 
   get activePointerId(): number | null {
@@ -64,8 +53,6 @@ export class JoystickInput {
   reset(): void {
     this.pointerId = null;
     this.current = neutralInput();
-    this.pendingIntent = 'none';
-    this.armed = true;
   }
 
   attach(element: HTMLElement, windowTarget: Window = window): () => void {
@@ -111,40 +98,27 @@ export class JoystickInput {
   }
 
   private updateFromPoint(x: number, y: number): void {
-    let yaw = -(x - this.centerX) / this.radius;
+    let yaw = (x - this.centerX) / this.radius;
     let pitch = -(y - this.centerY) / this.radius;
-    const magnitude = Math.hypot(yaw, pitch);
+    let magnitude = Math.hypot(yaw, pitch);
 
     if (magnitude > 1) {
       yaw /= magnitude;
       pitch /= magnitude;
+      magnitude = 1;
     }
 
-    // InputState is presentation-only in V2. Expose horizontal movement in
-    // screen coordinates while preserving the existing logical yaw used
-    // below to resolve discrete left/right TurnIntent values.
-    this.current = { yaw: -yaw, pitch };
-    this.updateDiscreteIntent(yaw, pitch);
-  }
-
-  private updateDiscreteIntent(yaw: number, pitch: number): void {
-    const dominantMagnitude = Math.max(Math.abs(yaw), Math.abs(pitch));
-
-    if (dominantMagnitude <= JOYSTICK_REARM_THRESHOLD) {
-      this.armed = true;
+    if (magnitude <= JOYSTICK_DEADZONE) {
+      this.current = neutralInput();
       return;
     }
 
-    if (!this.armed || this.pendingIntent !== 'none' || dominantMagnitude < JOYSTICK_ACTIVATION_THRESHOLD) {
-      return;
-    }
-
-    if (Math.abs(yaw) >= Math.abs(pitch)) {
-      this.pendingIntent = yaw >= 0 ? 'left' : 'right';
-    } else {
-      this.pendingIntent = pitch >= 0 ? 'up' : 'down';
-    }
-
-    this.armed = false;
+    const scaledMagnitude = (magnitude - JOYSTICK_DEADZONE) / (1 - JOYSTICK_DEADZONE);
+    const directionX = yaw / magnitude;
+    const directionY = pitch / magnitude;
+    this.current = {
+      yaw: directionX * scaledMagnitude,
+      pitch: directionY * scaledMagnitude
+    };
   }
 }

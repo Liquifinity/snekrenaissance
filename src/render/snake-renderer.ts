@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { GRID_CONFIG, type GridConfig } from '../game/grid-config';
 import type { Vec3 } from '../game/types';
-import type { InterpolatedFrame, InterpolatedSegment } from './interpolation';
 import { PALETTE } from './scene';
 
 export const SNAKE_VOXEL_FILL = 0.8;
@@ -10,19 +9,16 @@ export const HEAD_VOXEL_SIZE = SNAKE_VOXEL_SIZE;
 export const EYE_VOXEL_SIZE = GRID_CONFIG.cellSize * 0.12;
 export const DEFAULT_RENDER_CAPACITY = 128;
 
-export type VoxelSnakeRenderSnapshot = Readonly<{
-  head: InterpolatedSegment;
-  body: readonly InterpolatedSegment[];
-  frame: InterpolatedFrame;
+export type VoxelBodySample = Readonly<{
+  id: number;
+  position: Vec3;
 }>;
 
-function displayedPosition(segment: InterpolatedSegment): Vec3 {
-  return {
-    x: segment.position.x + segment.displayWrapOffset.x,
-    y: segment.position.y + segment.displayWrapOffset.y,
-    z: segment.position.z + segment.displayWrapOffset.z
-  };
-}
+export type VoxelSnakeRenderSnapshot = Readonly<{
+  headPosition: Vec3;
+  headQuaternion: Readonly<{ x: number; y: number; z: number; w: number }>;
+  body: readonly VoxelBodySample[];
+}>;
 
 export class SnakeRenderer {
   private readonly bodyGeometry: THREE.BoxGeometry;
@@ -89,25 +85,26 @@ export class SnakeRenderer {
   }
 
   render(snapshot: VoxelSnakeRenderSnapshot): void {
-    const headPosition = displayedPosition(snapshot.head);
-    this.headMesh.position.set(headPosition.x, headPosition.y, headPosition.z);
+    this.headMesh.position.set(
+      snapshot.headPosition.x,
+      snapshot.headPosition.y,
+      snapshot.headPosition.z
+    );
     this.headMesh.quaternion.set(
-      snapshot.frame.quaternion.x,
-      snapshot.frame.quaternion.y,
-      snapshot.frame.quaternion.z,
-      snapshot.frame.quaternion.w
+      snapshot.headQuaternion.x,
+      snapshot.headQuaternion.y,
+      snapshot.headQuaternion.z,
+      snapshot.headQuaternion.w
     ).normalize();
 
     this.ensureCapacity(snapshot.body.length);
     this.bodyMesh.count = snapshot.body.length;
 
     for (let index = 0; index < snapshot.body.length; index += 1) {
-      const segment = snapshot.body[index];
-      const position = displayedPosition(segment);
-      this.transform.position.set(position.x, position.y, position.z);
+      const sample = snapshot.body[index];
+      this.transform.position.set(sample.position.x, sample.position.y, sample.position.z);
       this.transform.quaternion.identity();
-      const scale = segment.born ? Math.max(0.05, segment.birthAlpha) : 1;
-      this.transform.scale.setScalar(scale);
+      this.transform.scale.setScalar(1);
       this.transform.updateMatrix();
       this.bodyMesh.setMatrixAt(index, this.transform.matrix);
     }

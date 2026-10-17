@@ -1,4 +1,3 @@
-import type { TurnIntent } from '../game/grid-types';
 import { neutralInput, type InputState } from './input-state';
 
 const LEFT_KEYS = new Set(['arrowleft', 'a']);
@@ -15,33 +14,17 @@ function normalizeKey(key: string): string {
   return key.toLowerCase();
 }
 
-function keyToIntent(key: string): TurnIntent {
-  if (LEFT_KEYS.has(key)) return 'left';
-  if (RIGHT_KEYS.has(key)) return 'right';
-  if (UP_KEYS.has(key)) return 'up';
-  if (DOWN_KEYS.has(key)) return 'down';
-  return 'none';
-}
-
 export class KeyboardInput {
   private readonly pressed = new Set<string>();
   private current: InputState = neutralInput();
-  private pendingIntent: TurnIntent = 'none';
   private readonly onCameraToggle?: () => void;
 
   constructor(options: KeyboardInputOptions = {}) {
     this.onCameraToggle = options.onCameraToggle;
   }
 
-  /** Temporary V1 compatibility surface. V2 consumes takeIntent(). */
   get state(): InputState {
     return { ...this.current };
-  }
-
-  takeIntent(): TurnIntent {
-    const intent = this.pendingIntent;
-    this.pendingIntent = 'none';
-    return intent;
   }
 
   handleKeyDown(key: string): void {
@@ -49,12 +32,8 @@ export class KeyboardInput {
     const wasPressed = this.pressed.has(normalized);
     this.pressed.add(normalized);
 
-    if (!wasPressed) {
-      if (normalized === CAMERA_TOGGLE_KEY) {
-        this.onCameraToggle?.();
-      } else if (this.pendingIntent === 'none') {
-        this.pendingIntent = keyToIntent(normalized);
-      }
+    if (!wasPressed && normalized === CAMERA_TOGGLE_KEY) {
+      this.onCameraToggle?.();
     }
 
     this.recompute();
@@ -68,7 +47,6 @@ export class KeyboardInput {
   handleBlur(): void {
     this.pressed.clear();
     this.current = neutralInput();
-    this.pendingIntent = 'none';
   }
 
   attach(target: Window = window): () => void {
@@ -115,7 +93,7 @@ export class KeyboardInput {
     const down = [...DOWN_KEYS].some((key) => this.pressed.has(key)) ? 1 : 0;
 
     this.current = {
-      yaw: left - right,
+      yaw: right - left,
       pitch: up - down
     };
   }

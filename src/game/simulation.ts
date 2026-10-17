@@ -23,6 +23,10 @@ export class FixedStepClock {
     }
   }
 
+  get alpha(): number {
+    return Math.min(1 - Number.EPSILON, Math.max(0, this.accumulator / this.stepSeconds));
+  }
+
   consume(frameDeltaSeconds: number, step: (dt: number) => void): number {
     const safeFrameDelta = Number.isFinite(frameDeltaSeconds)
       ? Math.min(this.maxFrameDeltaSeconds, Math.max(0, frameDeltaSeconds))

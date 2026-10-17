@@ -1,16 +1,24 @@
 import { wouldSelfCollide } from './collision';
+import type { SteeringInput } from './flight';
 import { GRID_CONFIG, type GridConfig } from './grid-config';
 import { rotateGridFrame } from './grid-frame';
 import { advanceGridStep, cellKey } from './grid-topology';
 import type { GridDirection, GridFrame, TurnIntent } from './grid-types';
 import { snakeHead, type GridSnakeState } from './snake';
 
+/** Historical discrete Pixel Flight Grid V2 pressure metrics. */
 export type RunMetrics = Readonly<{
   occupancyRatio: number;
   safeMoveCount: number;
   nearBodyEncounters: number;
   firstPressureMs: number | null;
   firstConfinementMs: number | null;
+}>;
+
+export type V21ControlMetrics = Readonly<{
+  totalGridCellEntries: number;
+  averageSteeringMagnitude: number;
+  maxConsecutiveNonZeroSteeringTicks: number;
 }>;
 
 const LOCAL_ACTIONS: readonly TurnIntent[] = Object.freeze([
@@ -32,6 +40,7 @@ export function occupancyRatio(
   return state.segments.length / config.totalCells;
 }
 
+/** Historical V2 discrete safe-move metric. Not a V2.1 steering policy. */
 export function safeMoveCount(
   state: GridSnakeState,
   frame: GridFrame,
@@ -72,6 +81,7 @@ export function hasNearBodyEncounter(
   return false;
 }
 
+/** Historical V2 discrete pressure tracker retained for comparative evidence only. */
 export class GridMetricsTracker {
   private occupancy = 0;
   private safeMoves = 0;
@@ -104,6 +114,52 @@ export class GridMetricsTracker {
       nearBodyEncounters: this.nearBody,
       firstPressureMs: this.firstPressure,
       firstConfinementMs: this.firstConfinement
+    });
+  }
+}
+
+export function steeringMagnitude(input: SteeringInput): number {
+  if (!Number.isFinite(input.yaw) || !Number.isFinite(input.pitch)) {
+    throw new RangeError('Steering input must contain finite axes.');
+  }
+  return Math.min(1, Math.hypot(input.yaw, input.pitch));
+}
+
+export class V21MetricsTracker {
+  private gridCellEntries = 0;
+  private steeringMagnitudeSum = 0;
+  private steeringTicks = 0;
+  private currentNonZeroSteeringTicks = 0;
+  private maxNonZeroSteeringTicks = 0;
+
+  observeTick(input: SteeringInput, enteredCells: number): void {
+    if (!Number.isInteger(enteredCells) || enteredCells < 0) {
+      throw new RangeError('Grid-cell entry count must be a non-negative integer.');
+    }
+
+    const magnitude = steeringMagnitude(input);
+    this.gridCellEntries += enteredCells;
+    this.steeringMagnitudeSum += magnitude;
+    this.steeringTicks += 1;
+
+    if (magnitude > 0) {
+      this.currentNonZeroSteeringTicks += 1;
+      this.maxNonZeroSteeringTicks = Math.max(
+        this.maxNonZeroSteeringTicks,
+        this.currentNonZeroSteeringTicks
+      );
+    } else {
+      this.currentNonZeroSteeringTicks = 0;
+    }
+  }
+
+  snapshot(): V21ControlMetrics {
+    return Object.freeze({
+      totalGridCellEntries: this.gridCellEntries,
+      averageSteeringMagnitude: this.steeringTicks === 0
+        ? 0
+        : this.steeringMagnitudeSum / this.steeringTicks,
+      maxConsecutiveNonZeroSteeringTicks: this.maxNonZeroSteeringTicks
     });
   }
 }

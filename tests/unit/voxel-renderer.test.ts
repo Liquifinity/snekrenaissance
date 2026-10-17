@@ -1,35 +1,27 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import type { InterpolatedSegment } from '../../src/render/interpolation';
 import {
   DEFAULT_RENDER_CAPACITY,
   SNAKE_VOXEL_SIZE,
-  SnakeRenderer
+  SnakeRenderer,
+  type VoxelBodySample
 } from '../../src/render/snake-renderer';
 import {
   FOOD_VOXEL_SIZE,
   FoodRenderer
 } from '../../src/render/food-renderer';
 
-function interpolated(id: number, x: number, y = 0, z = 0): InterpolatedSegment {
-  return {
-    id,
-    position: { x, y, z },
-    born: false,
-    birthAlpha: 1,
-    displayWrapOffset: { x: 0, y: 0, z: 0 },
-    duplicatePosition: null
-  };
+function body(id: number, x: number, y = 0, z = 0): VoxelBodySample {
+  return { id, position: { x, y, z } };
 }
 
-const identityFrame = {
-  forward: { x: 0, y: 0, z: 1 },
-  right: { x: -1, y: 0, z: 0 },
-  up: { x: 0, y: 1, z: 0 },
-  quaternion: { x: 0, y: 0, z: 0, w: 1 }
-} as const;
+function matrixPosition(mesh: THREE.InstancedMesh, index: number): THREE.Vector3 {
+  const matrix = new THREE.Matrix4();
+  mesh.getMatrixAt(index, matrix);
+  return new THREE.Vector3().setFromMatrixPosition(matrix);
+}
 
-describe('voxel SnakeRenderer', () => {
+describe('continuous voxel SnakeRenderer', () => {
   it('uses instanced BoxGeometry for the body and a box head', () => {
     const scene = new THREE.Scene();
     const renderer = new SnakeRenderer(scene);
@@ -43,39 +35,70 @@ describe('voxel SnakeRenderer', () => {
     renderer.dispose();
   });
 
-  it('renders exactly the supplied logical body count and grows capacity without hiding voxels', () => {
-    const scene = new THREE.Scene();
-    const renderer = new SnakeRenderer(scene, 2);
-    const body = Array.from({ length: DEFAULT_RENDER_CAPACITY + 10 }, (_, index) => interpolated(index + 1, index * 0.1));
-
-    renderer.render({
-      head: interpolated(0, 0),
-      body,
-      frame: identityFrame
-    });
-
-    expect(renderer.renderedSegmentCount).toBe(body.length);
-    expect(renderer.capacity).toBeGreaterThanOrEqual(body.length);
-    renderer.dispose();
-  });
-
-  it('keeps two pixel-style eyes attached to the voxel head and follows presentation quaternion', () => {
+  it('renders the exact continuous head position and quaternion', () => {
     const scene = new THREE.Scene();
     const renderer = new SnakeRenderer(scene);
     renderer.render({
-      head: interpolated(0, 1, 2, 3),
-      body: [],
-      frame: {
-        ...identityFrame,
-        quaternion: { x: 0, y: Math.SQRT1_2, z: 0, w: Math.SQRT1_2 }
-      }
+      headPosition: { x: 1.25, y: -0.5, z: 0.75 },
+      headQuaternion: { x: 0, y: Math.SQRT1_2, z: 0, w: Math.SQRT1_2 },
+      body: []
     });
 
     const head = scene.getObjectByName('snake-head') as THREE.Mesh;
+    expect(head.position.toArray()).toEqual([1.25, -0.5, 0.75]);
+    expect(head.quaternion.y).toBeCloseTo(Math.SQRT1_2, 8);
+    expect(head.quaternion.w).toBeCloseTo(Math.SQRT1_2, 8);
     expect(scene.getObjectByName('snake-eye-left')).toBeDefined();
     expect(scene.getObjectByName('snake-eye-right')).toBeDefined();
-    expect(head.position.toArray()).toEqual([1, 2, 3]);
-    expect(head.quaternion.y).toBeCloseTo(Math.SQRT1_2, 8);
+    renderer.dispose();
+  });
+
+  it('maps body samples to matrices in strategic ID order', () => {
+    const scene = new THREE.Scene();
+    const renderer = new SnakeRenderer(scene);
+    const samples = [body(7, 0.1), body(9, 0.2), body(13, 0.3)];
+    renderer.render({
+      headPosition: { x: 0, y: 0, z: 0 },
+      headQuaternion: { x: 0, y: 0, z: 0, w: 1 },
+      body: samples
+    });
+
+    const mesh = scene.getObjectByName('snake-body-voxels') as THREE.InstancedMesh;
+    expect(renderer.renderedSegmentCount).toBe(3);
+    expect(matrixPosition(mesh, 0).x).toBeCloseTo(0.1, 6);
+    expect(matrixPosition(mesh, 1).x).toBeCloseTo(0.2, 6);
+    expect(matrixPosition(mesh, 2).x).toBeCloseTo(0.3, 6);
+    renderer.dispose();
+  });
+
+  it('preserves existing visual order when a new strategic tail ID is appended', () => {
+    const scene = new THREE.Scene();
+    const renderer = new SnakeRenderer(scene);
+    const head = { headPosition: { x: 0, y: 0, z: 0 }, headQuaternion: { x: 0, y: 0, z: 0, w: 1 } } as const;
+
+    renderer.render({ ...head, body: [body(1, 1), body(2, 2)] });
+    renderer.render({ ...head, body: [body(1, 1.1), body(2, 2.1), body(8, 3)] });
+
+    const mesh = scene.getObjectByName('snake-body-voxels') as THREE.InstancedMesh;
+    expect(matrixPosition(mesh, 0).x).toBeCloseTo(1.1, 6);
+    expect(matrixPosition(mesh, 1).x).toBeCloseTo(2.1, 6);
+    expect(matrixPosition(mesh, 2).x).toBeCloseTo(3, 6);
+    renderer.dispose();
+  });
+
+  it('grows capacity without hiding supplied body samples', () => {
+    const scene = new THREE.Scene();
+    const renderer = new SnakeRenderer(scene, 2);
+    const samples = Array.from({ length: DEFAULT_RENDER_CAPACITY + 10 }, (_, index) => body(index + 1, index * 0.1));
+
+    renderer.render({
+      headPosition: { x: 0, y: 0, z: 0 },
+      headQuaternion: { x: 0, y: 0, z: 0, w: 1 },
+      body: samples
+    });
+
+    expect(renderer.renderedSegmentCount).toBe(samples.length);
+    expect(renderer.capacity).toBeGreaterThanOrEqual(samples.length);
     renderer.dispose();
   });
 });

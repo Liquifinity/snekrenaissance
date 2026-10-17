@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
+import { forwardVector, type FlightPose } from '../../src/game/flight';
 import { GRID_CONFIG } from '../../src/game/grid-config';
 import {
   CAMERA_DISTANCE_CELLS,
@@ -8,6 +9,7 @@ import {
   CAMERA_LOOK_AHEAD_CELLS,
   ChaseCameraController
 } from '../../src/render/chase-camera';
+import { interpolateFlightPresentation } from '../../src/render/flight-presentation';
 
 const zero = { x: 0, y: 0, z: 0 };
 
@@ -20,6 +22,17 @@ function snapshot(
   return { headWorld, forwardWorld, upWorld, displayWrapOffset };
 }
 
+function continuousPresentation(yaw: number, pitch = 0) {
+  const orientation = { yaw, pitch, roll: 0 } as const;
+  const flight: FlightPose = {
+    unwrappedPosition: { x: 4.5, y: 4.5, z: 4.5 },
+    wrappedPosition: { x: 4.5, y: 4.5, z: 4.5 },
+    orientation,
+    forward: forwardVector(orientation)
+  };
+  return interpolateFlightPresentation(flight, flight, 1, GRID_CONFIG);
+}
+
 function finitePose(pose: ReturnType<ChaseCameraController['update']>): boolean {
   return [
     pose.position.x, pose.position.y, pose.position.z,
@@ -27,7 +40,7 @@ function finitePose(pose: ReturnType<ChaseCameraController['update']>): boolean 
   ].every(Number.isFinite);
 }
 
-describe('elevated grid-frame-aware chase camera', () => {
+describe('continuous flight chase camera', () => {
   it('uses the approved cell-relative baseline and 60 degree FOV', () => {
     expect(CAMERA_DISTANCE_CELLS).toBe(4);
     expect(CAMERA_HEIGHT_CELLS).toBe(2.8);
@@ -43,6 +56,29 @@ describe('elevated grid-frame-aware chase camera', () => {
     expect(pose.position.y).toBeCloseTo(2.8 * GRID_CONFIG.cellSize, 8);
     expect(pose.position.z).toBeCloseTo(-4 * GRID_CONFIG.cellSize, 8);
     expect(pose.target.z).toBeCloseTo(2 * GRID_CONFIG.cellSize, 8);
+  });
+
+  it('tracks a small continuous yaw without snapping to a cardinal axis', () => {
+    const controller = new ChaseCameraController();
+    const presentation = continuousPresentation(Math.PI / 36);
+    const pose = controller.update(presentation, 0);
+
+    expect(finitePose(pose)).toBe(true);
+    expect(Math.abs(pose.position.x)).toBeGreaterThan(0);
+    expect(Math.abs(pose.position.x)).toBeLessThan(GRID_CONFIG.cellSize * 0.5);
+    expect(pose.position.z).toBeLessThan(-1.5);
+    expect(pose.target.x).toBeGreaterThan(0);
+  });
+
+  it('tracks a small continuous pitch through interpolated forward/up vectors', () => {
+    const controller = new ChaseCameraController();
+    const presentation = continuousPresentation(0, Math.PI / 36);
+    const pose = controller.update(presentation, 0);
+
+    expect(finitePose(pose)).toBe(true);
+    expect(pose.target.y).toBeGreaterThan(0);
+    expect(pose.position.y).toBeLessThan(CAMERA_HEIGHT_CELLS * GRID_CONFIG.cellSize);
+    expect(pose.position.z).toBeLessThan(0);
   });
 
   it('uses interpolated local up instead of assuming world +Y', () => {

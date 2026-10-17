@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test';
 
-test('V2 stays local-first even when an HTTP ranking base is configured', async ({ page }) => {
+const RULESET = 'pixel-flight-grid-v2-1' as const;
+
+test('V2.1 stays local-first even when an HTTP ranking base is configured', async ({ page }) => {
   const apiRequests: string[] = [];
   page.on('request', (request) => {
     if (request.url().includes('/api/')) {
@@ -15,7 +17,7 @@ test('V2 stays local-first even when an HTTP ranking base is configured', async 
         apiBase: string;
         gatewayKind: string;
         forceGameOver: (result: {
-          rulesetId: 'pixel-flight-grid-v2';
+          rulesetId: 'pixel-flight-grid-v2-1';
           score: number;
           foodsCollected: number;
           length: number;
@@ -30,7 +32,7 @@ test('V2 stays local-first even when an HTTP ranking base is configured', async 
   expect(runtime).toEqual({ apiBase: '/rank', gatewayKind: 'HttpSessionGateway' });
 
   await page.locator('[data-action="continue"]').click();
-  await page.locator('input[name="username"]').fill('v2-local');
+  await page.locator('input[name="username"]').fill('v21-local');
   await page.locator('[data-action="play"]').click();
 
   await expect(page.locator('[data-hud-score]')).toHaveText('SCORE 0');
@@ -38,11 +40,11 @@ test('V2 stays local-first even when an HTTP ranking base is configured', async 
   await page.waitForTimeout(250);
   expect(apiRequests.filter((entry) => entry.includes('/api/games'))).toEqual([]);
 
-  await page.evaluate(() => {
+  await page.evaluate((ruleset) => {
     const harness = (window as unknown as {
       __SNEK_TEST__?: {
         forceGameOver: (result: {
-          rulesetId: 'pixel-flight-grid-v2';
+          rulesetId: 'pixel-flight-grid-v2-1';
           score: number;
           foodsCollected: number;
           length: number;
@@ -54,7 +56,7 @@ test('V2 stays local-first even when an HTTP ranking base is configured', async 
     }).__SNEK_TEST__;
     if (!harness) throw new Error('missing ranked E2E harness');
     harness.forceGameOver({
-      rulesetId: 'pixel-flight-grid-v2',
+      rulesetId: ruleset,
       score: 7,
       foodsCollected: 7,
       length: 20,
@@ -62,7 +64,7 @@ test('V2 stays local-first even when an HTTP ranking base is configured', async 
       foodEaten: 7,
       durationMs: 4_000
     });
-  });
+  }, RULESET);
 
   await expect(page.locator('[data-view="game-over"]')).toBeVisible();
   await expect(page.locator('.result-metrics')).toContainText('SCORE');
