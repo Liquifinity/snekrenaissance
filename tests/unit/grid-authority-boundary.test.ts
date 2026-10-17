@@ -6,6 +6,7 @@ const SRC_ROOT = join(process.cwd(), 'src');
 const GAME_ROOT = join(SRC_ROOT, 'game');
 const WORLD_TO_CELL_DEFINITION = 'game/grid-topology.ts';
 const FORBIDDEN_RETIRED_V1_AUTHORITY = /\b(TrailBuffer|sampleBodyPositions|advanceHead|SNAKE_SPEED|SEGMENT_SPACING|FOOD_PICKUP_RADIUS|SELF_COLLISION_RADIUS|headWrapped|headUnwrapped|bodyPositions|LegacySteeringInput|LegacyChaseCameraSnapshot)\b/;
+const FORBIDDEN_V2_RUNSTATE_AUTHORITY = /\b(TurnIntentQueue|GridMovementClock|rotateGridFrame|queueTurnIntent|INITIAL_GRID_FRAME|LogicalTransition)\b/;
 
 async function listTypeScriptFiles(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -43,6 +44,15 @@ describe('grid authority boundary', () => {
     }
 
     expect(violations).toEqual([]);
+  });
+
+  it('keeps the active V2.1 RunState independent from discrete V2 steering and render code', async () => {
+    const source = await readFile(join(GAME_ROOT, 'run-state.ts'), 'utf8');
+    expect(FORBIDDEN_V2_RUNSTATE_AUTHORITY.test(source)).toBe(false);
+    expect(source).not.toMatch(/from ['"]three['"]/);
+    expect(source).not.toMatch(/render\/flight-trail/);
+    expect(source).toMatch(/advanceFlightPose/);
+    expect(source).toMatch(/traverseGridSegment/);
   });
 
   it('allows V2.1 continuous logical flight without resurrecting V1 steering/trail modules', async () => {
