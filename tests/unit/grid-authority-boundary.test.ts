@@ -4,9 +4,11 @@ import { describe, expect, it } from 'vitest';
 
 const SRC_ROOT = join(process.cwd(), 'src');
 const GAME_ROOT = join(SRC_ROOT, 'game');
+const INPUT_ROOT = join(SRC_ROOT, 'input');
 const WORLD_TO_CELL_DEFINITION = 'game/grid-topology.ts';
 const FORBIDDEN_RETIRED_V1_AUTHORITY = /\b(TrailBuffer|sampleBodyPositions|advanceHead|SNAKE_SPEED|SEGMENT_SPACING|FOOD_PICKUP_RADIUS|SELF_COLLISION_RADIUS|headWrapped|headUnwrapped|bodyPositions|LegacySteeringInput|LegacyChaseCameraSnapshot)\b/;
 const FORBIDDEN_V2_RUNSTATE_AUTHORITY = /\b(TurnIntentQueue|GridMovementClock|rotateGridFrame|queueTurnIntent|INITIAL_GRID_FRAME|LogicalTransition)\b/;
+const FORBIDDEN_DISCRETE_INPUT_BRIDGE = /\b(takeIntent|pendingIntent|legacyIntentArmed|LEGACY_INTENT_ACTIVATION_THRESHOLD|LEGACY_INTENT_REARM_THRESHOLD)\b/;
 
 async function listTypeScriptFiles(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -53,6 +55,18 @@ describe('grid authority boundary', () => {
     expect(source).not.toMatch(/render\/flight-trail/);
     expect(source).toMatch(/advanceFlightPose/);
     expect(source).toMatch(/traverseGridSegment/);
+  });
+
+  it('removes the legacy discrete movement bridge from active input adapters', async () => {
+    const violations: string[] = [];
+
+    for (const file of await listTypeScriptFiles(INPUT_ROOT)) {
+      const repoRelative = relative(SRC_ROOT, file).replaceAll('\\', '/');
+      const source = await readFile(file, 'utf8');
+      if (FORBIDDEN_DISCRETE_INPUT_BRIDGE.test(source)) violations.push(repoRelative);
+    }
+
+    expect(violations).toEqual([]);
   });
 
   it('allows V2.1 continuous logical flight without resurrecting V1 steering/trail modules', async () => {
