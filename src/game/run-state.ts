@@ -160,7 +160,8 @@ export function stepRun(
   state.previousFlight = previousFlight;
   processGridEntries(state, entries, rng);
 
-  if (state.phase !== 'game-over') {
+  const resultingPhase = state.phase as RunPhase;
+  if (resultingPhase !== 'game-over') {
     state.flight = nextFlight;
   }
 
