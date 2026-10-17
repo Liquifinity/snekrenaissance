@@ -9,6 +9,17 @@ const WORLD_TO_CELL_DEFINITION = 'game/grid-topology.ts';
 const FORBIDDEN_RETIRED_V1_AUTHORITY = /\b(TrailBuffer|sampleBodyPositions|advanceHead|SNAKE_SPEED|SEGMENT_SPACING|FOOD_PICKUP_RADIUS|SELF_COLLISION_RADIUS|headWrapped|headUnwrapped|bodyPositions|LegacySteeringInput|LegacyChaseCameraSnapshot)\b/;
 const FORBIDDEN_V2_RUNSTATE_AUTHORITY = /\b(TurnIntentQueue|GridMovementClock|rotateGridFrame|queueTurnIntent|INITIAL_GRID_FRAME|LogicalTransition)\b/;
 const FORBIDDEN_DISCRETE_INPUT_BRIDGE = /\b(takeIntent|pendingIntent|legacyIntentArmed|LEGACY_INTENT_ACTIVATION_THRESHOLD|LEGACY_INTENT_REARM_THRESHOLD)\b/;
+const FORBIDDEN_ACTIVE_V2_AUTHORITY = /\b(TurnIntentQueue|GridMovementClock|queueTurnIntent|rotateGridFrame|JOYSTICK_ACTIVATION_THRESHOLD|JOYSTICK_REARM_THRESHOLD|LogicalTransition|buildRenderTransition|interpolateTransition)\b/;
+const ACTIVE_V21_RUNTIME_FILES = Object.freeze([
+  'main.ts',
+  'game/run-state.ts',
+  'input/keyboard.ts',
+  'input/joystick.ts',
+  'render/chase-camera.ts',
+  'render/flight-presentation.ts',
+  'render/flight-trail.ts',
+  'render/snake-renderer.ts'
+]);
 
 async function listTypeScriptFiles(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -64,6 +75,17 @@ describe('grid authority boundary', () => {
       const repoRelative = relative(SRC_ROOT, file).replaceAll('\\', '/');
       const source = await readFile(file, 'utf8');
       if (FORBIDDEN_DISCRETE_INPUT_BRIDGE.test(source)) violations.push(repoRelative);
+    }
+
+    expect(violations).toEqual([]);
+  });
+
+  it('keeps all active V2.1 runtime modules free of retired discrete V2 authority', async () => {
+    const violations: string[] = [];
+
+    for (const repoRelative of ACTIVE_V21_RUNTIME_FILES) {
+      const source = await readFile(join(SRC_ROOT, repoRelative), 'utf8');
+      if (FORBIDDEN_ACTIVE_V2_AUTHORITY.test(source)) violations.push(repoRelative);
     }
 
     expect(violations).toEqual([]);
