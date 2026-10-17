@@ -31,9 +31,18 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] }
     },
     {
-      name: 'mobile-chromium',
+      name: 'mobile-portrait-chromium',
       testIgnore: '**/ranked.spec.ts',
       use: { ...devices['Pixel 7'] }
+    },
+    {
+      name: 'mobile-landscape-chromium',
+      testIgnore: '**/ranked.spec.ts',
+      use: {
+        ...devices['Pixel 7'],
+        viewport: { width: 844, height: 390 },
+        screen: { width: 844, height: 390 }
+      }
     },
     {
       name: 'ranked-chromium',

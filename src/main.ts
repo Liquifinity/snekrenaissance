@@ -166,11 +166,20 @@ function exposeVisualInput(input: InputState): void {
   joystickKnob.style.transform = `translate(${input.yaw * 28}px, ${-input.pitch * 28}px)`;
 }
 
+// Read-only browser diagnostics used by responsive/E2E verification. Never read back by gameplay.
+function exposeLogicalTelemetry(run: RunState): void {
+  const head = run.snake.segments[0];
+  if (!head) return;
+  app.dataset.headCell = `${head.cell.x},${head.cell.y},${head.cell.z}`;
+  app.dataset.headForward = run.frame.forward;
+}
+
 function initializeRun(run: RunState): void {
   fixedClock.reset();
   cameraController.reset();
   setCameraMode('chase');
   updateChaseCamera(buildPresentation(run), 0);
+  exposeLogicalTelemetry(run);
 }
 
 let activeRun: RunState | null = null;
@@ -218,6 +227,7 @@ function frame(timestamp: number): void {
   }
 
   if (run) {
+    exposeLogicalTelemetry(run);
     const presentation = buildPresentation(run);
     snakeRenderer.render(presentation);
     foodRenderer.render(run.food ? cellToWorld(run.food, run.config) : null);
