@@ -15,15 +15,6 @@ export type ChaseCameraSnapshot = Readonly<{
   displayWrapOffset: Vec3;
 }>;
 
-/** Temporary Task 9→10 bridge for the still-unmigrated browser loop. */
-type LegacyChaseCameraSnapshot = Readonly<{
-  headWrapped: Vec3;
-  headUnwrapped?: Vec3;
-  forward: Vec3;
-  wrapOffset: Vec3;
-  up?: Vec3;
-}>;
-
 export type CameraPose = Readonly<{
   position: Vec3;
   target: Vec3;
@@ -59,26 +50,6 @@ function lerp(a: Vec3, b: Vec3, t: number): Vec3 {
   };
 }
 
-function isV2Snapshot(
-  snapshot: ChaseCameraSnapshot | LegacyChaseCameraSnapshot
-): snapshot is ChaseCameraSnapshot {
-  return 'headWorld' in snapshot;
-}
-
-function normalizeSnapshot(
-  snapshot: ChaseCameraSnapshot | LegacyChaseCameraSnapshot
-): ChaseCameraSnapshot {
-  if (isV2Snapshot(snapshot)) return snapshot;
-
-  const hasUnwrappedHead = snapshot.headUnwrapped !== undefined;
-  return {
-    headWorld: hasUnwrappedHead ? snapshot.headUnwrapped! : snapshot.headWrapped,
-    forwardWorld: snapshot.forward,
-    upWorld: snapshot.up ?? { x: 0, y: 1, z: 0 },
-    displayWrapOffset: hasUnwrappedHead ? snapshot.wrapOffset : { x: 0, y: 0, z: 0 }
-  };
-}
-
 function desiredPose(snapshot: ChaseCameraSnapshot, config: GridConfig): CameraPose {
   const forward = normalize(snapshot.forwardWorld, { x: 0, y: 0, z: 1 });
   const up = normalize(snapshot.upWorld, { x: 0, y: 1, z: 0 });
@@ -110,15 +81,11 @@ export class ChaseCameraController {
     }
   }
 
-  update(
-    rawSnapshot: ChaseCameraSnapshot | LegacyChaseCameraSnapshot,
-    dtSeconds: number
-  ): CameraPose {
+  update(snapshot: ChaseCameraSnapshot, dtSeconds: number): CameraPose {
     if (!Number.isFinite(dtSeconds) || dtSeconds < 0) {
       throw new RangeError('Camera dt must be a finite non-negative number.');
     }
 
-    const snapshot = normalizeSnapshot(rawSnapshot);
     const desired = desiredPose(snapshot, this.config);
 
     if (!this.pose || !this.lastDisplayWrapOffset) {
