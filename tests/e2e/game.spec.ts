@@ -48,6 +48,7 @@ test('pixel backing buffer stays reduced and independent of high DPR', async ({ 
     };
   });
 
+  expect(dimensions.dpr).toBeGreaterThanOrEqual(1);
   expect(dimensions.backingWidth).toBe(Math.max(1, Math.floor(dimensions.cssWidth * 0.5)));
   expect(dimensions.backingHeight).toBe(Math.max(1, Math.floor(dimensions.cssHeight * 0.5)));
   if (dimensions.dpr > 1) {
