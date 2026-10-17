@@ -1,60 +1,60 @@
 import { describe, expect, it } from 'vitest';
 import { KeyboardInput } from '../../src/input/keyboard';
 
-describe('KeyboardInput', () => {
-  it('maps arrows and WASD to camera-relative yaw/pitch signs', () => {
+describe('KeyboardInput discrete intents', () => {
+  it.each([
+    ['ArrowLeft', 'left'],
+    ['a', 'left'],
+    ['ArrowRight', 'right'],
+    ['d', 'right'],
+    ['ArrowUp', 'up'],
+    ['w', 'up'],
+    ['ArrowDown', 'down'],
+    ['s', 'down']
+  ] as const)('maps %s to one %s intent per press edge', (key, intent) => {
     const input = new KeyboardInput();
+    input.handleKeyDown(key);
+    expect(input.takeIntent()).toBe(intent);
+    expect(input.takeIntent()).toBe('none');
 
-    input.handleKeyDown('ArrowLeft');
-    expect(input.state.yaw).toBe(1);
-    input.handleKeyUp('ArrowLeft');
+    input.handleKeyDown(key);
+    expect(input.takeIntent()).toBe('none');
 
-    input.handleKeyDown('d');
-    expect(input.state.yaw).toBe(-1);
-    input.handleKeyUp('d');
-
-    input.handleKeyDown('w');
-    expect(input.state.pitch).toBe(1);
-    input.handleKeyUp('w');
-
-    input.handleKeyDown('ArrowDown');
-    expect(input.state.pitch).toBe(-1);
+    input.handleKeyUp(key);
+    input.handleKeyDown(key);
+    expect(input.takeIntent()).toBe(intent);
   });
 
-  it('toggles camera once when X is pressed', () => {
+  it('buffers at most one not-yet-drained movement intent', () => {
+    const input = new KeyboardInput();
+    input.handleKeyDown('a');
+    input.handleKeyDown('w');
+    expect(input.takeIntent()).toBe('left');
+    expect(input.takeIntent()).toBe('none');
+  });
+
+  it('toggles camera once per X press and never emits X as movement', () => {
     let toggles = 0;
     const input = new KeyboardInput({ onCameraToggle: () => { toggles += 1; } });
 
     input.handleKeyDown('x');
     input.handleKeyDown('x');
     expect(toggles).toBe(1);
+    expect(input.takeIntent()).toBe('none');
 
     input.handleKeyUp('x');
     input.handleKeyDown('x');
     expect(toggles).toBe(2);
+    expect(input.takeIntent()).toBe('none');
   });
 
-  it('releasing a key returns its axis toward neutral', () => {
-    const input = new KeyboardInput();
-    input.handleKeyDown('a');
-    input.handleKeyDown('w');
-    input.handleKeyUp('a');
-
-    expect(input.state).toEqual({ yaw: 0, pitch: 1 });
-  });
-
-  it('opposite keys cancel on the same axis', () => {
-    const input = new KeyboardInput();
-    input.handleKeyDown('a');
-    input.handleKeyDown('d');
-    expect(input.state.yaw).toBe(0);
-  });
-
-  it('blur clears every pressed key', () => {
+  it('blur clears held state and any pending intent', () => {
     const input = new KeyboardInput();
     input.handleKeyDown('ArrowRight');
-    input.handleKeyDown('ArrowUp');
     input.handleBlur();
-    expect(input.state).toEqual({ yaw: 0, pitch: 0 });
+    expect(input.takeIntent()).toBe('none');
+
+    input.handleKeyDown('ArrowRight');
+    expect(input.takeIntent()).toBe('right');
   });
 });

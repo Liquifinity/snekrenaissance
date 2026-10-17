@@ -7,38 +7,50 @@ conquer the space
 
 SNEK RENAISSANCE is an independent experimental browser game. It is not affiliated with, endorsed by, or presented as an official OpenAI or ChatGPT product.
 
-## Active V1
+## Active Pixel Flight Grid V2
 
-Single-player continuous 3D snake flight inside a cubic toroidal world. Crossing any face wraps to the opposite face; walls do not end the run. Food grows the body by exactly four segments. Self-collision is the gameplay game-over condition.
+The active game is a single-player 3D Snake running on a deterministic toroidal voxel grid. Gameplay authority is integer cell occupancy; rendering interpolates those cell transitions smoothly so the snake still reads as flight rather than stop-motion.
 
-Desktop controls: `A/←`, `D/→`, `W/↑`, `S/↓`.
+Baseline ruleset:
 
-Mobile: one virtual joystick controls yaw and pitch. Portrait and landscape layouts are supported.
+- `RULESET_ID = pixel-flight-grid-v2`;
+- `9 × 9 × 9` toroidal logical cells;
+- six-cell initial snake;
+- exact occupied-cell self-collision with tail-vacate semantics;
+- food occupies one free cell and adds two cells of pending growth;
+- canonical score is `foodsCollected`; occupied length is a separate metric;
+- `300 foods = 100%` remains the provisional completion contract;
+- visual grid divisions exactly match logical grid resolution.
 
-The active V1 is local-first. It requires no ranking server or database. The browser stores:
+Desktop controls: `A/←`, `D/→`, `W/↑`, `S/↓`. Inputs are local left/right/up/down intents resolved to deterministic 90-degree `GridFrame` turns at cell boundaries. `X` changes between the elevated chase camera and the front overview camera.
+
+Mobile uses the same discrete turn semantics through a threshold/rearm virtual joystick. Portrait and landscape are covered by browser tests.
+
+The presentation uses voxel snake/food geometry, antialiasing disabled, a reduced internal framebuffer (`RENDER_SCALE = 0.50` baseline), CSS pixelated upscale, and wrap-aware interpolation. Presentation-space floats never feed gameplay collision, food, scoring, growth or topology.
+
+## Local-first identity and score
+
+V2 requires no account or ranking server. The browser stores:
 
 - the chosen username;
-- an anonymous player ID reserved for future connected ranking;
-- the player's personal best.
+- the anonymous player ID reserved for future connected ranking;
+- the historical V1 local best under its existing key;
+- the V2 personal best separately under `snek.localBest.pixelGridV2`.
 
-Game over shows the current `SCORE` and `PERSONAL BEST`. A lower later score never replaces a higher stored record. The `RANK` screen in local mode is the player's own personal record, not a public leaderboard.
+V2 personal best is the highest `foodsCollected` score. A later lower score never replaces it. Historical V1 length records are not compared to V2 food scores.
 
-Username and personal best are stored in `localStorage`, so they survive reloads and later visits in the same browser profile. Clearing site/browser storage can remove them, and V1 does not synchronize them between devices.
-
-The approved local-first amendment is recorded in `docs/superpowers/specs/2026-10-16-v1-personal-rank-amendment.md`.
+The repository retains the existing HTTP/Cloudflare ranking seam, but that validator was designed for V1 arithmetic and explicitly does **not** advertise support for `pixel-flight-grid-v2`. Even when an HTTP API base is configured, the active V2 remains local-first until a future server validator explicitly supports this ruleset.
 
 ## Local development
 
-Install and run the game:
+Install and run:
 
 ```bash
 npm ci
 npm run dev
 ```
 
-The normal frontend build has no ranking API configured and therefore uses the local session path automatically.
-
-Verification:
+Core verification:
 
 ```bash
 npm audit --omit=dev --audit-level=moderate
@@ -49,44 +61,48 @@ npm run worker:build
 npm run build
 npx playwright install --with-deps chromium
 npm run test:e2e
+npm run test:tuning
 ```
 
-CI continues testing the preserved online-ranking implementation as well as the active local experience. Keeping those tests green ensures that a future global leaderboard can be re-enabled deliberately without coupling the current V1 to a server.
+The tuning harness compares 8³, 9³ and 10³ with 32 fixed seeds, one deterministic policy, and a hard semantic horizon of 10,000 logical steps. It is comparative evidence, not a substitute for human playtesting and cannot change the provisional 300-food completion contract without a separate approved spec amendment.
 
-The full dependency-audit triage, including known development-only Vitest advisories, is recorded under `docs/security/`.
+## Architecture documents
 
-## Future online ranking
+Canonical V2 design:
 
-The repository intentionally retains the already-built online-ranking seam:
+`docs/superpowers/specs/2026-10-16-snek-renaissance-pixel-flight-grid-v2-design.md`
 
-- `SessionGateway` / HTTP gateway;
+Canonical implementation plan:
+
+`docs/superpowers/plans/2026-10-16-snek-renaissance-pixel-flight-grid-v2.md`
+
+The earlier V1 specifications remain historical documentation. They are not rewritten to imply that V1 always used grid gameplay.
+
+## Preserved online-ranking seam
+
+The repository intentionally retains:
+
+- `SessionGateway` and HTTP gateway abstractions;
 - Cloudflare Worker API;
 - D1 schema and migrations;
-- public leaderboard UI;
-- ranked browser tests;
+- leaderboard UI and validation tests;
 - production release tooling.
 
-These components are not required by the active V1. They are preserved for a future version in which scores are shared between players.
+These components are preserved for a future ruleset-aware global ranking system. The active V2 does not submit scores to the current V1 validator.
 
-For local development of that future backend path:
+For backend development:
 
 ```bash
 npm run worker:migrate
 npm run worker:dev
 ```
 
-To explicitly opt a frontend build into the preserved online-ranking path, set `VITE_RANKING_API_BASE` to the API origin or same-origin proxy path before starting/building Vite. If it is absent, the frontend remains local-only.
-
 ## Preserved Cloudflare release tooling
 
-Cloudflare deployment tooling remains in the repository as an optional future global-ranking deployment path. It is manual-only and is not necessary to publish or play the active local V1.
-
-The preserved resource names are:
+Cloudflare deployment tooling remains manual-only. The preserved resources are:
 
 - Worker: `snekrenaissance-api`;
 - D1 database: `snekrenaissance-leaderboard`;
 - Pages project: `snekrenaissance`.
 
-The manual workflow is `.github/workflows/deploy-production.yml`. It must not be dispatched for the active local-only release unless the product decision is made to enable the online ranking path.
-
-The committed `wrangler.jsonc` intentionally contains an all-zero D1 placeholder. Account IDs, database UUIDs, API tokens, and other credentials must never be committed to the repository.
+The manual workflow is `.github/workflows/deploy-production.yml`. The committed `wrangler.jsonc` intentionally contains an all-zero D1 placeholder. Account IDs, database UUIDs, API tokens and other credentials must never be committed.

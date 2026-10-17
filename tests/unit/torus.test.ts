@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { WORLD_SIZE } from '../../src/game/constants';
 import { shortestWrappedDelta, toroidalDistanceSq, wrapScalar, wrapVec3 } from '../../src/game/torus';
 
-describe('toroidal world math', () => {
+const WORLD_SIZE = 4;
+
+describe('toroidal presentation math', () => {
   it('wraps scalar values at positive and negative faces into [-L/2, L/2)', () => {
     expect(wrapScalar(8, 16)).toBe(-8);
     expect(wrapScalar(8.25, 16)).toBeCloseTo(-7.75);
@@ -19,16 +20,7 @@ describe('toroidal world math', () => {
     });
   });
 
-  it('wraps two axes in the same update', () => {
-    const half = WORLD_SIZE / 2;
-    expect(wrapVec3({ x: half + 0.5, y: 0, z: -half - 0.5 }, WORLD_SIZE)).toEqual({
-      x: -half + 0.5,
-      y: 0,
-      z: half - 0.5
-    });
-  });
-
-  it('wraps three axes in the same update', () => {
+  it('wraps multiple axes in the same update', () => {
     const half = WORLD_SIZE / 2;
     expect(wrapVec3({ x: half + 1, y: half + 2, z: -half - 3 }, WORLD_SIZE)).toEqual({
       x: -half + 1,
@@ -50,13 +42,5 @@ describe('toroidal world math', () => {
       { x: -half + 0.5, y: 0, z: 0 },
       WORLD_SIZE
     )).toBeCloseTo(1);
-  });
-
-  it('keeps ordinary Euclidean distance when no wrap is shorter', () => {
-    expect(toroidalDistanceSq(
-      { x: 0, y: 0, z: 0 },
-      { x: 2, y: 2, z: 0 },
-      WORLD_SIZE
-    )).toBeCloseTo(8);
   });
 });

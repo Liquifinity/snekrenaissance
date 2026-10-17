@@ -11,6 +11,7 @@ export type SessionSubmission =
   | { ranked: true; worldRank: number };
 
 export interface SessionGateway {
+  supportsRuleset(rulesetId: string): boolean;
   startRun(identity: PlayerIdentity): Promise<SessionStart>;
   submitResult(
     identity: PlayerIdentity,
@@ -22,6 +23,10 @@ export interface SessionGateway {
 }
 
 export class LocalSessionGateway implements SessionGateway {
+  supportsRuleset(_rulesetId: string): boolean {
+    return true;
+  }
+
   async startRun(_identity: PlayerIdentity): Promise<SessionStart> {
     return { ranked: false, sessionId: null };
   }

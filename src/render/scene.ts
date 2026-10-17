@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { WORLD_SIZE } from '../game/constants';
+import { GRID_CONFIG, type GridConfig } from '../game/grid-config';
+import { computeInternalRenderSize } from './pixel-resolution';
 
 export const PALETTE = {
   background: '#ffffff',
@@ -12,9 +13,11 @@ export const PALETTE = {
 export const CUBE_WALL_STYLE = 'tinted-grid' as const;
 export const CUBE_GUIDE_OPACITY = 0.58;
 export const CUBE_GRID_FACE_COUNT = 6;
-export const CUBE_GRID_DIVISIONS = 24;
+export const CUBE_GRID_DIVISIONS = GRID_CONFIG.resolution;
 export const CUBE_FACE_GRID_OPACITY = 0.22;
 export const CUBE_FACE_TINT_OPACITY = 0.05;
+export const RENDERER_ANTIALIAS = false;
+export const RENDERER_PIXEL_RATIO = 1;
 
 export type SceneContext = {
   scene: THREE.Scene;
@@ -35,12 +38,13 @@ function materialList(material: THREE.Material | THREE.Material[]): THREE.Materi
 }
 
 function createGridFace(
+  config: GridConfig,
   position: readonly [number, number, number],
   rotation: readonly [number, number, number]
 ): GridFace {
   const helper = new THREE.GridHelper(
-    WORLD_SIZE,
-    CUBE_GRID_DIVISIONS,
+    config.worldSize,
+    config.resolution,
     PALETTE.guides,
     PALETTE.guides
   );
@@ -57,7 +61,10 @@ function createGridFace(
   return { helper, materials };
 }
 
-export function createScene(canvas: HTMLCanvasElement): SceneContext {
+export function createScene(
+  canvas: HTMLCanvasElement,
+  config: GridConfig = GRID_CONFIG
+): SceneContext {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(PALETTE.background);
 
@@ -67,11 +74,12 @@ export function createScene(canvas: HTMLCanvasElement): SceneContext {
 
   const renderer = new THREE.WebGLRenderer({
     canvas,
-    antialias: true,
+    antialias: RENDERER_ANTIALIAS,
     alpha: false,
     powerPreference: 'high-performance'
   });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.setPixelRatio(RENDERER_PIXEL_RATIO);
 
   const ambient = new THREE.HemisphereLight(0xffffff, 0xdbe3ef, 1.55);
   scene.add(ambient);
@@ -80,7 +88,11 @@ export function createScene(canvas: HTMLCanvasElement): SceneContext {
   key.position.set(4, 7, -5);
   scene.add(key);
 
-  const cubeGeometry = new THREE.BoxGeometry(WORLD_SIZE, WORLD_SIZE, WORLD_SIZE);
+  const cubeGeometry = new THREE.BoxGeometry(
+    config.worldSize,
+    config.worldSize,
+    config.worldSize
+  );
   const edgeGeometry = new THREE.EdgesGeometry(cubeGeometry);
   const edgeMaterial = new THREE.LineBasicMaterial({
     color: PALETTE.guides,
@@ -100,32 +112,32 @@ export function createScene(canvas: HTMLCanvasElement): SceneContext {
   const cubeTint = new THREE.Mesh(cubeGeometry, cubeTintMaterial);
   scene.add(cubeTint);
 
-  const half = WORLD_SIZE / 2;
+  const half = config.worldSize / 2;
   const inset = 0.01;
   const inner = half - inset;
   const gridFaces: GridFace[] = [
-    createGridFace([0, -inner, 0], [0, 0, 0]),
-    createGridFace([0, inner, 0], [0, 0, 0]),
-    createGridFace([0, 0, -inner], [Math.PI / 2, 0, 0]),
-    createGridFace([0, 0, inner], [Math.PI / 2, 0, 0]),
-    createGridFace([-inner, 0, 0], [0, 0, Math.PI / 2]),
-    createGridFace([inner, 0, 0], [0, 0, Math.PI / 2])
+    createGridFace(config, [0, -inner, 0], [0, 0, 0]),
+    createGridFace(config, [0, inner, 0], [0, 0, 0]),
+    createGridFace(config, [0, 0, -inner], [Math.PI / 2, 0, 0]),
+    createGridFace(config, [0, 0, inner], [Math.PI / 2, 0, 0]),
+    createGridFace(config, [-inner, 0, 0], [0, 0, Math.PI / 2]),
+    createGridFace(config, [inner, 0, 0], [0, 0, Math.PI / 2])
   ];
 
-  for (const face of gridFaces) {
-    scene.add(face.helper);
-  }
+  for (const face of gridFaces) scene.add(face.helper);
 
   return {
     scene,
     camera,
     renderer,
     render: () => renderer.render(scene, camera),
-    resize: (width, height, pixelRatio = window.devicePixelRatio || 1) => {
+    resize: (width, height, _pixelRatio = window.devicePixelRatio || 1) => {
       const safeWidth = Math.max(1, Math.floor(width));
       const safeHeight = Math.max(1, Math.floor(height));
-      renderer.setPixelRatio(Math.min(2, Math.max(1, pixelRatio)));
-      renderer.setSize(safeWidth, safeHeight, false);
+      const internal = computeInternalRenderSize(safeWidth, safeHeight);
+
+      renderer.setPixelRatio(RENDERER_PIXEL_RATIO);
+      renderer.setSize(internal.width, internal.height, false);
       camera.aspect = safeWidth / safeHeight;
       camera.updateProjectionMatrix();
     },

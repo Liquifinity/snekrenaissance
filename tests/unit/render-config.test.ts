@@ -1,30 +1,40 @@
 import { describe, expect, it } from 'vitest';
-import { FOOD_RADIUS } from '../../src/render/food-renderer';
+import { GRID_CONFIG } from '../../src/game/grid-config';
+import { FOOD_VOXEL_SIZE } from '../../src/render/food-renderer';
 import {
+  CUBE_GRID_DIVISIONS,
   CUBE_GUIDE_OPACITY,
   CUBE_WALL_STYLE,
-  PALETTE
+  PALETTE,
+  RENDERER_ANTIALIAS,
+  RENDERER_PIXEL_RATIO
 } from '../../src/render/scene';
-import { BODY_RADIUS, HEAD_RADIUS } from '../../src/render/snake-renderer';
+import { HEAD_VOXEL_SIZE, SNAKE_VOXEL_SIZE } from '../../src/render/snake-renderer';
 
 function hexChannel(hex: string, offset: number): number {
   return Number.parseInt(hex.slice(offset, offset + 2), 16);
 }
 
-describe('approved render proportions', () => {
-  it('keeps the head close to body scale', () => {
-    expect(HEAD_RADIUS / BODY_RADIUS).toBeGreaterThanOrEqual(0.9);
-    expect(HEAD_RADIUS / BODY_RADIUS).toBeLessThanOrEqual(1.15);
+describe('approved V2 render proportions', () => {
+  it('keeps head and body on the same voxel footprint', () => {
+    expect(HEAD_VOXEL_SIZE / SNAKE_VOXEL_SIZE).toBeCloseTo(1, 8);
   });
 
-  it('renders food at twice the compact body radius', () => {
-    expect(FOOD_RADIUS / BODY_RADIUS).toBeCloseTo(2, 8);
+  it('keeps food smaller than the snake voxel for cell legibility', () => {
+    expect(FOOD_VOXEL_SIZE).toBeLessThan(SNAKE_VOXEL_SIZE);
+    expect(FOOD_VOXEL_SIZE / GRID_CONFIG.cellSize).toBeCloseTo(0.6, 8);
   });
 
-  it('uses a readable blue tinted grid cube', () => {
+  it('uses the logical resolution as the visible grid resolution', () => {
+    expect(CUBE_GRID_DIVISIONS).toBe(GRID_CONFIG.resolution);
     expect(CUBE_WALL_STYLE).toBe('tinted-grid');
     expect(CUBE_GUIDE_OPACITY).toBeGreaterThanOrEqual(0.45);
     expect(CUBE_GUIDE_OPACITY).toBeLessThanOrEqual(0.7);
+  });
+
+  it('uses AA-off and a logical pixel ratio of one for the low-resolution pipeline', () => {
+    expect(RENDERER_ANTIALIAS).toBe(false);
+    expect(RENDERER_PIXEL_RATIO).toBe(1);
   });
 
   it('exports a near-white background and blue guides/accent', () => {

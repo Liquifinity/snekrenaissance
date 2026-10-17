@@ -1,91 +1,79 @@
 import { expect, test } from '@playwright/test';
 
-test('ranked browser flow uses Worker+D1 and survives leaderboard read failure', async ({ page }) => {
-  let releaseStart!: () => void;
-  let startRouteHit = false;
+test('V2 stays local-first even when an HTTP ranking base is configured', async ({ page }) => {
   const apiRequests: string[] = [];
-  const holdStart = new Promise<void>((resolve) => {
-    releaseStart = resolve;
-  });
-
   page.on('request', (request) => {
     if (request.url().includes('/api/')) {
       apiRequests.push(`${request.method()} ${request.url()}`);
     }
   });
 
-  await page.route('**/rank/api/games', async (route) => {
-    startRouteHit = true;
-    await holdStart;
-    await route.continue();
-  });
-
   await page.goto('/');
   const runtime = await page.evaluate(() => {
     const harness = (window as unknown as {
-      __SNEK_TEST__?: { apiBase: string; gatewayKind: string };
+      __SNEK_TEST__?: {
+        apiBase: string;
+        gatewayKind: string;
+        forceGameOver: (result: {
+          rulesetId: 'pixel-flight-grid-v2';
+          score: number;
+          foodsCollected: number;
+          length: number;
+          maxLength: number;
+          foodEaten: number;
+          durationMs: number;
+        }) => void;
+      };
     }).__SNEK_TEST__;
     return harness ? { apiBase: harness.apiBase, gatewayKind: harness.gatewayKind } : null;
   });
   expect(runtime).toEqual({ apiBase: '/rank', gatewayKind: 'HttpSessionGateway' });
 
-  await expect(page.locator('[data-copy-line]').nth(0)).toHaveText('just because ChatGPT');
-  await expect(page.locator('[data-copy-line]').nth(1)).toHaveText('didnt complete my image.');
-
   await page.locator('[data-action="continue"]').click();
-  await page.locator('input[name="username"]').fill('ranked-e2e');
+  await page.locator('input[name="username"]').fill('v2-local');
   await page.locator('[data-action="play"]').click();
 
-  await expect(page.locator('#app')).toHaveAttribute('data-screen', 'username');
-  await expect(page.locator('[data-view="username"]')).toHaveAttribute('data-session-status', 'starting');
-  await expect.poll(() => apiRequests.join('\n')).toContain('/api/games');
-  await expect.poll(() => startRouteHit).toBe(true);
-  await expect(page.locator('[data-hud-length]')).toHaveCount(0);
-
-  releaseStart();
-  await expect(page.locator('[data-hud-length]')).toContainText('12');
-  await page.unroute('**/rank/api/games');
+  await expect(page.locator('[data-hud-score]')).toHaveText('SCORE 0');
+  await expect(page.locator('[data-hud-length]')).toHaveText('LENGTH 6');
+  await page.waitForTimeout(250);
+  expect(apiRequests.filter((entry) => entry.includes('/api/games'))).toEqual([]);
 
   await page.evaluate(() => {
     const harness = (window as unknown as {
-      __SNEK_TEST__?: { forceGameOver: (result: { maxLength: number; foodEaten: number; durationMs: number }) => void };
+      __SNEK_TEST__?: {
+        forceGameOver: (result: {
+          rulesetId: 'pixel-flight-grid-v2';
+          score: number;
+          foodsCollected: number;
+          length: number;
+          maxLength: number;
+          foodEaten: number;
+          durationMs: number;
+        }) => void;
+      };
     }).__SNEK_TEST__;
     if (!harness) throw new Error('missing ranked E2E harness');
-    harness.forceGameOver({ maxLength: 16, foodEaten: 1, durationMs: 1_000 });
-  });
-
-  await expect(page.locator('[data-view="game-over"]')).toBeVisible();
-  await expect(page.locator('.result-metrics')).toContainText('WORLD');
-  await expect(page.locator('.result-metrics')).toContainText(/#\d+/);
-
-  await page.locator('[data-action="rank"]').click();
-  await expect(page.locator('[data-leaderboard-state="ready"]')).toBeVisible();
-  await expect(page.locator('[data-leaderboard-row]')).toContainText('ranked-e2e');
-  await expect(page.locator('[data-leaderboard-row][data-self="true"]')).toBeVisible();
-
-  await page.locator('[data-action="back"]').click();
-  await expect(page.locator('[data-view="game-over"]')).toBeVisible();
-
-  await page.route('**/rank/api/leaderboard**', async (route) => {
-    await route.fulfill({
-      status: 503,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        error: {
-          code: 'TEMPORARY_FAILURE',
-          message: 'forced E2E leaderboard failure',
-          retryable: true
-        }
-      })
+    harness.forceGameOver({
+      rulesetId: 'pixel-flight-grid-v2',
+      score: 7,
+      foodsCollected: 7,
+      length: 20,
+      maxLength: 20,
+      foodEaten: 7,
+      durationMs: 4_000
     });
   });
 
-  await page.locator('[data-action="rank"]').click();
-  await expect(page.locator('[data-leaderboard-state="error"]')).toBeVisible();
-  await expect(page.locator('[role="alert"]')).toContainText('leaderboard');
+  await expect(page.locator('[data-view="game-over"]')).toBeVisible();
+  await expect(page.locator('.result-metrics')).toContainText('SCORE');
+  await expect(page.locator('.result-metrics')).toContainText('7');
+  await expect(page.locator('.result-metrics')).toContainText('PERSONAL BEST');
+  await expect(page.locator('.result-metrics')).not.toContainText('WORLD');
+  expect(apiRequests.filter((entry) => entry.includes('/api/'))).toEqual([]);
 
-  await page.locator('[data-action="back"]').click();
-  await expect(page.locator('[data-action="replay"]')).toBeVisible();
-  await page.locator('[data-action="replay"]').click();
-  await expect(page.locator('[data-hud-length]')).toContainText('12');
+  await page.locator('[data-action="rank"]').click();
+  await expect(page.locator('[data-view="rank"]')).toBeVisible();
+  await expect(page.locator('[data-view="rank"]')).toContainText('PERSONAL BEST');
+  await expect(page.locator('[data-view="rank"]')).toContainText('7');
+  expect(apiRequests.filter((entry) => entry.includes('/api/'))).toEqual([]);
 });

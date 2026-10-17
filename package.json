@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "test": "vitest run",
+    "test:tuning": "vitest run tests/metrics/grid-tuning.test.ts --reporter=verbose",
     "test:worker": "vitest run --config vitest.worker.config.ts",
     "typecheck": "tsc -b --pretty false",
     "worker:dev": "wrangler dev",
