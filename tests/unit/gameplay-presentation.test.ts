@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { GRID_CONFIG } from '../../src/game/grid-config';
 import {
@@ -11,7 +13,7 @@ import {
   SNAKE_VOXEL_SIZE
 } from '../../src/render/snake-renderer';
 
-describe('Pixel Flight Grid V2 presentation contract', () => {
+describe('Pixel Flight Grid V2.1 presentation contract', () => {
   it('derives aligned voxel footprints directly from GridConfig cell size', () => {
     expect(SNAKE_VOXEL_FILL).toBe(0.8);
     expect(FOOD_VOXEL_FILL).toBe(0.8);
@@ -36,5 +38,12 @@ describe('Pixel Flight Grid V2 presentation contract', () => {
     expect(sceneModule.PALETTE.accent).toBe('#3b82f6');
     expect(sceneModule.CUBE_GUIDE_OPACITY).toBeGreaterThanOrEqual(0.45);
     expect(sceneModule.CUBE_FACE_TINT_OPACITY).toBeGreaterThan(0);
+  });
+
+  it('keeps the active voxel renderer independent from V2 cell-step interpolation types', async () => {
+    const source = await readFile(join(process.cwd(), 'src/render/snake-renderer.ts'), 'utf8');
+    expect(source).not.toMatch(/from ['"].\/interpolation['"]/);
+    expect(source).not.toMatch(/InterpolatedSegment|InterpolatedFrame/);
+    expect(source).toMatch(/VoxelBodySample/);
   });
 });

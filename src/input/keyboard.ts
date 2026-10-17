@@ -33,11 +33,12 @@ export class KeyboardInput {
     this.onCameraToggle = options.onCameraToggle;
   }
 
-  /** Temporary V1 compatibility surface. V2 consumes takeIntent(). */
+  /** Authoritative continuous V2.1 steering state. */
   get state(): InputState {
     return { ...this.current };
   }
 
+  /** @deprecated Temporary V2 runtime bridge. Removed when main.ts migrates to V2.1. */
   takeIntent(): TurnIntent {
     const intent = this.pendingIntent;
     this.pendingIntent = 'none';
@@ -115,7 +116,7 @@ export class KeyboardInput {
     const down = [...DOWN_KEYS].some((key) => this.pressed.has(key)) ? 1 : 0;
 
     this.current = {
-      yaw: left - right,
+      yaw: right - left,
       pitch: up - down
     };
   }

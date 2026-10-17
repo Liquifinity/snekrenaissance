@@ -27,7 +27,7 @@ function finitePose(pose: ReturnType<ChaseCameraController['update']>): boolean 
   ].every(Number.isFinite);
 }
 
-describe('elevated grid-frame-aware chase camera', () => {
+describe('continuous chase camera', () => {
   it('uses the approved cell-relative baseline and 60 degree FOV', () => {
     expect(CAMERA_DISTANCE_CELLS).toBe(4);
     expect(CAMERA_HEIGHT_CELLS).toBe(2.8);
@@ -83,6 +83,23 @@ describe('elevated grid-frame-aware chase camera', () => {
     const pose = controller.update(snapshot(), 0);
     const distance = Math.hypot(pose.position.x, pose.position.y, pose.position.z);
     expect(distance).toBeGreaterThan(GRID_CONFIG.cellSize * 0.8);
+  });
+
+  it('responds to a small continuous yaw with a correspondingly small camera change', () => {
+    const controller = new ChaseCameraController();
+    const baseline = controller.update(snapshot(), 0);
+    const yaw = 0.08;
+    const forward = { x: Math.sin(yaw), y: 0, z: Math.cos(yaw) };
+    const turned = controller.update(snapshot(forward), 0);
+
+    const displacement = Math.hypot(
+      turned.position.x - baseline.position.x,
+      turned.position.y - baseline.position.y,
+      turned.position.z - baseline.position.z
+    );
+    expect(displacement).toBeGreaterThan(0);
+    expect(displacement).toBeLessThan(GRID_CONFIG.cellSize);
+    expect(Math.abs(turned.target.x - baseline.target.x)).toBeLessThan(GRID_CONFIG.cellSize);
   });
 
   it('smoothly converges toward ordinary head motion without overshooting', () => {
