@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { createGridConfig } from '../../src/game/grid-config';
 import { INITIAL_GRID_FRAME } from '../../src/game/grid-frame';
 import {
+  ContinuousControlMetricsTracker,
   GridMetricsTracker,
   occupancyRatio,
-  safeMoveCount
+  safeMoveCount,
+  steeringMagnitude
 } from '../../src/game/metrics';
 import type { GridSnakeState } from '../../src/game/snake';
 
@@ -87,5 +89,37 @@ describe('grid tuning metrics', () => {
     const state = snake([[1, 1, 1], [1, 1, 0]]);
     expect(() => tracker.observe(state, INITIAL_GRID_FRAME, -1, config)).toThrow('elapsedMs');
     expect(() => tracker.observe(state, INITIAL_GRID_FRAME, Number.NaN, config)).toThrow('elapsedMs');
+  });
+});
+
+describe('V2.1 continuous control metrics', () => {
+  it('normalizes steering magnitude into 0..1', () => {
+    expect(steeringMagnitude({ yaw: 0, pitch: 0 })).toBe(0);
+    expect(steeringMagnitude({ yaw: 0.3, pitch: 0.4 })).toBeCloseTo(0.5, 12);
+    expect(steeringMagnitude({ yaw: 1, pitch: 1 })).toBe(1);
+    expect(steeringMagnitude({ yaw: -2, pitch: 0 })).toBe(1);
+  });
+
+  it('tracks total cell entries, average steering magnitude and the longest non-zero streak', () => {
+    const tracker = new ContinuousControlMetricsTracker();
+    tracker.recordGridEntries(2);
+    tracker.observeSteering({ yaw: 0, pitch: 0 });
+    tracker.observeSteering({ yaw: 0.3, pitch: 0.4 });
+    tracker.recordGridEntries(3);
+    tracker.observeSteering({ yaw: 1, pitch: 0 });
+    tracker.observeSteering({ yaw: 0, pitch: 0 });
+    tracker.observeSteering({ yaw: 0, pitch: 0.25 });
+
+    expect(tracker.snapshot()).toEqual({
+      totalGridCellEntries: 5,
+      averageSteeringMagnitude: 0.35,
+      maxConsecutiveNonZeroSteeringTicks: 2
+    });
+  });
+
+  it('rejects invalid entry counts instead of contaminating V2.1 metrics', () => {
+    const tracker = new ContinuousControlMetricsTracker();
+    expect(() => tracker.recordGridEntries(-1)).toThrow(RangeError);
+    expect(() => tracker.recordGridEntries(1.5)).toThrow(RangeError);
   });
 });
