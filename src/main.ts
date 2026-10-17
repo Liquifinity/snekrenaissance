@@ -2,9 +2,9 @@ import './styles.css';
 import { AppController } from './app/app-controller';
 import { createSessionGateway } from './app/gateway-selection';
 import { RuntimeLifecycle } from './app/runtime-lifecycle';
+import type { GridPoint } from './game/flight';
 import { cellToWorld } from './game/grid-topology';
 import {
-  queueTurnIntent,
   stepRun,
   type RunResult,
   type RunState
@@ -16,14 +16,17 @@ import { KeyboardInput } from './input/keyboard';
 import { ChaseCameraController } from './render/chase-camera';
 import { FoodRenderer } from './render/food-renderer';
 import {
-  buildRenderTransition,
-  buildStationaryRenderTransition,
-  interpolateTransition,
-  type InterpolatedTransition
-} from './render/interpolation';
+  displayWorldForGridPoint,
+  interpolateFlightPresentation,
+  type FlightPresentation
+} from './render/flight-presentation';
+import { FlightTrail } from './render/flight-trail';
 import { applyOverviewCamera } from './render/overview-camera';
 import { createScene } from './render/scene';
-import { SnakeRenderer } from './render/snake-renderer';
+import {
+  SnakeRenderer,
+  type VoxelBodySample
+} from './render/snake-renderer';
 
 const appCandidate = document.querySelector<HTMLElement>('#app');
 const canvasCandidate = document.querySelector<HTMLCanvasElement>('#game-canvas');
@@ -40,26 +43,25 @@ const cameraController = new ChaseCameraController(scene.camera);
 const sessionGateway = createSessionGateway(import.meta.env.VITE_RANKING_API_BASE);
 const controller = new AppController({ root: app, gateway: sessionGateway });
 const fixedClock = new FixedStepClock();
+const flightTrail = new FlightTrail();
 const joystick = new JoystickInput();
+const TRAIL_RESERVE_CELLS = 2;
 
 type CameraMode = 'chase' | 'overview';
 let cameraMode: CameraMode = 'chase';
 app.dataset.cameraMode = cameraMode;
 
-function buildPresentation(run: RunState): InterpolatedTransition {
-  const renderTransition = run.transition
-    ? buildRenderTransition(run.transition, run.config)
-    : buildStationaryRenderTransition(run.snake.segments, run.frame);
-  return interpolateTransition(renderTransition, run.renderAlpha, run.config);
+function buildPresentation(run: RunState): FlightPresentation {
+  return interpolateFlightPresentation(
+    run.previousFlight,
+    run.flight,
+    fixedClock.alpha,
+    run.config
+  );
 }
 
-function updateChaseCamera(presentation: InterpolatedTransition, dtSeconds: number): void {
-  cameraController.update({
-    headWorld: presentation.head.position,
-    forwardWorld: presentation.frame.forward,
-    upWorld: presentation.frame.up,
-    displayWrapOffset: presentation.head.displayWrapOffset
-  }, dtSeconds);
+function updateChaseCamera(presentation: FlightPresentation, dtSeconds: number): void {
+  cameraController.update(presentation, dtSeconds);
 }
 
 function setCameraMode(mode: CameraMode): void {
@@ -150,8 +152,7 @@ const lifecycle = new RuntimeLifecycle(fixedClock, {
   showError: showRuntimeError
 });
 
-// Presentation/debug only. Logical gameplay consumes takeIntent(), never these analog values.
-function readVisualInput(): InputState {
+function readSteeringInput(): InputState {
   const keyboardState = keyboard.state;
   const joystickState = joystick.state;
   return {
@@ -160,10 +161,49 @@ function readVisualInput(): InputState {
   };
 }
 
-function exposeVisualInput(input: InputState): void {
+function exposeSteeringInput(input: InputState): void {
   app.dataset.inputYaw = String(input.yaw);
   app.dataset.inputPitch = String(input.pitch);
   joystickKnob.style.transform = `translate(${input.yaw * 28}px, ${-input.pitch * 28}px)`;
+}
+
+function unwrapCellCenterNear(
+  cell: Readonly<{ x: number; y: number; z: number }>,
+  anchor: GridPoint,
+  resolution: number
+): GridPoint {
+  const point = { x: cell.x + 0.5, y: cell.y + 0.5, z: cell.z + 0.5 };
+  for (const axis of ['x', 'y', 'z'] as const) {
+    point[axis] += Math.round((anchor[axis] - point[axis]) / resolution) * resolution;
+  }
+  return point;
+}
+
+function initialTrailPoints(run: RunState): GridPoint[] {
+  let anchor: GridPoint = run.flight.unwrappedPosition;
+  return run.snake.segments.map((segment, index) => {
+    if (index === 0) return { ...anchor };
+    const point = unwrapCellCenterNear(segment.cell, anchor, run.config.resolution);
+    anchor = point;
+    return point;
+  });
+}
+
+function retainedTrailDistance(run: RunState): number {
+  return run.snake.segments.length + run.snake.pendingGrowth + TRAIL_RESERVE_CELLS;
+}
+
+function buildBodySamples(run: RunState, presentation: FlightPresentation): VoxelBodySample[] {
+  const samples: VoxelBodySample[] = [];
+  for (let index = 1; index < run.snake.segments.length; index += 1) {
+    const segment = run.snake.segments[index];
+    const gridPoint = flightTrail.sampleBehind(index, presentation.unwrappedGridPoint);
+    samples.push({
+      id: segment.id,
+      position: displayWorldForGridPoint(gridPoint, run.config)
+    });
+  }
+  return samples;
 }
 
 // Read-only browser diagnostics used by responsive/E2E verification. Never read back by gameplay.
@@ -171,11 +211,16 @@ function exposeLogicalTelemetry(run: RunState): void {
   const head = run.snake.segments[0];
   if (!head) return;
   app.dataset.headCell = `${head.cell.x},${head.cell.y},${head.cell.z}`;
-  app.dataset.headForward = run.frame.forward;
+  app.dataset.headYaw = String(run.flight.orientation.yaw);
+  app.dataset.headPitch = String(run.flight.orientation.pitch);
+  const point = run.flight.wrappedPosition;
+  app.dataset.headPoint = `${point.x},${point.y},${point.z}`;
 }
 
 function initializeRun(run: RunState): void {
   fixedClock.reset();
+  flightTrail.reset(initialTrailPoints(run));
+  flightTrail.trimToDistance(retainedTrailDistance(run));
   cameraController.reset();
   setCameraMode('chase');
   updateChaseCamera(buildPresentation(run), 0);
@@ -188,11 +233,8 @@ let frameId = 0;
 let rendererFailed = false;
 
 function frame(timestamp: number): void {
-  const visualInput = readVisualInput();
-  exposeVisualInput(visualInput);
-
-  const keyboardIntent = keyboard.takeIntent();
-  const joystickIntent = joystick.takeIntent();
+  const steering = readSteeringInput();
+  exposeSteeringInput(steering);
 
   const run = controller.currentRun;
   if (run !== activeRun) {
@@ -207,13 +249,15 @@ function frame(timestamp: number): void {
   lastTimestamp = timestamp;
 
   if (run?.phase === 'playing') {
-    queueTurnIntent(run, keyboardIntent);
-    queueTurnIntent(run, joystickIntent);
-
     lifecycle.consumeFrame(frameDeltaSeconds, (dt) => {
       const previousLength = run.snake.segments.length;
       const previousFoods = run.foodsCollected;
-      stepRun(run, dt);
+      stepRun(run, steering, dt);
+
+      if (run.phase !== 'game-over') {
+        flightTrail.push(run.flight.unwrappedPosition);
+        flightTrail.trimToDistance(retainedTrailDistance(run));
+      }
 
       if (
         run.phase === 'game-over'
@@ -229,7 +273,11 @@ function frame(timestamp: number): void {
   if (run) {
     exposeLogicalTelemetry(run);
     const presentation = buildPresentation(run);
-    snakeRenderer.render(presentation);
+    snakeRenderer.render({
+      headPosition: presentation.displayedHeadWorld,
+      headQuaternion: presentation.quaternion,
+      body: buildBodySamples(run, presentation)
+    });
     foodRenderer.render(run.food ? cellToWorld(run.food, run.config) : null);
 
     if (cameraMode === 'chase') {
