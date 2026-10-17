@@ -82,7 +82,7 @@ export function traverseGridSegment(
 
   while (true) {
     const tNext = Math.min(tMax.x, tMax.y, tMax.z);
-    if (!Number.isFinite(tNext) || tNext > 1 + TIE_EPSILON) break;
+    if (!Number.isFinite(tNext) || tNext > 1) break;
 
     if (Math.abs(tMax.x - tNext) <= TIE_EPSILON) {
       current.x += step.x;
