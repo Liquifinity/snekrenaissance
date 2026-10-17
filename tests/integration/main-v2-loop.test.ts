@@ -3,20 +3,32 @@ import { describe, expect, it } from 'vitest';
 
 const source = readFileSync(new URL('../../src/main.ts', import.meta.url), 'utf8');
 
-describe('browser main loop V2 authority boundary', () => {
-  it('drains discrete intents and renders from interpolated logical transitions', () => {
-    expect(source).toContain('keyboard.takeIntent()');
-    expect(source).toContain('joystick.takeIntent()');
-    expect(source).toContain('queueTurnIntent(');
-    expect(source).toContain('buildStationaryRenderTransition(');
-    expect(source).toContain('buildRenderTransition(');
-    expect(source).toContain('interpolateTransition(');
+describe('browser main loop V2.1 authority boundary', () => {
+  it('uses one continuous steering path at the fixed simulation cadence', () => {
+    expect(source).toContain('keyboard.state');
+    expect(source).toContain('joystick.state');
+    expect(source).toContain('stepRun(run, input, dt');
+    expect(source).not.toContain('keyboard.takeIntent()');
+    expect(source).not.toContain('joystick.takeIntent()');
+    expect(source).not.toContain('queueTurnIntent(');
+    expect(source).not.toContain('GridMovementClock');
   });
 
-  it('does not feed continuous V1 presentation state back into gameplay/rendering', () => {
-    expect(source).not.toContain('stepRun(run, input, dt)');
-    expect(source).not.toContain('headWrapped: run.headWrapped');
-    expect(source).not.toContain('bodyPositions: run.bodyPositions');
-    expect(source).not.toContain('forward: run.forward');
+  it('renders from continuous fixed-state presentation and a render-only trail', () => {
+    expect(source).toContain('fixedClock.alpha');
+    expect(source).toContain('interpolateFlightPresentation(');
+    expect(source).toContain('FlightTrail');
+    expect(source).toContain('flightTrail.sampleBehind(');
+    expect(source).not.toContain('buildStationaryRenderTransition(');
+    expect(source).not.toContain('buildRenderTransition(');
+    expect(source).not.toContain('interpolateTransition(');
+  });
+
+  it('exposes read-only V2.1 steering telemetry without reading it back into gameplay', () => {
+    expect(source).toContain('data-head-yaw');
+    expect(source).toContain('data-head-pitch');
+    expect(source).toContain('data-head-point');
+    expect(source).toContain('data-head-cell');
+    expect(source).not.toMatch(/dataset\.headYaw[^\n]*stepRun/);
   });
 });
