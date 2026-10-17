@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 const SRC_ROOT = join(process.cwd(), 'src');
 const GAME_ROOT = join(SRC_ROOT, 'game');
 const WORLD_TO_CELL_DEFINITION = 'game/grid-topology.ts';
-const FORBIDDEN_V1_AUTHORITY = /\b(TrailBuffer|sampleBodyPositions|advanceHead|applySteering|forwardVector|SNAKE_SPEED|STEERING_RATE|MAX_PITCH|SEGMENT_SPACING|FOOD_PICKUP_RADIUS|SELF_COLLISION_RADIUS)\b/;
+const FORBIDDEN_V1_AUTHORITY = /\b(TrailBuffer|sampleBodyPositions|advanceHead|applySteering|forwardVector|SNAKE_SPEED|STEERING_RATE|MAX_PITCH|SEGMENT_SPACING|FOOD_PICKUP_RADIUS|SELF_COLLISION_RADIUS|headWrapped|headUnwrapped|bodyPositions|LegacySteeringInput|LegacyChaseCameraSnapshot)\b/;
 
 async function listTypeScriptFiles(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -33,7 +33,7 @@ describe('grid authority boundary', () => {
     expect(violations).toEqual([]);
   });
 
-  it('contains no active continuous V1 gameplay authority', async () => {
+  it('contains no active continuous V1 gameplay authority or retired bridge', async () => {
     const violations: string[] = [];
 
     for (const file of await listTypeScriptFiles(SRC_ROOT)) {
