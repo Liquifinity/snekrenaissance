@@ -1,4 +1,5 @@
 import { wouldSelfCollide } from './collision';
+import type { SteeringInput } from './flight';
 import { GRID_CONFIG, type GridConfig } from './grid-config';
 import { rotateGridFrame } from './grid-frame';
 import { advanceGridStep, cellKey } from './grid-topology';
@@ -11,6 +12,12 @@ export type RunMetrics = Readonly<{
   nearBodyEncounters: number;
   firstPressureMs: number | null;
   firstConfinementMs: number | null;
+}>;
+
+export type ContinuousControlMetrics = Readonly<{
+  totalGridCellEntries: number;
+  averageSteeringMagnitude: number;
+  maxConsecutiveNonZeroSteeringTicks: number;
 }>;
 
 const LOCAL_ACTIONS: readonly TurnIntent[] = Object.freeze([
@@ -70,6 +77,51 @@ export function hasNearBodyEncounter(
   }
 
   return false;
+}
+
+export function steeringMagnitude(input: SteeringInput): number {
+  return Math.min(1, Math.hypot(input.yaw, input.pitch));
+}
+
+export class ContinuousControlMetricsTracker {
+  private totalEntries = 0;
+  private steeringMagnitudeTotal = 0;
+  private steeringTicks = 0;
+  private currentNonZeroSteeringTicks = 0;
+  private maxNonZeroSteeringTicks = 0;
+
+  recordGridEntries(count: number): void {
+    if (!Number.isInteger(count) || count < 0) {
+      throw new RangeError('Grid entry count must be a non-negative integer');
+    }
+    this.totalEntries += count;
+  }
+
+  observeSteering(input: SteeringInput): void {
+    const magnitude = steeringMagnitude(input);
+    this.steeringMagnitudeTotal += magnitude;
+    this.steeringTicks += 1;
+
+    if (magnitude > 0) {
+      this.currentNonZeroSteeringTicks += 1;
+      this.maxNonZeroSteeringTicks = Math.max(
+        this.maxNonZeroSteeringTicks,
+        this.currentNonZeroSteeringTicks
+      );
+    } else {
+      this.currentNonZeroSteeringTicks = 0;
+    }
+  }
+
+  snapshot(): ContinuousControlMetrics {
+    return Object.freeze({
+      totalGridCellEntries: this.totalEntries,
+      averageSteeringMagnitude: this.steeringTicks > 0
+        ? this.steeringMagnitudeTotal / this.steeringTicks
+        : 0,
+      maxConsecutiveNonZeroSteeringTicks: this.maxNonZeroSteeringTicks
+    });
+  }
 }
 
 export class GridMetricsTracker {
