@@ -85,7 +85,7 @@ describe('meme-first application flow', () => {
     expect(root.querySelector('[role="alert"]')?.textContent).toContain('username');
   });
 
-  it('starts a V2 run with score, length, progress bar, and stored identity', () => {
+  it('starts a V2.1 run with score, length, progress bar, and stored identity', () => {
     const { root, controller } = setup();
     enterUsernameAndPlay(root, 'snekboi');
 
@@ -148,7 +148,7 @@ describe('meme-first application flow', () => {
     expect(root.textContent).not.toContain('GAME OVER');
   });
 
-  it('shows V2 food score and personal best for a local game over', () => {
+  it('shows V2.1 food score and personal best for a local game over', () => {
     const { root, controller } = setup();
     enterUsernameAndPlay(root, 'ren');
     finishRun(controller, 24);
@@ -163,7 +163,7 @@ describe('meme-first application flow', () => {
     expect(root.querySelector('[data-action="rank"]')).not.toBeNull();
   });
 
-  it('shows the local V2 score record without public leaderboard language', () => {
+  it('shows the local V2.1 score record without public leaderboard language', () => {
     const { root, controller } = setup();
     enterUsernameAndPlay(root, 'ren');
     finishRun(controller, 24);
@@ -187,8 +187,10 @@ describe('meme-first application flow', () => {
     expect(input?.value).toBe('renato');
   });
 
-  it('keeps the highest V2 food-score best without overwriting historical V1 storage', () => {
+  it('keeps the highest V2.1 food-score best without overwriting historical V1 or V2 storage', () => {
     localStorage.setItem('snek.localBest', '68');
+    localStorage.setItem('snek.localBest.pixelGridV2', '33');
+
     const first = setup({ clearStorage: false });
     enterUsernameAndPlay(first.root, 'ren');
     finishRun(first.controller, 24);
@@ -199,7 +201,8 @@ describe('meme-first application flow', () => {
 
     expect(second.root.textContent).toContain('PERSONAL BEST');
     expect(second.root.textContent).toContain('24');
-    expect(localStorage.getItem('snek.localBest.pixelGridV2')).toBe('24');
+    expect(localStorage.getItem('snek.localBest.pixelGridV2_1')).toBe('24');
+    expect(localStorage.getItem('snek.localBest.pixelGridV2')).toBe('33');
     expect(localStorage.getItem('snek.localBest')).toBe('68');
 
     const third = setup({ clearStorage: false });
