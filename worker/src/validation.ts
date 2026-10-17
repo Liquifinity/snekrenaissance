@@ -1,10 +1,10 @@
 import {
-  FOOD_HEAD_EXCLUSION_RADIUS,
-  FOOD_PICKUP_RADIUS,
-  GROWTH_PER_FOOD,
-  INITIAL_BODY_SEGMENTS,
-  SNAKE_SPEED
-} from '../../src/game/constants';
+  V1_FOOD_HEAD_EXCLUSION_RADIUS,
+  V1_FOOD_PICKUP_RADIUS,
+  V1_GROWTH_PER_FOOD,
+  V1_INITIAL_BODY_SEGMENTS,
+  V1_SNAKE_SPEED
+} from './v1-rules';
 import type { StartGameRequest, SubmitResultRequest } from '../../src/shared/ranking-api';
 
 const USERNAME_MAX_CODE_POINTS = 24;
@@ -13,7 +13,7 @@ const MAX_FOOD_EATEN = 10_000;
 const SESSION_MAX_AGE_MS = 6 * 60 * 60 * 1_000;
 const CLIENT_CLOCK_GRACE_MS = 5_000;
 const THEORETICAL_FOOD_TRAVEL_MS =
-  ((FOOD_HEAD_EXCLUSION_RADIUS - FOOD_PICKUP_RADIUS) / SNAKE_SPEED) * 1_000;
+  ((V1_FOOD_HEAD_EXCLUSION_RADIUS - V1_FOOD_PICKUP_RADIUS) / V1_SNAKE_SPEED) * 1_000;
 const MIN_ACTIVE_MS_PER_FOOD = Math.min(200, Math.floor(THEORETICAL_FOOD_TRAVEL_MS));
 const CONTROL_CHARACTERS = /[\u0000-\u001F\u007F-\u009F]/u;
 const PLAYER_ID_PATTERN = /^[A-Za-z0-9._:-]+$/;
@@ -77,7 +77,7 @@ export function validateResultRequest(
 
   if (foodEaten > MAX_FOOD_EATEN) return fail('foodEaten exceeds the V1 limit.');
 
-  const expectedLength = INITIAL_BODY_SEGMENTS + foodEaten * GROWTH_PER_FOOD;
+  const expectedLength = V1_INITIAL_BODY_SEGMENTS + foodEaten * V1_GROWTH_PER_FOOD;
   if (maxLength !== expectedLength) return fail('maxLength does not match canonical growth.');
 
   if (durationMs < foodEaten * MIN_ACTIVE_MS_PER_FOOD) {
