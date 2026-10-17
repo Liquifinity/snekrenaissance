@@ -120,7 +120,10 @@ export class JoystickInput {
       pitch /= magnitude;
     }
 
-    this.current = { yaw, pitch };
+    // InputState is presentation-only in V2. Expose horizontal movement in
+    // screen coordinates while preserving the existing logical yaw used
+    // below to resolve discrete left/right TurnIntent values.
+    this.current = { yaw: -yaw, pitch };
     this.updateDiscreteIntent(yaw, pitch);
   }
 

@@ -20,9 +20,9 @@ describe('approved V2 render proportions', () => {
     expect(HEAD_VOXEL_SIZE / SNAKE_VOXEL_SIZE).toBeCloseTo(1, 8);
   });
 
-  it('keeps food smaller than the snake voxel for cell legibility', () => {
-    expect(FOOD_VOXEL_SIZE).toBeLessThan(SNAKE_VOXEL_SIZE);
-    expect(FOOD_VOXEL_SIZE / GRID_CONFIG.cellSize).toBeCloseTo(0.6, 8);
+  it('aligns food to the same voxel footprint as the snake grid', () => {
+    expect(FOOD_VOXEL_SIZE).toBeCloseTo(SNAKE_VOXEL_SIZE, 8);
+    expect(FOOD_VOXEL_SIZE / GRID_CONFIG.cellSize).toBeCloseTo(0.8, 8);
   });
 
   it('uses the logical resolution as the visible grid resolution', () => {

@@ -12,14 +12,14 @@ import {
 } from '../../src/render/snake-renderer';
 
 describe('Pixel Flight Grid V2 presentation contract', () => {
-  it('derives voxel footprints directly from GridConfig cell size', () => {
+  it('derives aligned voxel footprints directly from GridConfig cell size', () => {
     expect(SNAKE_VOXEL_FILL).toBe(0.8);
-    expect(FOOD_VOXEL_FILL).toBe(0.6);
+    expect(FOOD_VOXEL_FILL).toBe(0.8);
     expect(SNAKE_VOXEL_SIZE).toBeCloseTo(GRID_CONFIG.cellSize * 0.8, 8);
     expect(HEAD_VOXEL_SIZE).toBeCloseTo(SNAKE_VOXEL_SIZE, 8);
-    expect(FOOD_VOXEL_SIZE).toBeCloseTo(GRID_CONFIG.cellSize * 0.6, 8);
+    expect(FOOD_VOXEL_SIZE).toBeCloseTo(GRID_CONFIG.cellSize * 0.8, 8);
     expect(SNAKE_VOXEL_SIZE).toBeCloseTo(0.32, 8);
-    expect(FOOD_VOXEL_SIZE).toBeCloseTo(0.24, 8);
+    expect(FOOD_VOXEL_SIZE).toBeCloseTo(0.32, 8);
   });
 
   it('binds the visible cube grid exactly to the logical grid resolution', () => {

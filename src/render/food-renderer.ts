@@ -3,7 +3,7 @@ import { GRID_CONFIG, type GridConfig } from '../game/grid-config';
 import type { Vec3 } from '../game/types';
 import { PALETTE } from './scene';
 
-export const FOOD_VOXEL_FILL = 0.6;
+export const FOOD_VOXEL_FILL = 0.8;
 export const FOOD_VOXEL_SIZE = GRID_CONFIG.cellSize * FOOD_VOXEL_FILL;
 
 export class FoodRenderer {

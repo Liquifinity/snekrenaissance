@@ -3,9 +3,13 @@ import { describe, expect, it } from 'vitest';
 import type { InterpolatedSegment } from '../../src/render/interpolation';
 import {
   DEFAULT_RENDER_CAPACITY,
+  SNAKE_VOXEL_SIZE,
   SnakeRenderer
 } from '../../src/render/snake-renderer';
-import { FoodRenderer } from '../../src/render/food-renderer';
+import {
+  FOOD_VOXEL_SIZE,
+  FoodRenderer
+} from '../../src/render/food-renderer';
 
 function interpolated(id: number, x: number, y = 0, z = 0): InterpolatedSegment {
   return {
@@ -87,5 +91,9 @@ describe('voxel FoodRenderer', () => {
     expect(mesh?.geometry).toBeInstanceOf(THREE.BoxGeometry);
     expect(mesh?.position.toArray()).toEqual([0.4, -0.8, 1.2]);
     renderer.dispose();
+  });
+
+  it('uses the same visual voxel size as the snake grid', () => {
+    expect(FOOD_VOXEL_SIZE).toBe(SNAKE_VOXEL_SIZE);
   });
 });

@@ -13,6 +13,15 @@ async function startGame(page: import('@playwright/test').Page, username: string
   await expect(page.locator('#game-canvas')).toBeVisible();
 }
 
+async function joystickKnobOffset(knob: import('@playwright/test').Locator): Promise<{ x: number; y: number }> {
+  return knob.evaluate((element) => {
+    const transform = getComputedStyle(element).transform;
+    if (!transform || transform === 'none') return { x: 0, y: 0 };
+    const matrix = new DOMMatrixReadOnly(transform);
+    return { x: matrix.m41, y: matrix.m42 };
+  });
+}
+
 test('desktop V2 uses one discrete turn per key press and preserves camera switching', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-chromium');
   await startGame(page, 'desktop-snek');
@@ -57,6 +66,49 @@ test('pixel backing buffer stays reduced and independent of high DPR', async ({ 
     expect(dimensions.backingWidth).toBeLessThan(dimensions.cssWidth * dimensions.dpr);
     expect(dimensions.backingHeight).toBeLessThan(dimensions.cssHeight * dimensions.dpr);
   }
+});
+
+test('joystick cursor follows the physical screen direction on both mobile layouts', async ({ page }, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith('mobile-'));
+  await startGame(page, `cursor-${testInfo.project.name}`);
+
+  const joystick = page.locator('[data-joystick]');
+  const knob = page.locator('.joystick-knob');
+  const box = await joystick.boundingBox();
+  if (!box) throw new Error('missing joystick box');
+
+  const centerX = box.x + box.width / 2;
+  const centerY = box.y + box.height / 2;
+  const leftX = box.x + 4;
+  const rightX = box.x + box.width - 4;
+  const upY = box.y + 4;
+  const downY = box.y + box.height - 4;
+  const pointerId = 17;
+
+  await joystick.dispatchEvent('pointerdown', { pointerId, clientX: centerX, clientY: centerY });
+
+  await joystick.dispatchEvent('pointermove', { pointerId, clientX: rightX, clientY: centerY });
+  await expect.poll(async () => (await joystickKnobOffset(knob)).x).toBeGreaterThan(0);
+
+  await joystick.dispatchEvent('pointermove', { pointerId, clientX: centerX, clientY: centerY });
+  await expect.poll(async () => Math.abs((await joystickKnobOffset(knob)).x)).toBeLessThan(1);
+
+  await joystick.dispatchEvent('pointermove', { pointerId, clientX: leftX, clientY: centerY });
+  await expect.poll(async () => (await joystickKnobOffset(knob)).x).toBeLessThan(0);
+
+  await joystick.dispatchEvent('pointermove', { pointerId, clientX: centerX, clientY: centerY });
+  await expect.poll(async () => Math.abs((await joystickKnobOffset(knob)).y)).toBeLessThan(1);
+
+  await joystick.dispatchEvent('pointermove', { pointerId, clientX: centerX, clientY: upY });
+  await expect.poll(async () => (await joystickKnobOffset(knob)).y).toBeLessThan(0);
+
+  await joystick.dispatchEvent('pointermove', { pointerId, clientX: centerX, clientY: centerY });
+  await expect.poll(async () => Math.abs((await joystickKnobOffset(knob)).y)).toBeLessThan(1);
+
+  await joystick.dispatchEvent('pointermove', { pointerId, clientX: centerX, clientY: downY });
+  await expect.poll(async () => (await joystickKnobOffset(knob)).y).toBeGreaterThan(0);
+
+  await joystick.dispatchEvent('pointerup', { pointerId, clientX: centerX, clientY: downY });
 });
 
 test('mobile portrait and landscape keep controls playable, latched, and inside viewport', async ({ page }, testInfo) => {
