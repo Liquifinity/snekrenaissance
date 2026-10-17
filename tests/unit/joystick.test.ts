@@ -1,87 +1,82 @@
 import { describe, expect, it } from 'vitest';
-import {
-  JOYSTICK_ACTIVATION_THRESHOLD,
-  JOYSTICK_REARM_THRESHOLD,
-  JoystickInput
-} from '../../src/input/joystick';
+import { JOYSTICK_DEADZONE, JoystickInput } from '../../src/input/joystick';
 
-describe('JoystickInput discrete intents', () => {
-  it('uses the approved activation and rearm thresholds', () => {
-    expect(JOYSTICK_ACTIVATION_THRESHOLD).toBe(0.55);
-    expect(JOYSTICK_REARM_THRESHOLD).toBe(0.25);
+function expectStateClose(actual: { yaw: number; pitch: number }, expected: { yaw: number; pitch: number }): void {
+  expect(actual.yaw).toBeCloseTo(expected.yaw, 6);
+  expect(actual.pitch).toBeCloseTo(expected.pitch, 6);
+}
+
+describe('JoystickInput continuous steering state', () => {
+  it('uses the approved radial deadzone', () => {
+    expect(JOYSTICK_DEADZONE).toBe(0.15);
   });
 
-  it('resolves the dominant axis to one local turn intent', () => {
-    const left = new JoystickInput();
-    left.begin(1, 0, 0, 0, 0, 100);
-    left.move(1, -70, -20);
-    expect(left.takeIntent()).toBe('left');
-
-    const right = new JoystickInput();
-    right.begin(2, 0, 0, 0, 0, 100);
-    right.move(2, 70, 20);
-    expect(right.takeIntent()).toBe('right');
-
-    const up = new JoystickInput();
-    up.begin(3, 0, 0, 0, 0, 100);
-    up.move(3, 10, -70);
-    expect(up.takeIntent()).toBe('up');
-
-    const down = new JoystickInput();
-    down.begin(4, 0, 0, 0, 0, 100);
-    down.move(4, -10, 70);
-    expect(down.takeIntent()).toBe('down');
-  });
-
-  it('emits at most one intent while a deflection remains held', () => {
+  it('uses the same four axis signs as keyboard controls', () => {
     const joystick = new JoystickInput();
     joystick.begin(1, 0, 0, 0, 0, 100);
-    joystick.move(1, -70, 0);
-    expect(joystick.takeIntent()).toBe('left');
 
-    joystick.move(1, -90, 0);
-    expect(joystick.takeIntent()).toBe('none');
+    joystick.move(1, 100, 0);
+    expectStateClose(joystick.state, { yaw: 1, pitch: 0 });
+    joystick.move(1, -100, 0);
+    expectStateClose(joystick.state, { yaw: -1, pitch: 0 });
+    joystick.move(1, 0, -100);
+    expectStateClose(joystick.state, { yaw: 0, pitch: 1 });
+    joystick.move(1, 0, 100);
+    expectStateClose(joystick.state, { yaw: 0, pitch: -1 });
   });
 
-  it('requires rearm near center before a new deflection can emit', () => {
+  it('keeps small radial motion neutral and rescales outside the deadzone', () => {
     const joystick = new JoystickInput();
-    joystick.begin(1, 0, 0, 0, 0, 100);
-    joystick.move(1, -70, 0);
-    expect(joystick.takeIntent()).toBe('left');
+    joystick.begin(2, 0, 0, 0, 0, 100);
 
-    joystick.move(1, 0, -40);
-    expect(joystick.takeIntent()).toBe('none');
+    joystick.move(2, 10, 0);
+    expectStateClose(joystick.state, { yaw: 0, pitch: 0 });
 
-    joystick.move(1, 20, 0);
-    expect(joystick.takeIntent()).toBe('none');
-
-    joystick.move(1, 0, -70);
-    expect(joystick.takeIntent()).toBe('up');
+    joystick.move(2, 70, 0);
+    expect(joystick.state.yaw).toBeCloseTo((0.7 - 0.15) / 0.85, 6);
+    expect(joystick.state.pitch).toBeCloseTo(0, 6);
   });
 
-  it('pointer end and cancel clear pending intent and pointer state', () => {
+  it('preserves direction and proportional magnitude for diagonal deflection', () => {
+    const joystick = new JoystickInput();
+    joystick.begin(3, 0, 0, 0, 0, 100);
+    joystick.move(3, 30, -40);
+
+    const rescaledMagnitude = (0.5 - 0.15) / 0.85;
+    expect(joystick.state.yaw).toBeCloseTo(rescaledMagnitude * 0.6, 6);
+    expect(joystick.state.pitch).toBeCloseTo(rescaledMagnitude * 0.8, 6);
+  });
+
+  it('moves right through center to left without rearm or stale commands', () => {
+    const joystick = new JoystickInput();
+    joystick.begin(4, 0, 0, 0, 0, 100);
+    joystick.move(4, 80, 0);
+    expect(joystick.state.yaw).toBeGreaterThan(0);
+
+    joystick.move(4, 0, 0);
+    expectStateClose(joystick.state, { yaw: 0, pitch: 0 });
+
+    joystick.move(4, -80, 0);
+    expect(joystick.state.yaw).toBeLessThan(0);
+  });
+
+  it('end, cancel, and reset neutralize pointer state', () => {
     const ended = new JoystickInput();
-    ended.begin(7, -70, 0, 0, 0, 100);
-    ended.end(7);
-    expect(ended.takeIntent()).toBe('none');
+    ended.begin(5, 80, 0, 0, 0, 100);
+    ended.end(5);
+    expectStateClose(ended.state, { yaw: 0, pitch: 0 });
     expect(ended.activePointerId).toBeNull();
 
     const cancelled = new JoystickInput();
-    cancelled.begin(8, 70, 0, 0, 0, 100);
-    cancelled.cancel(8);
-    expect(cancelled.takeIntent()).toBe('none');
+    cancelled.begin(6, 0, -80, 0, 0, 100);
+    cancelled.cancel(6);
+    expectStateClose(cancelled.state, { yaw: 0, pitch: 0 });
     expect(cancelled.activePointerId).toBeNull();
-  });
 
-  it('reset clears stale input and rearms after resize/orientation changes', () => {
-    const joystick = new JoystickInput();
-    joystick.begin(4, -70, 0, 0, 0, 100);
-    joystick.reset();
-
-    expect(joystick.takeIntent()).toBe('none');
-    expect(joystick.activePointerId).toBeNull();
-
-    joystick.begin(5, 0, -70, 0, 0, 100);
-    expect(joystick.takeIntent()).toBe('up');
+    const reset = new JoystickInput();
+    reset.begin(7, -80, 0, 0, 0, 100);
+    reset.reset();
+    expectStateClose(reset.state, { yaw: 0, pitch: 0 });
+    expect(reset.activePointerId).toBeNull();
   });
 });

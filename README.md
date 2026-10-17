@@ -7,39 +7,47 @@ conquer the space
 
 SNEK RENAISSANCE is an independent experimental browser game. It is not affiliated with, endorsed by, or presented as an official OpenAI or ChatGPT product.
 
-## Active Pixel Flight Grid V2
+## Active Pixel Flight Grid V2.1
 
-The active game is a single-player 3D Snake running on a deterministic toroidal voxel grid. Gameplay authority is integer cell occupancy; rendering interpolates those cell transitions smoothly so the snake still reads as flight rather than stop-motion.
+The active game is a single-player 3D Snake with continuous flight steering and exact strategic occupancy on a finite toroidal voxel grid. The head pose moves continuously in logical grid coordinates at a fixed 60 Hz simulation cadence. A deterministic voxel traversal bridge enumerates every logical cell entered by that continuous trajectory, so food, growth and self-collision remain exact even though steering is no longer quantized to 90-degree turns.
 
 Baseline ruleset:
 
-- `RULESET_ID = pixel-flight-grid-v2`;
+- `RULESET_ID = pixel-flight-grid-v2-1`;
 - `9 × 9 × 9` toroidal logical cells;
-- six-cell initial snake;
+- six-cell initial strategic snake;
+- continuous yaw/pitch steering at 60 Hz;
+- flight speed baseline of `6 cells/s`;
+- steering rate baseline of `π × 0.9 rad/s` with pitch clamped to `±80°`;
+- deterministic unwrapped voxel traversal prevents tunneling and canonicalizes toroidal cell entry;
 - exact occupied-cell self-collision with tail-vacate semantics;
-- food occupies one free cell and adds two cells of pending growth;
+- food occupies exactly one free logical cell and adds two cells of pending growth;
 - canonical score is `foodsCollected`; occupied length is a separate metric;
 - `300 foods = 100%` remains the provisional completion contract;
+- snake and food voxel footprints remain `0.8 × cellSize`;
 - visual grid divisions exactly match logical grid resolution.
 
-Desktop controls: `A/←`, `D/→`, `W/↑`, `S/↓`. Inputs are local left/right/up/down intents resolved to deterministic 90-degree `GridFrame` turns at cell boundaries. `X` changes between the elevated chase camera and the front overview camera.
+Desktop controls are continuous while held: `A/←` steers left, `D/→` steers right, `W/↑` steers up, and `S/↓` steers down. `X` remains an edge-triggered camera toggle between chase and overview modes. There is no movement FIFO, no one-turn-per-keypress latch, and no 6 Hz steering gate.
 
-Mobile uses the same discrete turn semantics through a threshold/rearm virtual joystick. Portrait and landscape are covered by browser tests.
+Mobile uses a proportional virtual joystick with radial deadzone `0.15`. Physical right/left/up/down map to the same signed yaw/pitch convention as keyboard input. The stick does not require recenter/rearm before accepting the next direction; it is sampled continuously while the pointer remains active.
 
-The presentation uses voxel snake/food geometry, antialiasing disabled, a reduced internal framebuffer (`RENDER_SCALE = 0.50` baseline), CSS pixelated upscale, and wrap-aware interpolation. Presentation-space floats never feed gameplay collision, food, scoring, growth or topology.
+The strategic body is still an ordered stable-ID chain of occupied `GridCell` values. The renderer uses a separate unwrapped `FlightTrail` only for visual continuity; that trail and all Three.js/world-space values are presentation-only and never feed collision, food, score, growth or topology. The chase camera follows the same continuous head pose and wrap offset used for presentation.
+
+The presentation keeps voxel snake/food geometry, antialiasing disabled, a reduced internal framebuffer (`RENDER_SCALE = 0.50` baseline), CSS pixelated upscale, and toroidal wrap handling without a full-cube interpolation sweep.
 
 ## Local-first identity and score
 
-V2 requires no account or ranking server. The browser stores:
+V2.1 requires no account or ranking server. The browser stores:
 
 - the chosen username;
 - the anonymous player ID reserved for future connected ranking;
 - the historical V1 local best under its existing key;
-- the V2 personal best separately under `snek.localBest.pixelGridV2`.
+- the historical V2 personal best under `snek.localBest.pixelGridV2`;
+- the active V2.1 personal best separately under `snek.localBest.pixelGridV2_1`.
 
-V2 personal best is the highest `foodsCollected` score. A later lower score never replaces it. Historical V1 length records are not compared to V2 food scores.
+V2.1 personal best is the highest `foodsCollected` score. A later lower score never replaces it. Historical V1 and V2 records remain intact and are not compared to the V2.1 score.
 
-The repository retains the existing HTTP/Cloudflare ranking seam, but that validator was designed for V1 arithmetic and explicitly does **not** advertise support for `pixel-flight-grid-v2`. Even when an HTTP API base is configured, the active V2 remains local-first until a future server validator explicitly supports this ruleset.
+The repository retains the existing HTTP/Cloudflare ranking seam, but that validator was designed for the legacy ruleset contract and explicitly does **not** advertise support for `pixel-flight-grid-v2-1`. Even when an HTTP API base is configured, V2.1 remains local-first until a future server validator explicitly supports this ruleset.
 
 ## Local development
 
@@ -61,22 +69,21 @@ npm run worker:build
 npm run build
 npx playwright install --with-deps chromium
 npm run test:e2e
-npm run test:tuning
 ```
 
-The tuning harness compares 8³, 9³ and 10³ with 32 fixed seeds, one deterministic policy, and a hard semantic horizon of 10,000 logical steps. It is comparative evidence, not a substitute for human playtesting and cannot change the provisional 300-food completion contract without a separate approved spec amendment.
+The retained 8³/9³/10³ 32-seed greedy-turn harness is **historical V2 discrete evidence**. It is not a V2.1 autopilot and must not be interpreted as a V2.1 tuning verdict because continuous steering changes the reachable control policy. V2.1 records separate continuous-control metrics such as grid-cell entries, average steering magnitude and longest non-zero steering streak. Human playtesting remains mandatory for final control-feel acceptance.
 
 ## Architecture documents
 
-Canonical V2 design:
+Canonical V2.1 design:
 
-`docs/superpowers/specs/2026-10-16-snek-renaissance-pixel-flight-grid-v2-design.md`
+`docs/superpowers/specs/2026-10-17-snek-renaissance-pixel-flight-grid-v2-1-smooth-control-design.md`
 
-Canonical implementation plan:
+Canonical V2.1 implementation plan:
 
-`docs/superpowers/plans/2026-10-16-snek-renaissance-pixel-flight-grid-v2.md`
+`docs/superpowers/plans/2026-10-17-snek-renaissance-pixel-flight-grid-v2-1-smooth-control-r1.md`
 
-The earlier V1 specifications remain historical documentation. They are not rewritten to imply that V1 always used grid gameplay.
+The earlier V1 and V2 specifications remain historical documentation. They are not rewritten to imply that those versions always used the V2.1 control architecture.
 
 ## Preserved online-ranking seam
 
@@ -88,7 +95,7 @@ The repository intentionally retains:
 - leaderboard UI and validation tests;
 - production release tooling.
 
-These components are preserved for a future ruleset-aware global ranking system. The active V2 does not submit scores to the current V1 validator.
+These components are preserved for a future ruleset-aware global ranking system. The active V2.1 does not submit scores to the current legacy validator.
 
 For backend development:
 

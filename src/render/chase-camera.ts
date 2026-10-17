@@ -1,6 +1,7 @@
 import type { PerspectiveCamera } from 'three';
 import { GRID_CONFIG, type GridConfig } from '../game/grid-config';
 import type { Vec3 } from '../game/types';
+import type { FlightPresentation } from './flight-presentation';
 
 export const CAMERA_DISTANCE_CELLS = 4;
 export const CAMERA_HEIGHT_CELLS = 2.8;
@@ -8,12 +9,10 @@ export const CAMERA_LOOK_AHEAD_CELLS = 2;
 export const CAMERA_FOV = 60;
 export const CAMERA_SMOOTHING = 8;
 
-export type ChaseCameraSnapshot = Readonly<{
-  headWorld: Vec3;
-  forwardWorld: Vec3;
-  upWorld: Vec3;
-  displayWrapOffset: Vec3;
-}>;
+export type ChaseCameraSnapshot = Pick<
+  FlightPresentation,
+  'headWorld' | 'forwardWorld' | 'upWorld' | 'displayWrapOffset'
+>;
 
 export type CameraPose = Readonly<{
   position: Vec3;

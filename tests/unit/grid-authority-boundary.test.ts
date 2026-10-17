@@ -4,8 +4,22 @@ import { describe, expect, it } from 'vitest';
 
 const SRC_ROOT = join(process.cwd(), 'src');
 const GAME_ROOT = join(SRC_ROOT, 'game');
+const INPUT_ROOT = join(SRC_ROOT, 'input');
 const WORLD_TO_CELL_DEFINITION = 'game/grid-topology.ts';
-const FORBIDDEN_V1_AUTHORITY = /\b(TrailBuffer|sampleBodyPositions|advanceHead|applySteering|forwardVector|SNAKE_SPEED|STEERING_RATE|MAX_PITCH|SEGMENT_SPACING|FOOD_PICKUP_RADIUS|SELF_COLLISION_RADIUS|headWrapped|headUnwrapped|bodyPositions|LegacySteeringInput|LegacyChaseCameraSnapshot)\b/;
+const FORBIDDEN_RETIRED_V1_AUTHORITY = /\b(TrailBuffer|sampleBodyPositions|advanceHead|SNAKE_SPEED|SEGMENT_SPACING|FOOD_PICKUP_RADIUS|SELF_COLLISION_RADIUS|headWrapped|headUnwrapped|bodyPositions|LegacySteeringInput|LegacyChaseCameraSnapshot)\b/;
+const FORBIDDEN_V2_RUNSTATE_AUTHORITY = /\b(TurnIntentQueue|GridMovementClock|rotateGridFrame|queueTurnIntent|INITIAL_GRID_FRAME|LogicalTransition)\b/;
+const FORBIDDEN_DISCRETE_INPUT_BRIDGE = /\b(takeIntent|pendingIntent|legacyIntentArmed|LEGACY_INTENT_ACTIVATION_THRESHOLD|LEGACY_INTENT_REARM_THRESHOLD)\b/;
+const FORBIDDEN_ACTIVE_V2_AUTHORITY = /\b(TurnIntentQueue|GridMovementClock|queueTurnIntent|rotateGridFrame|JOYSTICK_ACTIVATION_THRESHOLD|JOYSTICK_REARM_THRESHOLD|LogicalTransition|buildRenderTransition|interpolateTransition)\b/;
+const ACTIVE_V21_RUNTIME_FILES = Object.freeze([
+  'main.ts',
+  'game/run-state.ts',
+  'input/keyboard.ts',
+  'input/joystick.ts',
+  'render/chase-camera.ts',
+  'render/flight-presentation.ts',
+  'render/flight-trail.ts',
+  'render/snake-renderer.ts'
+]);
 
 async function listTypeScriptFiles(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -33,20 +47,53 @@ describe('grid authority boundary', () => {
     expect(violations).toEqual([]);
   });
 
-  it('contains no active continuous V1 gameplay authority or retired bridge', async () => {
+  it('contains no retired continuous V1 gameplay authority or bridge', async () => {
     const violations: string[] = [];
 
     for (const file of await listTypeScriptFiles(SRC_ROOT)) {
       const repoRelative = relative(SRC_ROOT, file).replaceAll('\\', '/');
       const source = await readFile(file, 'utf8');
-      if (FORBIDDEN_V1_AUTHORITY.test(source)) violations.push(repoRelative);
+      if (FORBIDDEN_RETIRED_V1_AUTHORITY.test(source)) violations.push(repoRelative);
     }
 
     expect(violations).toEqual([]);
   });
 
-  it('removes the old steering and trail authority modules entirely', async () => {
+  it('keeps the active V2.1 RunState independent from discrete V2 steering and render code', async () => {
+    const source = await readFile(join(GAME_ROOT, 'run-state.ts'), 'utf8');
+    expect(FORBIDDEN_V2_RUNSTATE_AUTHORITY.test(source)).toBe(false);
+    expect(source).not.toMatch(/from ['"]three['"]/);
+    expect(source).not.toMatch(/render\/flight-trail/);
+    expect(source).toMatch(/advanceFlightPose/);
+    expect(source).toMatch(/traverseGridSegment/);
+  });
+
+  it('removes the legacy discrete movement bridge from active input adapters', async () => {
+    const violations: string[] = [];
+
+    for (const file of await listTypeScriptFiles(INPUT_ROOT)) {
+      const repoRelative = relative(SRC_ROOT, file).replaceAll('\\', '/');
+      const source = await readFile(file, 'utf8');
+      if (FORBIDDEN_DISCRETE_INPUT_BRIDGE.test(source)) violations.push(repoRelative);
+    }
+
+    expect(violations).toEqual([]);
+  });
+
+  it('keeps all active V2.1 runtime modules free of retired discrete V2 authority', async () => {
+    const violations: string[] = [];
+
+    for (const repoRelative of ACTIVE_V21_RUNTIME_FILES) {
+      const source = await readFile(join(SRC_ROOT, repoRelative), 'utf8');
+      if (FORBIDDEN_ACTIVE_V2_AUTHORITY.test(source)) violations.push(repoRelative);
+    }
+
+    expect(violations).toEqual([]);
+  });
+
+  it('allows V2.1 continuous logical flight without resurrecting V1 steering/trail modules', async () => {
     const gameFiles = await readdir(GAME_ROOT);
+    expect(gameFiles).toContain('flight.ts');
     expect(gameFiles).not.toContain('steering.ts');
     expect(gameFiles).not.toContain('trail.ts');
   });

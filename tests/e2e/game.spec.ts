@@ -13,6 +13,18 @@ async function startGame(page: import('@playwright/test').Page, username: string
   await expect(page.locator('#game-canvas')).toBeVisible();
 }
 
+async function numericAppAttribute(
+  page: import('@playwright/test').Page,
+  attribute: string
+): Promise<number> {
+  const raw = await page.locator('#app').getAttribute(attribute);
+  const value = Number(raw);
+  if (raw === null || !Number.isFinite(value)) {
+    throw new Error(`missing numeric app attribute ${attribute}: ${raw}`);
+  }
+  return value;
+}
+
 async function joystickKnobOffset(knob: import('@playwright/test').Locator): Promise<{ x: number; y: number }> {
   return knob.evaluate((element) => {
     const transform = getComputedStyle(element).transform;
@@ -22,23 +34,60 @@ async function joystickKnobOffset(knob: import('@playwright/test').Locator): Pro
   });
 }
 
-test('desktop V2 uses one discrete turn per key press and preserves camera switching', async ({ page }, testInfo) => {
+test('desktop V2.1 holds continuous steering and preserves camera switching', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-chromium');
   await startGame(page, 'desktop-snek');
 
-  await expect(page.locator('#app')).toHaveAttribute('data-camera-mode', 'chase');
+  const app = page.locator('#app');
+  await expect(app).toHaveAttribute('data-camera-mode', 'chase');
   await page.keyboard.press('x');
-  await expect(page.locator('#app')).toHaveAttribute('data-camera-mode', 'overview');
+  await expect(app).toHaveAttribute('data-camera-mode', 'overview');
   await page.keyboard.press('x');
-  await expect(page.locator('#app')).toHaveAttribute('data-camera-mode', 'chase');
+  await expect(app).toHaveAttribute('data-camera-mode', 'chase');
 
-  await expect(page.locator('#app')).toHaveAttribute('data-head-forward', '+Z');
+  await page.keyboard.down('ArrowRight');
+  await expect.poll(() => numericAppAttribute(page, 'data-input-yaw')).toBe(1);
+  const rightStart = await numericAppAttribute(page, 'data-head-yaw');
+  await page.waitForTimeout(120);
+  const rightMid = await numericAppAttribute(page, 'data-head-yaw');
+  await page.waitForTimeout(120);
+  const rightEnd = await numericAppAttribute(page, 'data-head-yaw');
+  expect(rightMid).toBeGreaterThan(rightStart + 0.05);
+  expect(rightEnd).toBeGreaterThan(rightMid + 0.05);
+
+  await page.keyboard.up('ArrowRight');
+  await expect.poll(() => numericAppAttribute(page, 'data-input-yaw')).toBe(0);
+  await page.waitForTimeout(80);
+  const neutralYaw = await numericAppAttribute(page, 'data-head-yaw');
+  await page.waitForTimeout(100);
+  const neutralYawLater = await numericAppAttribute(page, 'data-head-yaw');
+  expect(Math.abs(neutralYawLater - neutralYaw)).toBeLessThan(0.01);
+
   await page.keyboard.down('ArrowLeft');
-  await expect(page.locator('#app')).toHaveAttribute('data-head-forward', '+X');
-  await page.waitForTimeout(600);
-  await expect(page.locator('#app')).toHaveAttribute('data-head-forward', '+X');
+  await expect.poll(() => numericAppAttribute(page, 'data-input-yaw')).toBe(-1);
+  const leftStart = await numericAppAttribute(page, 'data-head-yaw');
+  await page.waitForTimeout(120);
+  const leftEnd = await numericAppAttribute(page, 'data-head-yaw');
+  expect(leftEnd).toBeLessThan(leftStart - 0.05);
   await page.keyboard.up('ArrowLeft');
-  await expect(page.locator('#app')).toHaveAttribute('data-screen', 'game');
+
+  await page.keyboard.down('ArrowUp');
+  await expect.poll(() => numericAppAttribute(page, 'data-input-pitch')).toBe(1);
+  const upStart = await numericAppAttribute(page, 'data-head-pitch');
+  await page.waitForTimeout(120);
+  const upEnd = await numericAppAttribute(page, 'data-head-pitch');
+  expect(upEnd).toBeGreaterThan(upStart + 0.05);
+  await page.keyboard.up('ArrowUp');
+
+  await page.keyboard.down('ArrowDown');
+  await expect.poll(() => numericAppAttribute(page, 'data-input-pitch')).toBe(-1);
+  const downStart = await numericAppAttribute(page, 'data-head-pitch');
+  await page.waitForTimeout(120);
+  const downEnd = await numericAppAttribute(page, 'data-head-pitch');
+  expect(downEnd).toBeLessThan(downStart - 0.05);
+  await page.keyboard.up('ArrowDown');
+
+  await expect(app).toHaveAttribute('data-screen', 'game');
 });
 
 test('pixel backing buffer stays reduced and independent of high DPR', async ({ page }) => {
@@ -111,30 +160,60 @@ test('joystick cursor follows the physical screen direction on both mobile layou
   await joystick.dispatchEvent('pointerup', { pointerId, clientX: centerX, clientY: downY });
 });
 
-test('mobile portrait and landscape keep controls playable, latched, and inside viewport', async ({ page }, testInfo) => {
+test('mobile V2.1 joystick steers continuously without recenter/rearm and remains responsive', async ({ page }, testInfo) => {
   test.skip(!testInfo.project.name.startsWith('mobile-'));
   await startGame(page, `mobile-${testInfo.project.name}`);
 
+  const app = page.locator('#app');
   const joystick = page.locator('[data-joystick]');
   await expect(joystick).toBeVisible();
   await expect(page.locator('[data-camera-toggle]')).toBeVisible();
 
   await page.locator('[data-camera-toggle]').click();
-  await expect(page.locator('#app')).toHaveAttribute('data-camera-mode', 'overview');
+  await expect(app).toHaveAttribute('data-camera-mode', 'overview');
   await page.locator('[data-camera-toggle]').click();
-  await expect(page.locator('#app')).toHaveAttribute('data-camera-mode', 'chase');
+  await expect(app).toHaveAttribute('data-camera-mode', 'chase');
 
   const box = await joystick.boundingBox();
   if (!box) throw new Error('missing joystick box');
   const centerX = box.x + box.width / 2;
   const centerY = box.y + box.height / 2;
+  const leftX = box.x + 4;
   const rightX = box.x + box.width - 4;
+  const upperRightY = box.y + box.height * 0.2;
+  const pointerId = 7;
 
-  await joystick.dispatchEvent('pointerdown', { pointerId: 7, clientX: centerX, clientY: centerY });
-  await joystick.dispatchEvent('pointermove', { pointerId: 7, clientX: rightX, clientY: centerY });
-  await expect(page.locator('#app')).toHaveAttribute('data-head-forward', '-X');
-  await page.waitForTimeout(600);
-  await expect(page.locator('#app')).toHaveAttribute('data-head-forward', '-X');
+  await joystick.dispatchEvent('pointerdown', { pointerId, clientX: centerX, clientY: centerY });
+  await joystick.dispatchEvent('pointermove', { pointerId, clientX: rightX, clientY: centerY });
+  await expect.poll(() => numericAppAttribute(page, 'data-input-yaw')).toBeGreaterThan(0.5);
+  const rightStart = await numericAppAttribute(page, 'data-head-yaw');
+  await page.waitForTimeout(120);
+  const rightEnd = await numericAppAttribute(page, 'data-head-yaw');
+  expect(rightEnd).toBeGreaterThan(rightStart + 0.03);
+
+  await joystick.dispatchEvent('pointermove', { pointerId, clientX: centerX, clientY: centerY });
+  await expect.poll(async () => Math.abs(await numericAppAttribute(page, 'data-input-yaw'))).toBeLessThan(0.01);
+  await page.waitForTimeout(80);
+  const neutralStart = await numericAppAttribute(page, 'data-head-yaw');
+  await page.waitForTimeout(100);
+  const neutralEnd = await numericAppAttribute(page, 'data-head-yaw');
+  expect(Math.abs(neutralEnd - neutralStart)).toBeLessThan(0.01);
+
+  // Same pointer remains active: direct opposite steering requires no pointer-up/rearm cycle.
+  await joystick.dispatchEvent('pointermove', { pointerId, clientX: leftX, clientY: centerY });
+  await expect.poll(() => numericAppAttribute(page, 'data-input-yaw')).toBeLessThan(-0.5);
+  const leftStart = await numericAppAttribute(page, 'data-head-yaw');
+  await page.waitForTimeout(120);
+  const leftEnd = await numericAppAttribute(page, 'data-head-yaw');
+  expect(leftEnd).toBeLessThan(leftStart - 0.03);
+
+  await joystick.dispatchEvent('pointermove', { pointerId, clientX: rightX, clientY: upperRightY });
+  await expect.poll(() => numericAppAttribute(page, 'data-input-yaw')).toBeGreaterThan(0.2);
+  await expect.poll(() => numericAppAttribute(page, 'data-input-pitch')).toBeGreaterThan(0.2);
+
+  await joystick.dispatchEvent('pointerup', { pointerId, clientX: rightX, clientY: upperRightY });
+  await expect.poll(async () => Math.abs(await numericAppAttribute(page, 'data-input-yaw'))).toBeLessThan(0.01);
+  await expect.poll(async () => Math.abs(await numericAppAttribute(page, 'data-input-pitch'))).toBeLessThan(0.01);
 
   const beforeResize = await page.evaluate(() => ({
     scrollWidth: document.documentElement.scrollWidth,
@@ -147,9 +226,9 @@ test('mobile portrait and landscape keep controls playable, latched, and inside 
   await page.setViewportSize({ width: current.height, height: current.width });
   await page.evaluate(() => window.dispatchEvent(new Event('orientationchange')));
   await page.waitForTimeout(100);
-  await expect(page.locator('#app')).toHaveAttribute('data-input-yaw', '0');
-  await expect(page.locator('#app')).toHaveAttribute('data-input-pitch', '0');
-  await expect(page.locator('#app')).toHaveAttribute('data-screen', 'game');
+  await expect(app).toHaveAttribute('data-input-yaw', '0');
+  await expect(app).toHaveAttribute('data-input-pitch', '0');
+  await expect(app).toHaveAttribute('data-screen', 'game');
 
   const afterResize = await page.evaluate(() => ({
     scrollWidth: document.documentElement.scrollWidth,

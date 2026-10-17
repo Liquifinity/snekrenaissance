@@ -5,7 +5,7 @@ import type { RunResult } from '../../src/game/run-state';
 
 const identity: PlayerIdentity = { playerId: 'player/with space', username: 'Ren <b>ato</b>' };
 const result: RunResult = {
-  rulesetId: 'pixel-flight-grid-v2',
+  rulesetId: 'pixel-flight-grid-v2-1',
   score: 2,
   foodsCollected: 2,
   length: 20,
