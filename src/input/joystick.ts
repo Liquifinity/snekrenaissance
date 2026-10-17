@@ -1,29 +1,16 @@
-import type { TurnIntent } from '../game/grid-types';
 import { neutralInput, type InputState } from './input-state';
 
 export const JOYSTICK_DEADZONE = 0.15;
-const LEGACY_INTENT_ACTIVATION_THRESHOLD = 0.55;
-const LEGACY_INTENT_REARM_THRESHOLD = 0.25;
 
 export class JoystickInput {
   private current: InputState = neutralInput();
-  private pendingIntent: TurnIntent = 'none';
-  private legacyIntentArmed = true;
   private pointerId: number | null = null;
   private centerX = 0;
   private centerY = 0;
   private radius = 1;
 
-  /** Authoritative continuous V2.1 steering state. */
   get state(): InputState {
     return { ...this.current };
-  }
-
-  /** @deprecated Temporary V2 runtime bridge. Removed when main.ts migrates to V2.1. */
-  takeIntent(): TurnIntent {
-    const intent = this.pendingIntent;
-    this.pendingIntent = 'none';
-    return intent;
   }
 
   get activePointerId(): number | null {
@@ -66,8 +53,6 @@ export class JoystickInput {
   reset(): void {
     this.pointerId = null;
     this.current = neutralInput();
-    this.pendingIntent = 'none';
-    this.legacyIntentArmed = true;
   }
 
   attach(element: HTMLElement, windowTarget: Window = window): () => void {
@@ -123,8 +108,6 @@ export class JoystickInput {
       magnitude = 1;
     }
 
-    this.updateLegacyIntent(yaw, pitch);
-
     if (magnitude <= JOYSTICK_DEADZONE) {
       this.current = neutralInput();
       return;
@@ -137,30 +120,5 @@ export class JoystickInput {
       yaw: directionX * scaledMagnitude,
       pitch: directionY * scaledMagnitude
     };
-  }
-
-  private updateLegacyIntent(yaw: number, pitch: number): void {
-    const dominantMagnitude = Math.max(Math.abs(yaw), Math.abs(pitch));
-
-    if (dominantMagnitude <= LEGACY_INTENT_REARM_THRESHOLD) {
-      this.legacyIntentArmed = true;
-      return;
-    }
-
-    if (
-      !this.legacyIntentArmed
-      || this.pendingIntent !== 'none'
-      || dominantMagnitude < LEGACY_INTENT_ACTIVATION_THRESHOLD
-    ) {
-      return;
-    }
-
-    if (Math.abs(yaw) >= Math.abs(pitch)) {
-      this.pendingIntent = yaw >= 0 ? 'right' : 'left';
-    } else {
-      this.pendingIntent = pitch >= 0 ? 'up' : 'down';
-    }
-
-    this.legacyIntentArmed = false;
   }
 }
