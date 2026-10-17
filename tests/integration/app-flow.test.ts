@@ -2,6 +2,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import { AppController } from '../../src/app/app-controller';
+import { RULESET_ID } from '../../src/game/grid-config';
 
 function setup(options: { clearStorage?: boolean } = {}): { root: HTMLElement; controller: AppController } {
   document.body.innerHTML = '<main id="app"><canvas id="game-canvas"></canvas></main>';
@@ -33,7 +34,7 @@ function finishRun(controller: AppController, score: number): void {
   const length = run.snake.segments.length;
   run.phase = 'game-over';
   run.result = {
-    rulesetId: 'pixel-flight-grid-v2',
+    rulesetId: RULESET_ID,
     score,
     foodsCollected: score,
     length,
@@ -129,7 +130,7 @@ describe('meme-first application flow', () => {
     run.score = 300;
     run.foodEaten = 300;
     run.result = {
-      rulesetId: 'pixel-flight-grid-v2',
+      rulesetId: RULESET_ID,
       score: 300,
       foodsCollected: 300,
       length: run.snake.segments.length,

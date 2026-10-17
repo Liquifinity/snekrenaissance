@@ -1,11 +1,12 @@
 import { describe, expect, test, vi } from 'vitest';
 import { HttpSessionGateway } from '../../src/app/http-session-gateway';
 import type { PlayerIdentity } from '../../src/app/identity';
+import { RULESET_ID } from '../../src/game/grid-config';
 import type { RunResult } from '../../src/game/run-state';
 
 const identity: PlayerIdentity = { playerId: 'player/with space', username: 'Ren <b>ato</b>' };
 const result: RunResult = {
-  rulesetId: 'pixel-flight-grid-v2',
+  rulesetId: RULESET_ID,
   score: 2,
   foodsCollected: 2,
   length: 20,
