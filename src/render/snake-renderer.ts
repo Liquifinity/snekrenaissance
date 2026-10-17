@@ -16,20 +16,6 @@ export type VoxelSnakeRenderSnapshot = Readonly<{
   frame: InterpolatedFrame;
 }>;
 
-/** Temporary Task 7→10 bridge for the still-unmigrated browser loop. */
-export type LegacySnakeRenderSnapshot = Readonly<{
-  headWrapped: Vec3;
-  bodyPositions: readonly Vec3[];
-  forward?: Vec3;
-  up?: Vec3;
-}>;
-
-function isVoxelSnapshot(
-  snapshot: VoxelSnakeRenderSnapshot | LegacySnakeRenderSnapshot
-): snapshot is VoxelSnakeRenderSnapshot {
-  return 'head' in snapshot && 'body' in snapshot && 'frame' in snapshot;
-}
-
 function displayedPosition(segment: InterpolatedSegment): Vec3 {
   return {
     x: segment.position.x + segment.displayWrapOffset.x,
@@ -54,8 +40,6 @@ export class SnakeRenderer {
   private readonly leftEye: THREE.Mesh;
   private readonly rightEye: THREE.Mesh;
   private readonly transform = new THREE.Object3D();
-  private readonly defaultForward = new THREE.Vector3(0, 0, 1);
-  private readonly legacyForward = new THREE.Vector3();
   private instanceCapacity: number;
 
   constructor(
@@ -104,26 +88,7 @@ export class SnakeRenderer {
     return this.bodyMesh.count;
   }
 
-  render(snapshot: VoxelSnakeRenderSnapshot | LegacySnakeRenderSnapshot): void {
-    if (isVoxelSnapshot(snapshot)) {
-      this.renderVoxel(snapshot);
-      return;
-    }
-    this.renderLegacyBridge(snapshot);
-  }
-
-  dispose(): void {
-    this.headMesh.remove(this.leftEye, this.rightEye);
-    this.scene.remove(this.bodyMesh, this.headMesh);
-    this.bodyMesh.dispose();
-    this.bodyGeometry.dispose();
-    this.headGeometry.dispose();
-    this.eyeGeometry.dispose();
-    this.material.dispose();
-    this.eyeMaterial.dispose();
-  }
-
-  private renderVoxel(snapshot: VoxelSnakeRenderSnapshot): void {
+  render(snapshot: VoxelSnakeRenderSnapshot): void {
     const headPosition = displayedPosition(snapshot.head);
     this.headMesh.position.set(headPosition.x, headPosition.y, headPosition.z);
     this.headMesh.quaternion.set(
@@ -150,34 +115,15 @@ export class SnakeRenderer {
     this.bodyMesh.instanceMatrix.needsUpdate = true;
   }
 
-  /** Remove in Task 10 when main.ts consumes InterpolatedTransition directly. */
-  private renderLegacyBridge(snapshot: LegacySnakeRenderSnapshot): void {
-    this.headMesh.position.set(
-      snapshot.headWrapped.x,
-      snapshot.headWrapped.y,
-      snapshot.headWrapped.z
-    );
-
-    const forward = snapshot.forward ?? { x: 0, y: 0, z: 1 };
-    this.legacyForward.set(forward.x, forward.y, forward.z);
-    if (this.legacyForward.lengthSq() < 1e-8) {
-      this.legacyForward.copy(this.defaultForward);
-    } else {
-      this.legacyForward.normalize();
-    }
-    this.headMesh.quaternion.setFromUnitVectors(this.defaultForward, this.legacyForward);
-
-    this.ensureCapacity(snapshot.bodyPositions.length);
-    this.bodyMesh.count = snapshot.bodyPositions.length;
-    for (let index = 0; index < snapshot.bodyPositions.length; index += 1) {
-      const position = snapshot.bodyPositions[index];
-      this.transform.position.set(position.x, position.y, position.z);
-      this.transform.quaternion.identity();
-      this.transform.scale.setScalar(1);
-      this.transform.updateMatrix();
-      this.bodyMesh.setMatrixAt(index, this.transform.matrix);
-    }
-    this.bodyMesh.instanceMatrix.needsUpdate = true;
+  dispose(): void {
+    this.headMesh.remove(this.leftEye, this.rightEye);
+    this.scene.remove(this.bodyMesh, this.headMesh);
+    this.bodyMesh.dispose();
+    this.bodyGeometry.dispose();
+    this.headGeometry.dispose();
+    this.eyeGeometry.dispose();
+    this.material.dispose();
+    this.eyeMaterial.dispose();
   }
 
   private createBodyMesh(capacity: number): THREE.InstancedMesh {
