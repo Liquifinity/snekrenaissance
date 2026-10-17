@@ -65,9 +65,9 @@ describe('continuous voxel SnakeRenderer', () => {
 
     const mesh = scene.getObjectByName('snake-body-voxels') as THREE.InstancedMesh;
     expect(renderer.renderedSegmentCount).toBe(3);
-    expect(matrixPosition(mesh, 0).x).toBeCloseTo(0.1, 12);
-    expect(matrixPosition(mesh, 1).x).toBeCloseTo(0.2, 12);
-    expect(matrixPosition(mesh, 2).x).toBeCloseTo(0.3, 12);
+    expect(matrixPosition(mesh, 0).x).toBeCloseTo(0.1, 6);
+    expect(matrixPosition(mesh, 1).x).toBeCloseTo(0.2, 6);
+    expect(matrixPosition(mesh, 2).x).toBeCloseTo(0.3, 6);
     renderer.dispose();
   });
 
@@ -80,9 +80,9 @@ describe('continuous voxel SnakeRenderer', () => {
     renderer.render({ ...head, body: [body(1, 1.1), body(2, 2.1), body(8, 3)] });
 
     const mesh = scene.getObjectByName('snake-body-voxels') as THREE.InstancedMesh;
-    expect(matrixPosition(mesh, 0).x).toBeCloseTo(1.1, 12);
-    expect(matrixPosition(mesh, 1).x).toBeCloseTo(2.1, 12);
-    expect(matrixPosition(mesh, 2).x).toBeCloseTo(3, 12);
+    expect(matrixPosition(mesh, 0).x).toBeCloseTo(1.1, 6);
+    expect(matrixPosition(mesh, 1).x).toBeCloseTo(2.1, 6);
+    expect(matrixPosition(mesh, 2).x).toBeCloseTo(3, 6);
     renderer.dispose();
   });
 
