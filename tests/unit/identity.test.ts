@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   LOCAL_BEST_KEY,
   V2_LOCAL_BEST_KEY,
+  V2_1_LOCAL_BEST_KEY,
   getOrCreatePlayerId,
   loadPixelGridV2Best,
+  loadPixelGridV2_1Best,
   loadUsername,
   savePixelGridV2Best,
+  savePixelGridV2_1Best,
   saveUsername,
   type StorageLike
 } from '../../src/app/identity';
@@ -46,14 +49,17 @@ describe('anonymous player identity', () => {
     expect(id).not.toBe('ren');
   });
 
-  it('stores V2 food score separately from the historical V1 best', () => {
+  it('keeps V1, V2 and V2.1 personal best namespaces independent', () => {
     const storage = new MemoryStorage();
     storage.setItem(LOCAL_BEST_KEY, '68');
+    expect(savePixelGridV2Best(storage, 24)).toBe(24);
 
-    expect(savePixelGridV2Best(storage, 7)).toBe(7);
-    expect(savePixelGridV2Best(storage, 4)).toBe(7);
-    expect(loadPixelGridV2Best(storage)).toBe(7);
-    expect(storage.getItem(V2_LOCAL_BEST_KEY)).toBe('7');
+    expect(savePixelGridV2_1Best(storage, 7)).toBe(7);
+    expect(savePixelGridV2_1Best(storage, 4)).toBe(7);
+    expect(loadPixelGridV2_1Best(storage)).toBe(7);
+    expect(loadPixelGridV2Best(storage)).toBe(24);
+    expect(storage.getItem(V2_1_LOCAL_BEST_KEY)).toBe('7');
+    expect(storage.getItem(V2_LOCAL_BEST_KEY)).toBe('24');
     expect(storage.getItem(LOCAL_BEST_KEY)).toBe('68');
   });
 });

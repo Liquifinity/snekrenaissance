@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('V2 stays local-first even when an HTTP ranking base is configured', async ({ page }) => {
+test('V2.1 stays local-first even when an HTTP ranking base is configured', async ({ page }) => {
   const apiRequests: string[] = [];
   page.on('request', (request) => {
     if (request.url().includes('/api/')) {
@@ -15,7 +15,7 @@ test('V2 stays local-first even when an HTTP ranking base is configured', async 
         apiBase: string;
         gatewayKind: string;
         forceGameOver: (result: {
-          rulesetId: 'pixel-flight-grid-v2';
+          rulesetId: 'pixel-flight-grid-v2-1';
           score: number;
           foodsCollected: number;
           length: number;
@@ -30,7 +30,7 @@ test('V2 stays local-first even when an HTTP ranking base is configured', async 
   expect(runtime).toEqual({ apiBase: '/rank', gatewayKind: 'HttpSessionGateway' });
 
   await page.locator('[data-action="continue"]').click();
-  await page.locator('input[name="username"]').fill('v2-local');
+  await page.locator('input[name="username"]').fill('v2-1-local');
   await page.locator('[data-action="play"]').click();
 
   await expect(page.locator('[data-hud-score]')).toHaveText('SCORE 0');
@@ -42,7 +42,7 @@ test('V2 stays local-first even when an HTTP ranking base is configured', async 
     const harness = (window as unknown as {
       __SNEK_TEST__?: {
         forceGameOver: (result: {
-          rulesetId: 'pixel-flight-grid-v2';
+          rulesetId: 'pixel-flight-grid-v2-1';
           score: number;
           foodsCollected: number;
           length: number;
@@ -54,7 +54,7 @@ test('V2 stays local-first even when an HTTP ranking base is configured', async 
     }).__SNEK_TEST__;
     if (!harness) throw new Error('missing ranked E2E harness');
     harness.forceGameOver({
-      rulesetId: 'pixel-flight-grid-v2',
+      rulesetId: 'pixel-flight-grid-v2-1',
       score: 7,
       foodsCollected: 7,
       length: 20,
@@ -70,6 +70,13 @@ test('V2 stays local-first even when an HTTP ranking base is configured', async 
   await expect(page.locator('.result-metrics')).toContainText('PERSONAL BEST');
   await expect(page.locator('.result-metrics')).not.toContainText('WORLD');
   expect(apiRequests.filter((entry) => entry.includes('/api/'))).toEqual([]);
+
+  const bests = await page.evaluate(() => ({
+    v2: localStorage.getItem('snek.localBest.pixelGridV2'),
+    v2_1: localStorage.getItem('snek.localBest.pixelGridV2_1')
+  }));
+  expect(bests.v2).toBeNull();
+  expect(bests.v2_1).toBe('7');
 
   await page.locator('[data-action="rank"]').click();
   await expect(page.locator('[data-view="rank"]')).toBeVisible();
