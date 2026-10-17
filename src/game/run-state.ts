@@ -160,7 +160,7 @@ export function stepRun(
   state.previousFlight = previousFlight;
   processGridEntries(state, entries, rng);
 
-  if (state.phase === 'playing') {
+  if (state.phase !== 'game-over') {
     state.flight = nextFlight;
   }
 
