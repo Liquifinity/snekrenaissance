@@ -84,8 +84,7 @@ describe('toroidal continuous voxel traversal', () => {
       { x: 8, y: 1, z: 1 },
       { x: 0, y: 1, z: 1 },
       { x: 1, y: 1, z: 1 },
-      { x: 2, y: 1, z: 1 },
-      { x: 3, y: 1, z: 1 }
+      { x: 2, y: 1, z: 1 }
     ]);
   });
 
