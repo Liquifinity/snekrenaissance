@@ -44,11 +44,31 @@ const joystick = new JoystickInput({
 });
 
 type CameraMode = 'chase' | 'overview';
+type TouchPoint = Readonly<{ x: number; y: number }>;
+const CAMERA_WHEEL_SENSITIVITY = 0.001;
+const cameraTouchPoints = new Map<number, TouchPoint>();
+let pinchStartDistance: number | null = null;
+let pinchStartZoomFactor = cameraController.zoomFactor;
 let cameraMode: CameraMode = 'chase';
 app.dataset.cameraMode = cameraMode;
+app.dataset.cameraZoomFactor = cameraController.zoomFactor.toFixed(4);
 
 function updateChaseCamera(run: RunState, dtSeconds: number): void {
   cameraController.update(buildPixelChaseCameraSnapshot(run), dtSeconds);
+}
+
+function applyCurrentOverviewCamera(): void {
+  applyOverviewCamera(
+    scene.camera,
+    controller.currentRun?.config,
+    cameraController.zoomFactor
+  );
+}
+
+function setCameraZoomFactor(factor: number): void {
+  cameraController.setZoomFactor(factor);
+  app.dataset.cameraZoomFactor = cameraController.zoomFactor.toFixed(4);
+  if (cameraMode === 'overview') applyCurrentOverviewCamera();
 }
 
 function setCameraMode(mode: CameraMode): void {
@@ -57,7 +77,7 @@ function setCameraMode(mode: CameraMode): void {
   const run = controller.currentRun;
 
   if (mode === 'overview') {
-    applyOverviewCamera(scene.camera, run?.config);
+    applyCurrentOverviewCamera();
     return;
   }
 
@@ -68,6 +88,52 @@ function setCameraMode(mode: CameraMode): void {
 function toggleCamera(): void {
   if (controller.screen !== 'game') return;
   setCameraMode(cameraMode === 'chase' ? 'overview' : 'chase');
+}
+
+function touchDistance(): number | null {
+  if (cameraTouchPoints.size !== 2) return null;
+  const [first, second] = [...cameraTouchPoints.values()];
+  if (!first || !second) return null;
+  const distance = Math.hypot(second.x - first.x, second.y - first.y);
+  return Number.isFinite(distance) && distance > 0 ? distance : null;
+}
+
+function restartPinchBaseline(): void {
+  const distance = touchDistance();
+  pinchStartDistance = distance;
+  pinchStartZoomFactor = cameraController.zoomFactor;
+}
+
+function handleCameraWheel(event: WheelEvent): void {
+  if (controller.screen !== 'game') return;
+  event.preventDefault();
+  const multiplier = Math.exp(event.deltaY * CAMERA_WHEEL_SENSITIVITY);
+  setCameraZoomFactor(cameraController.zoomFactor * multiplier);
+}
+
+function handleCameraPointerDown(event: PointerEvent): void {
+  if (controller.screen !== 'game' || event.pointerType !== 'touch') return;
+  cameraTouchPoints.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  if (cameraTouchPoints.size === 2) restartPinchBaseline();
+  else if (cameraTouchPoints.size > 2) pinchStartDistance = null;
+  if (cameraTouchPoints.size >= 2) event.preventDefault();
+}
+
+function handleCameraPointerMove(event: PointerEvent): void {
+  if (!cameraTouchPoints.has(event.pointerId)) return;
+  cameraTouchPoints.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  if (cameraTouchPoints.size !== 2 || pinchStartDistance === null) return;
+
+  const distance = touchDistance();
+  if (distance === null) return;
+  setCameraZoomFactor(pinchStartZoomFactor * (distance / pinchStartDistance));
+  event.preventDefault();
+}
+
+function handleCameraPointerEnd(event: PointerEvent): void {
+  if (!cameraTouchPoints.delete(event.pointerId)) return;
+  if (cameraTouchPoints.size === 2) restartPinchBaseline();
+  else pinchStartDistance = null;
 }
 
 const keyboard = new KeyboardInput({
@@ -119,7 +185,11 @@ function showRuntimeError(message: string): void {
 
 const lifecycle = new RuntimeLifecycle(fixedClock, {
   resize,
-  resetTouch: () => joystick.reset(),
+  resetTouch: () => {
+    joystick.reset();
+    cameraTouchPoints.clear();
+    pinchStartDistance = null;
+  },
   showError: showRuntimeError
 });
 
@@ -303,18 +373,19 @@ function handleVisibilityChange(): void {
 
 function handleResize(): void {
   lifecycle.handleResize();
-  if (cameraMode === 'overview') {
-    applyOverviewCamera(scene.camera, controller.currentRun?.config);
-  }
+  if (cameraMode === 'overview') applyCurrentOverviewCamera();
 }
 
 function handleOrientationChange(): void {
   lifecycle.handleOrientationChange();
-  if (cameraMode === 'overview') {
-    applyOverviewCamera(scene.camera, controller.currentRun?.config);
-  }
+  if (cameraMode === 'overview') applyCurrentOverviewCamera();
 }
 
+canvas.addEventListener('wheel', handleCameraWheel, { passive: false });
+canvas.addEventListener('pointerdown', handleCameraPointerDown);
+canvas.addEventListener('pointermove', handleCameraPointerMove);
+canvas.addEventListener('pointerup', handleCameraPointerEnd);
+canvas.addEventListener('pointercancel', handleCameraPointerEnd);
 canvas.addEventListener('webglcontextlost', (event) => {
   event.preventDefault();
   rendererFailed = true;
@@ -333,6 +404,11 @@ window.addEventListener('pagehide', () => {
   detachKeyboard();
   detachJoystick();
   cameraToggle.removeEventListener('click', toggleCamera);
+  canvas.removeEventListener('wheel', handleCameraWheel);
+  canvas.removeEventListener('pointerdown', handleCameraPointerDown);
+  canvas.removeEventListener('pointermove', handleCameraPointerMove);
+  canvas.removeEventListener('pointerup', handleCameraPointerEnd);
+  canvas.removeEventListener('pointercancel', handleCameraPointerEnd);
   document.removeEventListener('visibilitychange', handleVisibilityChange);
   window.removeEventListener('resize', handleResize);
   window.removeEventListener('orientationchange', handleOrientationChange);
