@@ -198,6 +198,7 @@ if (e2eMode) {
       setManualClock: (enabled: boolean) => void;
       consumeFrame: (frameDeltaSeconds: number) => number;
       setFoodCell: (cell: TestFoodCell) => void;
+      getCameraPosition: () => Readonly<{ x: number; y: number; z: number }>;
       forceGameOver: (result: RunResult) => void;
     };
   };
@@ -208,7 +209,6 @@ if (e2eMode) {
     setManualClock: (enabled) => {
       manualClock = enabled;
       fixedClock.reset();
-      lastTimestamp = null;
     },
     consumeFrame: (frameDeltaSeconds) => {
       const run = controller.currentRun;
@@ -239,6 +239,11 @@ if (e2eMode) {
 
       run.food = { x: cell.x, y: cell.y, z: cell.z };
     },
+    getCameraPosition: () => ({
+      x: scene.camera.position.x,
+      y: scene.camera.position.y,
+      z: scene.camera.position.z
+    }),
     forceGameOver: (result) => {
       const run = controller.currentRun;
       if (!run) throw new Error('No active run to finish.');
