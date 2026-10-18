@@ -166,6 +166,16 @@ function exposeSteeringInput(input: InputState): void {
   joystickKnob.style.transform = `translate(${input.yaw * 28}px, ${-input.pitch * 28}px)`;
 }
 
+function exposeFoodPickupTelemetry(run: RunState, food: Readonly<{ x: number; y: number; z: number }>): void {
+  const head = run.snake.segments[0];
+  if (!head) return;
+  const foodWorld = cellToWorld(food, run.config);
+  const headWorld = cellToWorld(head.cell, run.config);
+  app.dataset.lastFoodPickupCell = `${food.x},${food.y},${food.z}`;
+  app.dataset.lastFoodPickupWorld = `${foodWorld.x},${foodWorld.y},${foodWorld.z}`;
+  app.dataset.lastFoodPickupHeadWorld = `${headWorld.x},${headWorld.y},${headWorld.z}`;
+}
+
 // Read-only browser diagnostics used by responsive/E2E verification. Never read back by gameplay.
 function exposeLogicalTelemetry(run: RunState): void {
   const head = run.snake.segments[0];
@@ -213,7 +223,12 @@ function frame(timestamp: number): void {
     lifecycle.consumeFrame(frameDeltaSeconds, (dt) => {
       const previousLength = run.snake.segments.length;
       const previousFoods = run.foodsCollected;
+      const consumedFood = run.food ? { ...run.food } : null;
       stepRun(run, steering, dt);
+
+      if (consumedFood && run.foodsCollected > previousFoods) {
+        exposeFoodPickupTelemetry(run, consumedFood);
+      }
 
       if (
         run.phase === 'game-over'
