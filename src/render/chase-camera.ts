@@ -7,6 +7,9 @@ export const CAMERA_HEIGHT_CELLS = 2.8;
 export const CAMERA_LOOK_AHEAD_CELLS = 2;
 export const CAMERA_FOV = 60;
 export const CAMERA_SMOOTHING = 8;
+export const CAMERA_ZOOM_MIN = 0.65;
+export const CAMERA_ZOOM_MAX = 5;
+export const CAMERA_ZOOM_DEFAULT = 1;
 
 export type ChaseCameraSnapshot = Readonly<{
   headWorld: Vec3;
@@ -49,11 +52,15 @@ function lerp(a: Vec3, b: Vec3, t: number): Vec3 {
   };
 }
 
-function desiredPose(snapshot: ChaseCameraSnapshot, config: GridConfig): CameraPose {
+function desiredPose(
+  snapshot: ChaseCameraSnapshot,
+  config: GridConfig,
+  zoomFactor: number
+): CameraPose {
   const forward = normalize(snapshot.forwardWorld, { x: 0, y: 0, z: 1 });
   const up = normalize(snapshot.upWorld, { x: 0, y: 1, z: 0 });
-  const distance = CAMERA_DISTANCE_CELLS * config.cellSize;
-  const height = CAMERA_HEIGHT_CELLS * config.cellSize;
+  const distance = CAMERA_DISTANCE_CELLS * config.cellSize * zoomFactor;
+  const height = CAMERA_HEIGHT_CELLS * config.cellSize * zoomFactor;
   const lookAhead = CAMERA_LOOK_AHEAD_CELLS * config.cellSize;
 
   return {
@@ -83,6 +90,7 @@ function wrapRebase(previous: Vec3, current: Vec3, worldSize: number): Vec3 {
 export class ChaseCameraController {
   private pose: CameraPose | null = null;
   private lastHeadWorld: Vec3 | null = null;
+  private currentZoomFactor = CAMERA_ZOOM_DEFAULT;
 
   constructor(
     private readonly camera?: PerspectiveCamera,
@@ -94,12 +102,23 @@ export class ChaseCameraController {
     }
   }
 
+  get zoomFactor(): number {
+    return this.currentZoomFactor;
+  }
+
+  setZoomFactor(factor: number): void {
+    if (!Number.isFinite(factor) || factor <= 0) {
+      throw new RangeError('Camera zoom factor must be finite and > 0.');
+    }
+    this.currentZoomFactor = Math.min(CAMERA_ZOOM_MAX, Math.max(CAMERA_ZOOM_MIN, factor));
+  }
+
   update(snapshot: ChaseCameraSnapshot, dtSeconds: number): CameraPose {
     if (!Number.isFinite(dtSeconds) || dtSeconds < 0) {
       throw new RangeError('Camera dt must be a finite non-negative number.');
     }
 
-    const desired = desiredPose(snapshot, this.config);
+    const desired = desiredPose(snapshot, this.config, this.currentZoomFactor);
 
     if (!this.pose || !this.lastHeadWorld) {
       this.pose = {
