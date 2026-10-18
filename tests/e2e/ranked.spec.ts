@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-const RULESET = 'snek-core-v3' as const;
+const RULESET = 'snek-core-v4' as const;
 
 type RankedHarness = {
   apiBase: string;
@@ -41,7 +41,7 @@ function nextCell(
   throw new Error(`unknown direction ${direction}`);
 }
 
-test('SNEK CORE V3 stays local-first even when an HTTP ranking base is configured', async ({ page }) => {
+test('SNEK CORE V4 stays local-first even when an HTTP ranking base is configured', async ({ page }) => {
   const apiRequests: string[] = [];
   page.on('request', (request) => {
     if (request.url().includes('/api/')) apiRequests.push(`${request.method()} ${request.url()}`);
@@ -55,7 +55,7 @@ test('SNEK CORE V3 stays local-first even when an HTTP ranking base is configure
   expect(runtime).toEqual({ apiBase: '/rank', gatewayKind: 'HttpSessionGateway' });
 
   await page.locator('[data-action="continue"]').click();
-  await page.locator('input[name="username"]').fill('v3-local');
+  await page.locator('input[name="username"]').fill('v4-local');
   await page.locator('[data-action="play"]').click();
 
   await expect(page.locator('[data-hud-score]')).toHaveText('SCORE 0');
@@ -90,10 +90,10 @@ test('SNEK CORE V3 stays local-first even when an HTTP ranking base is configure
   expect(apiRequests.filter((entry) => entry.includes('/api/'))).toEqual([]);
 });
 
-test('SNEK CORE V3 pickup visibly coincides with the exact committed head cell center', async ({ page }) => {
+test('SNEK CORE V4 pickup visibly coincides with the exact committed head cell center', async ({ page }) => {
   await page.goto('/');
   await page.locator('[data-action="continue"]').click();
-  await page.locator('input[name="username"]').fill('pickup-v3');
+  await page.locator('input[name="username"]').fill('pickup-v4');
   await page.locator('[data-action="play"]').click();
   await expect(page.locator('[data-hud-score]')).toHaveText('SCORE 0');
 

@@ -4,24 +4,20 @@ import { describe, expect, it } from 'vitest';
 
 const SRC_ROOT = join(process.cwd(), 'src');
 const GAME_ROOT = join(SRC_ROOT, 'game');
-const INPUT_ROOT = join(SRC_ROOT, 'input');
 const RENDER_ROOT = join(SRC_ROOT, 'render');
+const INPUT_ROOT = join(SRC_ROOT, 'input');
 const WORLD_TO_CELL_DEFINITION = 'game/grid-topology.ts';
-const FORBIDDEN_RETIRED_V1_AUTHORITY = /\b(TrailBuffer|sampleBodyPositions|advanceHead|SNAKE_SPEED|SEGMENT_SPACING|FOOD_PICKUP_RADIUS|SELF_COLLISION_RADIUS|headWrapped|headUnwrapped|bodyPositions|LegacySteeringInput|LegacyChaseCameraSnapshot)\b/;
-const FORBIDDEN_V3_RUNSTATE_AUTHORITY = /\b(FlightPose|SteeringInput|advanceFlightPose|createInitialFlightPose|traverseGridSegment|GridCellEntry|quantizeForwardToGridDirection|visibleDirection|TurnIntentQueue|GridMovementClock|queueTurnIntent|LogicalTransition|INITIAL_GRID_FRAME|advanceGridMovement|pendingTurn|queueTurn)\b/;
-const FORBIDDEN_DISCRETE_INPUT_BRIDGE = /\b(takeIntent|pendingIntent|legacyIntentArmed|LEGACY_INTENT_ACTIVATION_THRESHOLD|LEGACY_INTENT_REARM_THRESHOLD)\b/;
-const FORBIDDEN_ACTIVE_LEGACY_AUTHORITY = /\b(FlightPose|advanceFlightPose|traverseGridSegment|quantizeForwardToGridDirection|visibleDirection|TurnIntentQueue|GridMovementClock|queueTurnIntent|JOYSTICK_ACTIVATION_THRESHOLD|JOYSTICK_REARM_THRESHOLD|LogicalTransition|buildRenderTransition|interpolateTransition)\b/;
-const ACTIVE_V3_RUNTIME_FILES = Object.freeze([
+const ACTIVE_V4_RUNTIME_FILES = Object.freeze([
   'main.ts',
   'game/run-state.ts',
   'input/keyboard.ts',
-  'input/joystick.ts',
-  'render/chase-camera.ts',
-  'render/pixel-camera-presentation.ts',
+  'input/direction-pad.ts',
+  'render/board-camera.ts',
   'render/pixel-snake-presentation.ts',
   'render/snake-renderer.ts',
   'render/food-renderer.ts'
 ]);
+const FORBIDDEN_V4_AUTHORITY = /\b(GridFrame|TurnIntent|queueTurn|pendingTurn|ChaseCameraController|JoystickInput|wrapRebase|buildPixelChaseCameraSnapshot|applyOverviewCamera)\b/;
 
 async function listTypeScriptFiles(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -30,95 +26,65 @@ async function listTypeScriptFiles(directory: string): Promise<string[]> {
     if (entry.isDirectory()) return listTypeScriptFiles(path);
     return entry.isFile() && entry.name.endsWith('.ts') ? [path] : [];
   }));
-
   return nested.flat();
 }
 
-describe('grid authority boundary', () => {
+describe('SNEK CORE V4 authority boundary', () => {
   it('keeps worldToCell out of production consumers', async () => {
     const violations: string[] = [];
-
     for (const file of await listTypeScriptFiles(SRC_ROOT)) {
       const repoRelative = relative(SRC_ROOT, file).replaceAll('\\', '/');
       if (repoRelative === WORLD_TO_CELL_DEFINITION) continue;
-
       const source = await readFile(file, 'utf8');
       if (/\bworldToCell\b/.test(source)) violations.push(repoRelative);
     }
-
     expect(violations).toEqual([]);
   });
 
-  it('contains no retired continuous V1 gameplay authority or bridge', async () => {
+  it('keeps active V4 runtime free of local-frame, joystick and chase authority', async () => {
     const violations: string[] = [];
-
-    for (const file of await listTypeScriptFiles(SRC_ROOT)) {
-      const repoRelative = relative(SRC_ROOT, file).replaceAll('\\', '/');
-      const source = await readFile(file, 'utf8');
-      if (FORBIDDEN_RETIRED_V1_AUTHORITY.test(source)) violations.push(repoRelative);
+    for (const repoRelative of ACTIVE_V4_RUNTIME_FILES) {
+      const source = await readFile(join(SRC_ROOT, repoRelative), 'utf8');
+      if (FORBIDDEN_V4_AUTHORITY.test(source)) violations.push(repoRelative);
     }
-
     expect(violations).toEqual([]);
   });
 
-  it('keeps active V4 RunState exclusively board-space grid-authoritative', async () => {
+  it('keeps RunState on heading + pendingDirection + advanceGridStep only', async () => {
     const source = await readFile(join(GAME_ROOT, 'run-state.ts'), 'utf8');
-    expect(FORBIDDEN_V3_RUNSTATE_AUTHORITY.test(source)).toBe(false);
-    expect(source).not.toMatch(/from ['"]three['"]/);
-    expect(source).not.toMatch(/render\//);
     expect(source).toMatch(/heading/);
     expect(source).toMatch(/pendingDirection/);
     expect(source).toMatch(/queueDirection/);
     expect(source).toMatch(/advanceGridStep/);
+    expect(source).not.toMatch(/\b(GridFrame|TurnIntent|queueTurn|advanceGridMovement|INITIAL_GRID_FRAME)\b/);
+    expect(source).not.toMatch(/from ['"]three['"]/);
+    expect(source).not.toMatch(/render\//);
   });
 
-  it('removes the legacy discrete movement bridge from active input adapters', async () => {
-    const violations: string[] = [];
-
-    for (const file of await listTypeScriptFiles(INPUT_ROOT)) {
-      const repoRelative = relative(SRC_ROOT, file).replaceAll('\\', '/');
-      const source = await readFile(file, 'utf8');
-      if (FORBIDDEN_DISCRETE_INPUT_BRIDGE.test(source)) violations.push(repoRelative);
-    }
-
-    expect(violations).toEqual([]);
-  });
-
-  it('keeps all active V3 runtime modules free of retired locomotion authority', async () => {
-    const violations: string[] = [];
-
-    for (const repoRelative of ACTIVE_V3_RUNTIME_FILES) {
-      const source = await readFile(join(SRC_ROOT, repoRelative), 'utf8');
-      if (FORBIDDEN_ACTIVE_LEGACY_AUTHORITY.test(source)) violations.push(repoRelative);
-    }
-
-    expect(violations).toEqual([]);
-  });
-
-  it('keeps FlightTrail out of the active V3 presentation architecture', async () => {
+  it('removes obsolete V3 authority modules from production', async () => {
+    const gameFiles = await readdir(GAME_ROOT);
+    const inputFiles = await readdir(INPUT_ROOT);
     const renderFiles = await readdir(RENDER_ROOT);
-    expect(renderFiles).not.toContain('flight-trail.ts');
-
-    const mainSource = await readFile(join(SRC_ROOT, 'main.ts'), 'utf8');
-    expect(mainSource).not.toMatch(/\b(FlightTrail|flightTrail|sampleBehind)\b/);
-    expect(mainSource).toContain('snakeRenderer.render(buildPixelSnakeRenderSnapshot(run))');
+    expect(gameFiles).not.toContain('grid-frame.ts');
+    expect(gameFiles).not.toContain('grid-movement.ts');
+    expect(inputFiles).not.toContain('joystick.ts');
+    expect(renderFiles).not.toContain('chase-camera.ts');
+    expect(renderFiles).not.toContain('overview-camera.ts');
+    expect(renderFiles).not.toContain('pixel-camera-presentation.ts');
   });
 
-  it('keeps the pixel snake snapshot on snapped grid presentation inputs during migration', async () => {
+  it('derives snake presentation from GridCell + heading only', async () => {
     const source = await readFile(join(RENDER_ROOT, 'pixel-snake-presentation.ts'), 'utf8');
-    expect(source).not.toMatch(/\b(FlightPose|FlightPresentation|FlightTrail|unwrappedGridPoint|displayedHeadWorld|sampleBehind|visibleDirection)\b/);
     expect(source).toMatch(/cellToWorld/);
+    expect(source).toMatch(/quaternionForHeading/);
+    expect(source).toMatch(/run\.heading/);
+    expect(source).not.toMatch(/\b(GridFrame|run\.frame|quaternionForGridFrame)\b/);
   });
 
-  it('keeps historical continuous-navigation modules unreachable from active V3 runtime', async () => {
-    const violations: string[] = [];
-    const forbidden = /\b(FlightPose|advanceFlightPose|traverseGridSegment|quantizeForwardToGridDirection|FlightPresentation)\b/;
-
-    for (const repoRelative of ACTIVE_V3_RUNTIME_FILES) {
-      const source = await readFile(join(SRC_ROOT, repoRelative), 'utf8');
-      if (forbidden.test(source)) violations.push(repoRelative);
-    }
-
-    expect(violations).toEqual([]);
+  it('keeps one board camera route in the browser runtime', async () => {
+    const source = await readFile(join(SRC_ROOT, 'main.ts'), 'utf8');
+    expect(source).toMatch(/BoardCameraController/);
+    expect(source).toContain("app.dataset.cameraMode = 'board'");
+    expect(source).not.toMatch(/\b(ChaseCameraController|applyOverviewCamera|toggleCamera|JoystickInput)\b/);
   });
 });

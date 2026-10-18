@@ -9,7 +9,7 @@ import { SNAKE_VOXEL_SIZE } from '../../src/render/snake-renderer';
 
 const stableRng = () => 0.75;
 
-describe('SNEK CORE V3 one-lattice presentation contract', () => {
+describe('SNEK CORE V4 one-lattice presentation contract', () => {
   it('maps an equal head/food GridCell to an identical world center', () => {
     const run = createRun(stableRng);
     const cell = snakeHead(run.snake).cell;
@@ -31,9 +31,7 @@ describe('SNEK CORE V3 one-lattice presentation contract', () => {
     const consumedCell = { x: 4, y: 4, z: 5 } as const;
     const consumedWorld = cellToWorld(consumedCell, run.config);
     run.food = consumedCell;
-
     stepRun(run, stableRng);
-
     expect(run.foodsCollected).toBe(1);
     expect(snakeHead(run.snake).cell).toEqual(consumedCell);
     expect(cellToWorld(snakeHead(run.snake).cell, run.config)).toEqual(consumedWorld);
@@ -46,7 +44,6 @@ describe('SNEK CORE V3 one-lattice presentation contract', () => {
     run.food = { x: 0, y: 0, z: 0 };
     stepRun(run, stableRng);
     stepRun(run, stableRng);
-
     const snapshot = buildPixelSnakeRenderSnapshot(run);
     expect(snapshot.body).toHaveLength(run.snake.segments.length - 1);
     expect(FOOD_VOXEL_SIZE).toBe(SNAKE_VOXEL_SIZE);
