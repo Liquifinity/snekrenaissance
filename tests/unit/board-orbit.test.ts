@@ -41,7 +41,7 @@ describe('SNEK CORE V5 board orbit gestures', () => {
     expect(BOARD_ORBIT_RADIANS_PER_PIXEL).toBe(0.005);
   });
 
-  it('maps primary mouse drag to azimuth/polar and stops completely on release', () => {
+  it('maps primary mouse drag so the cube follows both drag axes and stops completely on release', () => {
     const target = document.createElement('div');
     const camera = createCamera();
     const onChange = vi.fn();
@@ -55,7 +55,7 @@ describe('SNEK CORE V5 board orbit gestures', () => {
     }));
 
     expect(camera.orbitBy).toHaveBeenCalledTimes(1);
-    expect(camera.orbitBy).toHaveBeenLastCalledWith(-0.1, 0.15);
+    expect(camera.orbitBy).toHaveBeenLastCalledWith(-0.1, -0.15);
     expect(onChange).toHaveBeenCalledTimes(1);
 
     target.dispatchEvent(pointerEvent('pointerup', {
@@ -86,7 +86,7 @@ describe('SNEK CORE V5 board orbit gestures', () => {
     detach();
   });
 
-  it('orbits with one touch, pauses orbit for two-touch pinch, and uses the pinch baseline', () => {
+  it('orbits with one touch using the same drag direction, pauses orbit for two-touch pinch, and uses the pinch baseline', () => {
     const target = document.createElement('div');
     const camera = createCamera();
     const onChange = vi.fn();
@@ -98,7 +98,7 @@ describe('SNEK CORE V5 board orbit gestures', () => {
     target.dispatchEvent(pointerEvent('pointermove', {
       pointerId: 10, pointerType: 'touch', clientX: 10, clientY: 20
     }));
-    expect(camera.orbitBy).toHaveBeenLastCalledWith(-0.05, 0.1);
+    expect(camera.orbitBy).toHaveBeenLastCalledWith(-0.05, -0.1);
 
     camera.orbitBy.mockClear();
     onChange.mockClear();
@@ -139,7 +139,7 @@ describe('SNEK CORE V5 board orbit gestures', () => {
     }));
 
     expect(camera.orbitBy).toHaveBeenCalledTimes(1);
-    expect(camera.orbitBy).toHaveBeenCalledWith(-0.01, 0.005);
+    expect(camera.orbitBy).toHaveBeenCalledWith(-0.01, -0.005);
     detach();
   });
 
