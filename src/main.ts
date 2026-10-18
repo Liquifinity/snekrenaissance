@@ -113,16 +113,38 @@ const detachJoystick = joystick.attach(joystickShell, window);
 controller.mount();
 
 if (import.meta.env.MODE === 'e2e-ranked') {
+  type TestFoodCell = Readonly<{ x: number; y: number; z: number }>;
   const testWindow = window as typeof window & {
     __SNEK_TEST__?: {
       apiBase: string;
       gatewayKind: string;
+      setFoodCell: (cell: TestFoodCell) => void;
       forceGameOver: (result: RunResult) => void;
     };
   };
   testWindow.__SNEK_TEST__ = {
     apiBase: import.meta.env.VITE_RANKING_API_BASE ?? '',
     gatewayKind: sessionGateway.constructor.name,
+    setFoodCell: (cell) => {
+      const run = controller.currentRun;
+      if (!run) throw new Error('No active run for deterministic food placement.');
+
+      for (const axis of ['x', 'y', 'z'] as const) {
+        const value = cell[axis];
+        if (!Number.isInteger(value) || value < 0 || value >= run.config.resolution) {
+          throw new RangeError(`Test food ${axis} must be an integer in 0..${run.config.resolution - 1}.`);
+        }
+      }
+
+      const occupied = run.snake.segments.some((segment) => (
+        segment.cell.x === cell.x
+        && segment.cell.y === cell.y
+        && segment.cell.z === cell.z
+      ));
+      if (occupied) throw new Error('Cannot place deterministic test food on an occupied snake cell.');
+
+      run.food = { x: cell.x, y: cell.y, z: cell.z };
+    },
     forceGameOver: (result) => {
       const run = controller.currentRun;
       if (!run) throw new Error('No active run to finish.');
