@@ -183,13 +183,13 @@ function consumeStrategicFrame(run: RunState, frameDeltaSeconds: number): number
 }
 
 type TestFoodCell = Readonly<{ x: number; y: number; z: number }>;
-let manualClock = false;
+const e2eMode = import.meta.env.MODE === 'e2e' || import.meta.env.MODE === 'e2e-ranked';
+let manualClock = e2eMode;
 let activeRun: RunState | null = null;
 let lastTimestamp: number | null = null;
 let frameId = 0;
 let rendererFailed = false;
 
-const e2eMode = import.meta.env.MODE === 'e2e' || import.meta.env.MODE === 'e2e-ranked';
 if (e2eMode) {
   const testWindow = window as typeof window & {
     __SNEK_TEST__?: {
