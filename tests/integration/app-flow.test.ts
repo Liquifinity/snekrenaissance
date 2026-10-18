@@ -33,7 +33,7 @@ function finishRun(controller: AppController, score: number): void {
   const length = run.snake.segments.length;
   run.phase = 'game-over';
   run.result = {
-    rulesetId: 'pixel-flight-grid-v2-1',
+    rulesetId: 'pixel-flight-grid-v2-2',
     score,
     foodsCollected: score,
     length,
@@ -84,7 +84,7 @@ describe('meme-first application flow', () => {
     expect(root.querySelector('[role="alert"]')?.textContent).toContain('username');
   });
 
-  it('starts a V2.1 run with score, length, progress bar, and stored identity', () => {
+  it('starts a V2.2 run with score, length, progress bar, and stored identity', () => {
     const { root, controller } = setup();
     enterUsernameAndPlay(root, 'snekboi');
 
@@ -129,7 +129,7 @@ describe('meme-first application flow', () => {
     run.score = 300;
     run.foodEaten = 300;
     run.result = {
-      rulesetId: 'pixel-flight-grid-v2-1',
+      rulesetId: 'pixel-flight-grid-v2-2',
       score: 300,
       foodsCollected: 300,
       length: run.snake.segments.length,
@@ -147,7 +147,7 @@ describe('meme-first application flow', () => {
     expect(root.textContent).not.toContain('GAME OVER');
   });
 
-  it('shows V2.1 food score and personal best for a local game over', () => {
+  it('shows V2.2 food score and personal best for a local game over', () => {
     const { root, controller } = setup();
     enterUsernameAndPlay(root, 'ren');
     finishRun(controller, 24);
@@ -162,7 +162,7 @@ describe('meme-first application flow', () => {
     expect(root.querySelector('[data-action="rank"]')).not.toBeNull();
   });
 
-  it('shows the local V2.1 score record without public leaderboard language', () => {
+  it('shows the local V2.2 score record without public leaderboard language', () => {
     const { root, controller } = setup();
     enterUsernameAndPlay(root, 'ren');
     finishRun(controller, 24);
@@ -186,9 +186,10 @@ describe('meme-first application flow', () => {
     expect(input?.value).toBe('renato');
   });
 
-  it('keeps the highest V2.1 food-score best without overwriting V1 or V2 history', () => {
+  it('keeps the highest V2.2 food-score best without overwriting V1, V2 or V2.1 history', () => {
     localStorage.setItem('snek.localBest', '68');
     localStorage.setItem('snek.localBest.pixelGridV2', '19');
+    localStorage.setItem('snek.localBest.pixelGridV2_1', '13');
     const first = setup({ clearStorage: false });
     enterUsernameAndPlay(first.root, 'ren');
     finishRun(first.controller, 24);
@@ -199,7 +200,8 @@ describe('meme-first application flow', () => {
 
     expect(second.root.textContent).toContain('PERSONAL BEST');
     expect(second.root.textContent).toContain('24');
-    expect(localStorage.getItem('snek.localBest.pixelGridV2_1')).toBe('24');
+    expect(localStorage.getItem('snek.localBest.pixelGridV2_2')).toBe('24');
+    expect(localStorage.getItem('snek.localBest.pixelGridV2_1')).toBe('13');
     expect(localStorage.getItem('snek.localBest.pixelGridV2')).toBe('19');
     expect(localStorage.getItem('snek.localBest')).toBe('68');
 
