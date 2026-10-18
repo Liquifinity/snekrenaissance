@@ -10,6 +10,7 @@ export const USERNAME_KEY = 'snek.username';
 export const LOCAL_BEST_KEY = 'snek.localBest';
 export const V2_LOCAL_BEST_KEY = 'snek.localBest.pixelGridV2';
 export const V2_1_LOCAL_BEST_KEY = 'snek.localBest.pixelGridV2_1';
+export const V2_2_LOCAL_BEST_KEY = 'snek.localBest.pixelGridV2_2';
 
 function defaultId(): string {
   if (typeof globalThis.crypto?.randomUUID === 'function') {
@@ -56,7 +57,7 @@ export function loadLocalBest(storage: StorageLike): number {
   return loadNonNegativeInteger(storage, LOCAL_BEST_KEY);
 }
 
-/** Historical V1 best. V2/V2.1 code must not write this key. */
+/** Historical V1 best. Newer rulesets must not write this key. */
 export function saveLocalBest(storage: StorageLike, length: number): number {
   return saveBest(storage, LOCAL_BEST_KEY, length);
 }
@@ -66,15 +67,25 @@ export function loadPixelGridV2Best(storage: StorageLike): number {
   return loadNonNegativeInteger(storage, V2_LOCAL_BEST_KEY);
 }
 
-/** Historical Pixel Flight Grid V2 best. V2.1 code must use savePixelGridV2_1Best(). */
+/** Historical Pixel Flight Grid V2 best. */
 export function savePixelGridV2Best(storage: StorageLike, score: number): number {
   return saveBest(storage, V2_LOCAL_BEST_KEY, score);
 }
 
+/** Historical Pixel Flight Grid V2.1 best. */
 export function loadPixelGridV2_1Best(storage: StorageLike): number {
   return loadNonNegativeInteger(storage, V2_1_LOCAL_BEST_KEY);
 }
 
+/** Historical Pixel Flight Grid V2.1 best. V2.2 code must use savePixelGridV2_2Best(). */
 export function savePixelGridV2_1Best(storage: StorageLike, score: number): number {
   return saveBest(storage, V2_1_LOCAL_BEST_KEY, score);
+}
+
+export function loadPixelGridV2_2Best(storage: StorageLike): number {
+  return loadNonNegativeInteger(storage, V2_2_LOCAL_BEST_KEY);
+}
+
+export function savePixelGridV2_2Best(storage: StorageLike, score: number): number {
+  return saveBest(storage, V2_2_LOCAL_BEST_KEY, score);
 }
