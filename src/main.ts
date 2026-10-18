@@ -106,50 +106,6 @@ const detachKeyboard = keyboard.attach(window);
 const detachJoystick = joystick.attach(joystickShell, window);
 controller.mount();
 
-if (import.meta.env.MODE === 'e2e-ranked') {
-  type TestFoodCell = Readonly<{ x: number; y: number; z: number }>;
-  const testWindow = window as typeof window & {
-    __SNEK_TEST__?: {
-      apiBase: string;
-      gatewayKind: string;
-      setFoodCell: (cell: TestFoodCell) => void;
-      forceGameOver: (result: RunResult) => void;
-    };
-  };
-  testWindow.__SNEK_TEST__ = {
-    apiBase: import.meta.env.VITE_RANKING_API_BASE ?? '',
-    gatewayKind: sessionGateway.constructor.name,
-    setFoodCell: (cell) => {
-      const run = controller.currentRun;
-      if (!run) throw new Error('No active run for deterministic food placement.');
-
-      for (const axis of ['x', 'y', 'z'] as const) {
-        const value = cell[axis];
-        if (!Number.isInteger(value) || value < 0 || value >= run.config.resolution) {
-          throw new RangeError(`Test food ${axis} must be an integer in 0..${run.config.resolution - 1}.`);
-        }
-      }
-
-      const occupied = run.snake.segments.some((segment) => (
-        segment.cell.x === cell.x
-        && segment.cell.y === cell.y
-        && segment.cell.z === cell.z
-      ));
-      if (occupied) throw new Error('Cannot place deterministic test food on an occupied snake cell.');
-
-      run.food = { x: cell.x, y: cell.y, z: cell.z };
-    },
-    forceGameOver: (result) => {
-      const run = controller.currentRun;
-      if (!run) throw new Error('No active run to finish.');
-      run.phase = 'game-over';
-      run.result = result;
-      run.maxLength = result.maxLength;
-      controller.handleRunState(run);
-    }
-  };
-}
-
 function resize(): void {
   const rect = canvas.getBoundingClientRect();
   scene.resize(rect.width, rect.height);
@@ -170,6 +126,7 @@ const lifecycle = new RuntimeLifecycle(fixedClock, {
 function updateJoystickVisual(): void {
   const vector = joystick.visualVector;
   joystickKnob.style.transform = `translate(${vector.x * 28}px, ${-vector.y * 28}px)`;
+  app.dataset.joystickSector = joystick.sector;
 }
 
 function exposeFoodPickupTelemetry(run: RunState, food: Readonly<{ x: number; y: number; z: number }>): void {
@@ -201,10 +158,97 @@ function initializeRun(run: RunState): void {
   exposeLogicalTelemetry(run);
 }
 
+function advanceStrategicRun(run: RunState): void {
+  const previousLength = run.snake.segments.length;
+  const previousFoods = run.foodsCollected;
+  const consumedFood = run.food ? { ...run.food } : null;
+  stepRun(run);
+
+  if (consumedFood && run.foodsCollected > previousFoods) {
+    exposeFoodPickupTelemetry(run, consumedFood);
+  }
+
+  if (
+    run.phase === 'game-over'
+    || run.phase === 'completed'
+    || run.snake.segments.length !== previousLength
+    || run.foodsCollected !== previousFoods
+  ) {
+    controller.handleRunState(run);
+  }
+}
+
+function consumeStrategicFrame(run: RunState, frameDeltaSeconds: number): number {
+  return lifecycle.consumeFrame(frameDeltaSeconds, () => advanceStrategicRun(run));
+}
+
+type TestFoodCell = Readonly<{ x: number; y: number; z: number }>;
+let manualClock = false;
 let activeRun: RunState | null = null;
 let lastTimestamp: number | null = null;
 let frameId = 0;
 let rendererFailed = false;
+
+const e2eMode = import.meta.env.MODE === 'e2e' || import.meta.env.MODE === 'e2e-ranked';
+if (e2eMode) {
+  const testWindow = window as typeof window & {
+    __SNEK_TEST__?: {
+      apiBase: string;
+      gatewayKind: string;
+      setManualClock: (enabled: boolean) => void;
+      consumeFrame: (frameDeltaSeconds: number) => number;
+      setFoodCell: (cell: TestFoodCell) => void;
+      forceGameOver: (result: RunResult) => void;
+    };
+  };
+
+  testWindow.__SNEK_TEST__ = {
+    apiBase: import.meta.env.VITE_RANKING_API_BASE ?? '',
+    gatewayKind: sessionGateway.constructor.name,
+    setManualClock: (enabled) => {
+      manualClock = enabled;
+      fixedClock.reset();
+      lastTimestamp = null;
+    },
+    consumeFrame: (frameDeltaSeconds) => {
+      const run = controller.currentRun;
+      if (!run || run.phase !== 'playing') {
+        throw new Error('No active playing run for deterministic frame consumption.');
+      }
+      const steps = consumeStrategicFrame(run, frameDeltaSeconds);
+      exposeLogicalTelemetry(run);
+      return steps;
+    },
+    setFoodCell: (cell) => {
+      const run = controller.currentRun;
+      if (!run) throw new Error('No active run for deterministic food placement.');
+
+      for (const axis of ['x', 'y', 'z'] as const) {
+        const value = cell[axis];
+        if (!Number.isInteger(value) || value < 0 || value >= run.config.resolution) {
+          throw new RangeError(`Test food ${axis} must be an integer in 0..${run.config.resolution - 1}.`);
+        }
+      }
+
+      const occupied = run.snake.segments.some((segment) => (
+        segment.cell.x === cell.x
+        && segment.cell.y === cell.y
+        && segment.cell.z === cell.z
+      ));
+      if (occupied) throw new Error('Cannot place deterministic test food on an occupied snake cell.');
+
+      run.food = { x: cell.x, y: cell.y, z: cell.z };
+    },
+    forceGameOver: (result) => {
+      const run = controller.currentRun;
+      if (!run) throw new Error('No active run to finish.');
+      run.phase = 'game-over';
+      run.result = result;
+      run.maxLength = result.maxLength;
+      controller.handleRunState(run);
+    }
+  };
+}
 
 function frame(timestamp: number): void {
   updateJoystickVisual();
@@ -221,26 +265,8 @@ function frame(timestamp: number): void {
     : Math.max(0, (timestamp - lastTimestamp) / 1000);
   lastTimestamp = timestamp;
 
-  if (run?.phase === 'playing') {
-    lifecycle.consumeFrame(frameDeltaSeconds, () => {
-      const previousLength = run.snake.segments.length;
-      const previousFoods = run.foodsCollected;
-      const consumedFood = run.food ? { ...run.food } : null;
-      stepRun(run);
-
-      if (consumedFood && run.foodsCollected > previousFoods) {
-        exposeFoodPickupTelemetry(run, consumedFood);
-      }
-
-      if (
-        run.phase === 'game-over'
-        || run.phase === 'completed'
-        || run.snake.segments.length !== previousLength
-        || run.foodsCollected !== previousFoods
-      ) {
-        controller.handleRunState(run);
-      }
-    });
+  if (run?.phase === 'playing' && !manualClock) {
+    consumeStrategicFrame(run, frameDeltaSeconds);
   }
 
   if (run) {
