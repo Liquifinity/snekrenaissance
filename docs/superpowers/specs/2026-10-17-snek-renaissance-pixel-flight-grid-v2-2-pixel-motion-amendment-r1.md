@@ -1,6 +1,6 @@
 # SNEK RENAISSANCE — Pixel Flight Grid V2.2 Orientation Amendment R1
 
-Status: **DRAFT FOR HUMAN REVIEW**  
+Status: **APPROVED — CANONICAL AMENDMENT R1**  
 Date: 2026-10-17  
 Applies to: `docs/superpowers/specs/2026-10-17-snek-renaissance-pixel-flight-grid-v2-2-pixel-motion-design.md`  
 Baseline `main`: `fd852aa54081a1026d146ead06c4778738c2f6ef`
