@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { GRID_CONFIG } from '../../src/game/grid-config';
 import { FixedStepClock } from '../../src/game/simulation';
 
 describe('FixedStepClock', () => {
@@ -55,6 +56,28 @@ describe('FixedStepClock', () => {
     expect(clock.consume(0.07, step)).toBe(1);
     expect(step).toHaveBeenCalledTimes(1);
     expect(step).toHaveBeenLastCalledWith(0.1);
+  });
+
+  it('supports the V3 strategic cadence of exactly six cell steps per second', () => {
+    const stepSeconds = 1 / GRID_CONFIG.stepsPerSecond;
+    const clock = new FixedStepClock(stepSeconds, 1, 8);
+    const step = vi.fn();
+
+    expect(clock.consume(stepSeconds / 2, step)).toBe(0);
+    expect(step).not.toHaveBeenCalled();
+    expect(clock.consume(stepSeconds / 2, step)).toBe(1);
+    expect(step).toHaveBeenCalledTimes(1);
+    expect(step).toHaveBeenLastCalledWith(stepSeconds);
+  });
+
+  it('can deterministically catch up three V3 strategic steps in one render frame', () => {
+    const stepSeconds = 1 / GRID_CONFIG.stepsPerSecond;
+    const clock = new FixedStepClock(stepSeconds, 1, 8);
+    const step = vi.fn();
+
+    expect(clock.consume(stepSeconds * 3, step)).toBe(3);
+    expect(step).toHaveBeenCalledTimes(3);
+    expect(clock.alpha).toBeCloseTo(0, 12);
   });
 
   it('treats non-finite and negative frame deltas as zero input', () => {
