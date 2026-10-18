@@ -1,7 +1,7 @@
 # SNEK RENAISSANCE — PWA + Fork-First Repository Design
 
 Date: 2026-10-18
-Status: Approved design, pending written-spec review
+Status: Approved specification
 Baseline: `main@e3bdb7d26eadb51187ba419b3b8ea454d30d1618`
 
 ## 1. Intent
@@ -312,4 +312,4 @@ This design aligns with current browser/PWA guidance and the selected Vite integ
 
 This document defines architecture only.
 
-No implementation begins from approval of the conversational design alone. After this written spec is reviewed and explicitly approved, the next step is a separate implementation plan defining exact files, dependency changes, tests, cleanup audit, sequencing and merge gates.
+The written specification is approved. The next step is a separate implementation plan defining exact files, dependency changes, tests, cleanup audit, sequencing and merge gates. Implementation begins only after that plan is reviewed and explicitly approved.
