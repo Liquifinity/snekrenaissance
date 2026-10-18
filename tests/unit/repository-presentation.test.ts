@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const readme = readFileSync('README.md', 'utf8');
@@ -29,9 +29,17 @@ describe('repository presentation', () => {
     expect(readme).not.toMatch(/Earlier V1\/V2\/V2\.1\/V2\.2 specifications/);
   });
 
-  it('states platform-dependent installation and an accurate license status', () => {
-    expect(readme).toMatch(/browser|platform/i);
+  it('publishes MIT only after the asset-rights gate has passed', () => {
+    expect(existsSync('LICENSE')).toBe(true);
+    if (!existsSync('LICENSE')) return;
+
+    const license = readFileSync('LICENSE', 'utf8');
+    expect(license).toContain('MIT License');
+    expect(license).toContain('Copyright (c) 2026 SNEK RENAISSANCE contributors');
+    expect(license).toContain('Permission is hereby granted, free of charge');
+
     expect(readme).toMatch(/## License/i);
-    expect(readme).toMatch(/asset provenance|asset rights|license review|pending/i);
+    expect(readme).toMatch(/MIT/i);
+    expect(readme).not.toMatch(/asset provenance|asset rights|license review|pending/i);
   });
 });
