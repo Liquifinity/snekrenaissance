@@ -1,16 +1,62 @@
-import { neutralInput, type InputState } from './input-state';
+import type { TurnIntent } from '../game/grid-types';
 
 export const JOYSTICK_DEADZONE = 0.15;
+export const JOYSTICK_SECTOR_HYSTERESIS_DEGREES = 10;
+
+export type JoystickSector = 'neutral' | 'left' | 'right' | 'up' | 'down';
+export type JoystickVisualVector = Readonly<{ x: number; y: number }>;
+
+type TurnEvent = Exclude<TurnIntent, 'none'>;
+
+export type JoystickInputOptions = {
+  onTurnIntent?: (intent: TurnEvent) => void;
+};
+
+const SECTOR_CENTER_DEGREES: Readonly<Record<TurnEvent, number>> = Object.freeze({
+  right: 0,
+  up: 90,
+  left: 180,
+  down: -90
+});
+
+const DIAGONAL_TIE_EPSILON = 1e-12;
+
+function normalizeAngleDegrees(angle: number): number {
+  return ((angle + 180) % 360 + 360) % 360 - 180;
+}
+
+function angularDistanceDegrees(a: number, b: number): number {
+  return Math.abs(normalizeAngleDegrees(a - b));
+}
+
+function nominalSector(x: number, y: number): TurnEvent {
+  const absX = Math.abs(x);
+  const absY = Math.abs(y);
+  const horizontalWins = absX > absY || Math.abs(absX - absY) <= DIAGONAL_TIE_EPSILON;
+
+  if (horizontalWins) return x >= 0 ? 'right' : 'left';
+  return y >= 0 ? 'up' : 'down';
+}
 
 export class JoystickInput {
-  private current: InputState = neutralInput();
+  private currentSector: JoystickSector = 'neutral';
+  private currentVisual: JoystickVisualVector = Object.freeze({ x: 0, y: 0 });
   private pointerId: number | null = null;
   private centerX = 0;
   private centerY = 0;
   private radius = 1;
+  private readonly onTurnIntent?: (intent: TurnEvent) => void;
 
-  get state(): InputState {
-    return { ...this.current };
+  constructor(options: JoystickInputOptions = {}) {
+    this.onTurnIntent = options.onTurnIntent;
+  }
+
+  get sector(): JoystickSector {
+    return this.currentSector;
+  }
+
+  get visualVector(): JoystickVisualVector {
+    return { ...this.currentVisual };
   }
 
   get activePointerId(): number | null {
@@ -52,7 +98,8 @@ export class JoystickInput {
 
   reset(): void {
     this.pointerId = null;
-    this.current = neutralInput();
+    this.currentSector = 'neutral';
+    this.currentVisual = Object.freeze({ x: 0, y: 0 });
   }
 
   attach(element: HTMLElement, windowTarget: Window = window): () => void {
@@ -98,27 +145,39 @@ export class JoystickInput {
   }
 
   private updateFromPoint(x: number, y: number): void {
-    let yaw = (x - this.centerX) / this.radius;
-    let pitch = -(y - this.centerY) / this.radius;
-    let magnitude = Math.hypot(yaw, pitch);
+    let vectorX = (x - this.centerX) / this.radius;
+    let vectorY = -(y - this.centerY) / this.radius;
+    let magnitude = Math.hypot(vectorX, vectorY);
 
     if (magnitude > 1) {
-      yaw /= magnitude;
-      pitch /= magnitude;
+      vectorX /= magnitude;
+      vectorY /= magnitude;
       magnitude = 1;
     }
 
+    this.currentVisual = Object.freeze({ x: vectorX, y: vectorY });
+
     if (magnitude <= JOYSTICK_DEADZONE) {
-      this.current = neutralInput();
+      this.currentSector = 'neutral';
       return;
     }
 
-    const scaledMagnitude = (magnitude - JOYSTICK_DEADZONE) / (1 - JOYSTICK_DEADZONE);
-    const directionX = yaw / magnitude;
-    const directionY = pitch / magnitude;
-    this.current = {
-      yaw: directionX * scaledMagnitude,
-      pitch: directionY * scaledMagnitude
-    };
+    const candidate = nominalSector(vectorX, vectorY);
+    let nextSector: TurnEvent = candidate;
+
+    if (this.currentSector !== 'neutral' && candidate !== this.currentSector) {
+      const angle = Math.atan2(vectorY, vectorX) * 180 / Math.PI;
+      const currentCenter = SECTOR_CENTER_DEGREES[this.currentSector];
+      const keepCurrentThrough = 45 + JOYSTICK_SECTOR_HYSTERESIS_DEGREES;
+
+      if (angularDistanceDegrees(angle, currentCenter) <= keepCurrentThrough) {
+        nextSector = this.currentSector;
+      }
+    }
+
+    if (nextSector === this.currentSector) return;
+
+    this.currentSector = nextSector;
+    this.onTurnIntent?.(nextSector);
   }
 }
