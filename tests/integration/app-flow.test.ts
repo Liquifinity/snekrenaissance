@@ -93,22 +93,22 @@ describe('meme-first application flow', () => {
     expect(localStorage.getItem('snek.username')).toBe('snekboi');
   });
 
-  it('updates progress only in completed groups of ten foods', () => {
+  it('updates progress linearly on every food toward the 33-food target', () => {
     const { root, controller } = setup();
     enterUsernameAndPlay(root, 'ren');
     const run = controller.currentRun;
     if (!run) throw new Error('missing run');
-    run.foodsCollected = 9;
-    run.score = 9;
-    run.foodEaten = 9;
+    run.foodsCollected = 1;
+    run.score = 1;
+    run.foodEaten = 1;
     controller.handleRunState(run);
-    expect(root.querySelector('[data-progress-label]')?.textContent).toBe('0.0%');
-    run.foodsCollected = 10;
-    run.score = 10;
-    run.foodEaten = 10;
+    expect(root.querySelector('[data-progress-label]')?.textContent).toBe('3.0%');
+    run.foodsCollected = 32;
+    run.score = 32;
+    run.foodEaten = 32;
     controller.handleRunState(run);
-    expect(root.querySelector('[data-progress-label]')?.textContent).toBe('3.3%');
-    expect(root.querySelector('[data-hud-score]')?.textContent).toBe('SCORE 10');
+    expect(root.querySelector('[data-progress-label]')?.textContent).toBe('97.0%');
+    expect(root.querySelector('[data-hud-score]')?.textContent).toBe('SCORE 32');
   });
 
   it('shows the supplied water image instead of game over when the run reaches 100%', () => {
@@ -117,16 +117,16 @@ describe('meme-first application flow', () => {
     const run = controller.currentRun;
     if (!run) throw new Error('missing run');
     run.phase = 'completed';
-    run.foodsCollected = 300;
-    run.score = 300;
-    run.foodEaten = 300;
+    run.foodsCollected = 33;
+    run.score = 33;
+    run.foodEaten = 33;
     run.result = {
       rulesetId: RULESET_ID,
-      score: 300,
-      foodsCollected: 300,
+      score: 33,
+      foodsCollected: 33,
       length: run.snake.segments.length,
       maxLength: run.maxLength,
-      foodEaten: 300,
+      foodEaten: 33,
       durationMs: 1000
     };
     controller.handleRunState(run);
