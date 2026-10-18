@@ -63,4 +63,10 @@ describe('browser main loop V3 authority', () => {
     expect(run.frame.forward).toBe('-X');
     expect(run.pendingTurn).toBe('none');
   });
+
+  it('uses joystick sectors only for turn events and analog coordinates only for knob presentation', () => {
+    expect(source).toContain('const joystick = new JoystickInput({');
+    expect(source).toContain('joystick.visualVector');
+    expect(source).not.toContain('joystick.state');
+  });
 });
