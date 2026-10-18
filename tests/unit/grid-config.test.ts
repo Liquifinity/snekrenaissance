@@ -5,9 +5,9 @@ import {
   createGridConfig
 } from '../../src/game/grid-config';
 
-describe('SNEK CORE V4 config', () => {
+describe('SNEK CORE V5 config', () => {
   it('derives the approved baseline configuration', () => {
-    expect(RULESET_ID).toBe('snek-core-v4');
+    expect(RULESET_ID).toBe('snek-core-v5');
     expect(GRID_CONFIG.resolution).toBe(9);
     expect(GRID_CONFIG.cellSize).toBe(0.4);
     expect(GRID_CONFIG.worldSize).toBeCloseTo(3.6, 10);
