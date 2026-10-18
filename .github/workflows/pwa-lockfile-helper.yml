@@ -7,7 +7,7 @@ on:
       - '.github/workflows/pwa-lockfile-helper.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   generate:
@@ -18,9 +18,9 @@ jobs:
         with:
           node-version: 22
       - run: npm install --save-dev --save-exact vite-plugin-pwa@2.0.0 --package-lock-only
-      - uses: actions/upload-artifact@v4
-        with:
-          name: pwa-package-files
-          path: |
-            package.json
-            package-lock.json
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "build: add vite PWA dependency"
+          git push
