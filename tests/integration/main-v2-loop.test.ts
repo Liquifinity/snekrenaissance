@@ -34,6 +34,13 @@ describe('browser main loop V2.2 authority boundary', () => {
     expect(source).not.toContain('cameraController.update(presentation, dtSeconds)');
   });
 
+  it('captures the consumed food center and committed head center before immediate respawn hides contact', () => {
+    expect(source).toContain('const consumedFood = run.food ? { ...run.food } : null');
+    expect(source).toContain('app.dataset.lastFoodPickupCell');
+    expect(source).toContain('app.dataset.lastFoodPickupWorld');
+    expect(source).toContain('app.dataset.lastFoodPickupHeadWorld');
+  });
+
   it('exposes continuous navigation plus discrete visible-direction/world telemetry', () => {
     expect(source).toContain('app.dataset.headYaw');
     expect(source).toContain('app.dataset.headPitch');
