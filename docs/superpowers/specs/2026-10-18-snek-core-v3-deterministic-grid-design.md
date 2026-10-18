@@ -1,6 +1,6 @@
 # SNEK CORE V3 — Deterministic Grid Movement
 
-Status: SPEC DRAFT FOR REVIEW  
+Status: APPROVED — IMPLEMENTED CANDIDATE  
 Date: 2026-10-18  
 Baseline `main`: `b0f92be886ba7d3fa30cc2472cd5491e33873dc2`  
 Supersedes as movement authority: Pixel Flight Grid V2.2 continuous `FlightPose` + DDA locomotion
