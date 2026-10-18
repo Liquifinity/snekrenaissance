@@ -29,6 +29,13 @@ function playingRun(): V4Run {
   return runStateModule.startRun(runStateModule.createRun(stableRng)) as V4Run;
 }
 
+function isolateHead(run: V4Run): void {
+  run.snake.segments = [{ id: 0, cell: { x: 4, y: 4, z: 4 } }];
+  run.snake.pendingGrowth = 0;
+  run.snake.nextSegmentId = 1;
+  run.food = { x: 0, y: 0, z: 0 };
+}
+
 describe('SNEK CORE V4 board-space strategic authority', () => {
   it('starts with +Z heading and no pending world direction', () => {
     const run = runStateModule.createRun(stableRng) as V4Run;
@@ -42,7 +49,7 @@ describe('SNEK CORE V4 board-space strategic authority', () => {
     if (!enqueue) return;
 
     const run = playingRun();
-    run.snake.segments[0] = { id: run.snake.segments[0].id, cell: { x: 4, y: 4, z: 4 } };
+    isolateHead(run);
     run.heading = direction === '-Z' ? '+X' : '+Z';
     run.pendingDirection = null;
     enqueue(run, direction);
