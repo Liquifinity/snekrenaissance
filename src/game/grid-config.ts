@@ -1,4 +1,4 @@
-export const RULESET_ID = 'snek-core-v4' as const;
+export const RULESET_ID = 'snek-core-v5' as const;
 
 export type GridConfigInput = Readonly<{
   resolution: number;
