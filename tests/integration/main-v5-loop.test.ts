@@ -69,9 +69,9 @@ describe('browser main loop V5 orbit/view authority', () => {
   it('uses one manual orbit-board camera with no chase or automatic wrap authority', () => {
     expect(source).toContain('attachBoardOrbit');
     expect(source).toContain("app.dataset.cameraMode = 'orbit-board'");
-    expect(source).toContain('dataViewUp');
-    expect(source).toContain('dataViewRight');
-    expect(source).toContain('dataViewInto');
+    expect(source).toContain('app.dataset.viewUp');
+    expect(source).toContain('app.dataset.viewRight');
+    expect(source).toContain('app.dataset.viewInto');
     expect(source).not.toContain('ChaseCameraController');
     expect(source).not.toContain('wrapRebase');
     expect(source).not.toContain('updateChaseCamera');
