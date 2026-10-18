@@ -74,14 +74,17 @@ test('desktop V3 latest pre-step turn wins and catch-up consumes it only on the 
   const app = page.locator('#app');
   const before = parseCell(await app.getAttribute('data-head-cell'));
 
+  // Prime half a strategic step without moving. The next 0.25 s frame then owes two steps
+  // under the browser clock's production MAX_FRAME_DELTA_SECONDS clamp.
+  expect(await consumeFrame(page, 1 / 12)).toBe(0);
   await page.keyboard.press('d');
   await page.keyboard.press('w');
   await expect(app).toHaveAttribute('data-pending-turn', 'up');
 
-  expect(await consumeFrame(page, 0.5)).toBe(3);
+  expect(await consumeFrame(page, 0.25)).toBe(2);
   await expect(app).toHaveAttribute('data-pending-turn', 'none');
   await expect(app).toHaveAttribute('data-head-direction', '+Y');
 
   const after = parseCell(await app.getAttribute('data-head-cell'));
-  expect(after).toEqual([before[0], (before[1] + 3) % 9, before[2]]);
+  expect(after).toEqual([before[0], (before[1] + 2) % 9, before[2]]);
 });
