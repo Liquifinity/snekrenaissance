@@ -81,7 +81,7 @@ export function attachBoardOrbit(
       if (dx !== 0 || dy !== 0) {
         camera.orbitBy(
           -dx * BOARD_ORBIT_RADIANS_PER_PIXEL,
-          dy * BOARD_ORBIT_RADIANS_PER_PIXEL
+          -dy * BOARD_ORBIT_RADIANS_PER_PIXEL
         );
         onChange();
       }
@@ -102,7 +102,7 @@ export function attachBoardOrbit(
       if (dx !== 0 || dy !== 0) {
         camera.orbitBy(
           -dx * BOARD_ORBIT_RADIANS_PER_PIXEL,
-          dy * BOARD_ORBIT_RADIANS_PER_PIXEL
+          -dy * BOARD_ORBIT_RADIANS_PER_PIXEL
         );
         onChange();
       }
