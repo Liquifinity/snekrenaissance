@@ -69,4 +69,14 @@ describe('browser main loop V3 authority', () => {
     expect(source).toContain('joystick.visualVector');
     expect(source).not.toContain('joystick.state');
   });
+
+  it('builds chase-camera guidance only from the active grid run', () => {
+    expect(source).toContain('buildPixelChaseCameraSnapshot(run)');
+    expect(source).not.toContain('FlightPresentation');
+    expect(source).not.toContain('interpolateFlightPresentation');
+    expect(source).not.toContain('buildPresentation');
+    expect(source).not.toContain('previousFlight');
+    expect(source).not.toMatch(/run\.flight/);
+    expect(source).not.toContain('visibleDirection');
+  });
 });
