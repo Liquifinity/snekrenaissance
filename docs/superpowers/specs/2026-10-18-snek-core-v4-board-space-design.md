@@ -209,17 +209,27 @@ This guarantees that toroidal wrap cannot create the current zoom/shake artifact
 
 ### 7.2 Oblique orientation
 
-The camera uses a stable oblique world-space direction so all three cube axes are visually legible.
+The camera uses a stable oblique world-space position so all three cube axes are visually legible.
 
-Canonical view direction should be derived from a fixed normalized vector close to:
+The canonical camera-position ray, measured from cube center toward the camera, is derived from the normalized vector:
 
 ```text
 (0.65, 0.55, 1.0)
 ```
 
-with world `+Y` as the camera up reference and target `(0, 0, 0)`.
+The camera position is:
 
-The exact scalar distance is computed from the cube size, viewport aspect and FOV; the direction itself remains fixed.
+```text
+cameraPosition = normalize(0.65, 0.55, 1.0) * cameraDistance
+```
+
+The camera target is always the cube center:
+
+```text
+cameraTarget = (0, 0, 0)
+```
+
+World `+Y` is the camera up reference. The exact scalar `cameraDistance` is computed from cube size, viewport aspect, FOV and manual zoom; the position ray itself remains fixed.
 
 This orientation is intentionally biased toward the Z axis so:
 
@@ -253,7 +263,7 @@ Existing user-controlled zoom remains:
 - desktop mouse wheel;
 - mobile two-finger pinch;
 - zoom changes camera distance from the cube center only;
-- target and view direction remain unchanged;
+- target and position ray remain unchanged;
 - no zoom value is changed by snake movement or wrap.
 
 V4 may retain the existing clamp values unless tests reveal a usability problem:
@@ -395,7 +405,7 @@ Implementation must follow TDD. Minimum required contracts:
 - wrapping the head across X/Y/Z does not change camera pose;
 - default camera fit contains the cube bounding volume;
 - wheel/pinch changes only camera distance/zoom state;
-- resize/orientation recomputes fit without changing world-space view direction.
+- resize/orientation recomputes fit without changing the world-space position ray.
 
 ### Presentation
 
