@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { GridDirection } from '../../src/game/grid-types';
 import { KeyboardInput } from '../../src/input/keyboard';
 
 describe('KeyboardInput V4 edge-triggered world directions', () => {
@@ -9,8 +10,8 @@ describe('KeyboardInput V4 edge-triggered world directions', () => {
     ['ArrowRight', '+X'], ['d', '+X'],
     ['q', '+Z'], ['e', '-Z']
   ] as const)('maps %s to one %s direction per press edge', (key, expected) => {
-    const directions: string[] = [];
-    const input = new KeyboardInput({ onDirection: (direction) => directions.push(direction) } as never);
+    const directions: GridDirection[] = [];
+    const input = new KeyboardInput({ onDirection: (direction: GridDirection) => directions.push(direction) });
 
     input.handleKeyDown(key);
     input.handleKeyDown(key);
@@ -23,8 +24,8 @@ describe('KeyboardInput V4 edge-triggered world directions', () => {
   });
 
   it('allows a newer different world direction before earlier keys are released', () => {
-    const directions: string[] = [];
-    const input = new KeyboardInput({ onDirection: (direction: string) => directions.push(direction) } as never);
+    const directions: GridDirection[] = [];
+    const input = new KeyboardInput({ onDirection: (direction) => directions.push(direction) });
     input.handleKeyDown('d');
     input.handleKeyDown('w');
     input.handleKeyDown('q');
@@ -32,8 +33,8 @@ describe('KeyboardInput V4 edge-triggered world directions', () => {
   });
 
   it('blur clears pressed edges so the same physical key can emit again', () => {
-    const directions: string[] = [];
-    const input = new KeyboardInput({ onDirection: (direction: string) => directions.push(direction) } as never);
+    const directions: GridDirection[] = [];
+    const input = new KeyboardInput({ onDirection: (direction) => directions.push(direction) });
     input.handleKeyDown('d');
     input.handleBlur();
     input.handleKeyDown('d');
@@ -41,8 +42,8 @@ describe('KeyboardInput V4 edge-triggered world directions', () => {
   });
 
   it('ignores X and unrelated keys instead of toggling camera', () => {
-    const directions: string[] = [];
-    const input = new KeyboardInput({ onDirection: (direction: string) => directions.push(direction) } as never);
+    const directions: GridDirection[] = [];
+    const input = new KeyboardInput({ onDirection: (direction) => directions.push(direction) });
     input.handleKeyDown('x');
     input.handleKeyDown('r');
     expect(directions).toEqual([]);
