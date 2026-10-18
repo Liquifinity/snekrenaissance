@@ -5,9 +5,9 @@ import {
   createGridConfig
 } from '../../src/game/grid-config';
 
-describe('Pixel Flight Grid V2.1 config', () => {
+describe('Pixel Flight Grid V2.2 config', () => {
   it('derives the approved baseline configuration', () => {
-    expect(RULESET_ID).toBe('pixel-flight-grid-v2-1');
+    expect(RULESET_ID).toBe('pixel-flight-grid-v2-2');
     expect(GRID_CONFIG.resolution).toBe(9);
     expect(GRID_CONFIG.cellSize).toBe(0.4);
     expect(GRID_CONFIG.worldSize).toBeCloseTo(3.6, 10);
