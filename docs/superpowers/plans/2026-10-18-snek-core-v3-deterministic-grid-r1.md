@@ -33,11 +33,11 @@
 
 ## Review Focus
 
-1. **Two turn inputs inside one cell interval:** newest event must replace the older pending turn, with no delayed replay; pinned in Task 3 and E2E Task 9.
-2. **Long/lagged render frame:** one buffered turn may affect only the first owed strategic step; pinned in Task 4 and E2E Task 9.
-3. **Joystick jitter near 45° boundaries:** latched sector must remain stable through the 10° hysteresis band; pinned in Task 6 and E2E Task 9.
+1. **Two turn inputs inside one cell interval:** newest event must replace the older pending turn, with no delayed replay; pinned in Task 3 and E2E Task 10.
+2. **Long/lagged render frame:** one buffered turn may affect only the first owed strategic step; pinned in Task 4 and E2E Task 10.
+3. **Joystick jitter near 45° boundaries:** latched sector must remain stable through the 10° hysteresis band; pinned in Task 5 and E2E Task 10.
 4. **Toroidal wrap while chase camera is smoothing:** gameplay must make one axis-only step and camera must rebase without flying through the arena; pinned in Tasks 2 and 7.
-5. **Vertical heading (`±Y`) with different local up vectors:** head/camera orientation must preserve full `GridFrame`, not collapse to forward-only orientation; pinned in Task 7.
+5. **Vertical heading (`±Y`) with different local up vectors:** head and camera orientation must preserve full `GridFrame`, not collapse to forward-only orientation; pinned in Tasks 6 and 7.
 
 ---
 
@@ -169,7 +169,7 @@ git commit -m "feat: make run state deterministic grid authority"
 - Modify: `src/input/keyboard.ts`
 - Modify: `src/main.ts`
 - Test: `tests/unit/keyboard.test.ts`
-- Test: `tests/integration/main-v2-loop.test.ts` (rename to `tests/integration/main-v3-loop.test.ts` when V3 becomes active)
+- Rename/modify: `tests/integration/main-v2-loop.test.ts` -> `tests/integration/main-v3-loop.test.ts`
 
 **Interfaces:**
 - Consumes: `TurnIntent`, `queueTurn()` from Task 2.
@@ -215,7 +215,7 @@ Expected: PASS.
 
 ```bash
 git add src/input/keyboard.ts src/main.ts tests/unit/keyboard.test.ts tests/integration/main-v3-loop.test.ts
-git rm tests/integration/main-v2-loop.test.ts  # only if renamed in this commit
+git rm tests/integration/main-v2-loop.test.ts
 git commit -m "feat: use edge-triggered keyboard turns"
 ```
 
@@ -237,7 +237,7 @@ Assert no strategic movement before `1/6` accumulated seconds; one step at `1/6`
 
 - [ ] **Step 2: Write RED catch-up test for single-use pending turn**
 
-Seed `pendingTurn='right'`, make the clock owe three strategic steps, and assert only step 1 turns; steps 2 and 3 continue in the resulting forward direction with `pendingTurn='none'`.
+Using a `FixedStepClock` test instance with sufficient `maxFrameDeltaSeconds` to owe three strategic steps, seed `pendingTurn='right'` and assert only step 1 turns; steps 2 and 3 continue in the resulting forward direction with `pendingTurn='none'`.
 
 - [ ] **Step 3: Replace the active 60 Hz flight stepping in `main.ts`**
 
@@ -245,7 +245,7 @@ Configure the existing `FixedStepClock` at `1 / GRID_CONFIG.stepsPerSecond`; eac
 
 - [ ] **Step 4: Remove obsolete steering telemetry from movement path**
 
-Delete `readSteeringInput()` and gameplay reads of `inputYaw/inputPitch`; presentation-only joystick knob telemetry moves to Task 6's visual vector.
+Delete `readSteeringInput()` and gameplay reads of `inputYaw/inputPitch`; presentation-only joystick knob telemetry moves to Task 5's visual vector.
 
 - [ ] **Step 5: Run focused tests**
 
@@ -300,6 +300,7 @@ Assert:
 neutral -> right emits right once
 right -> right emits nothing
 right -> up after hysteresis emits up once
+right -> left direct move emits left once once the new sector is unambiguous
 up -> neutral emits nothing
 neutral -> up emits up once
 pointer-up/cancel => neutral
@@ -374,7 +375,7 @@ git commit -m "feat: orient voxel snake from grid frame"
 
 **Files:**
 - Modify: `src/render/chase-camera.ts`
-- Replace: `src/render/pixel-camera-presentation.ts` with a GridFrame-based snapshot builder (same path is acceptable)
+- Modify: `src/render/pixel-camera-presentation.ts`
 - Modify: `src/main.ts`
 - Test: `tests/unit/chase-camera.test.ts`
 - Test: `tests/unit/pixel-camera-presentation.test.ts`
@@ -491,22 +492,21 @@ git add src/game/grid-config.ts src/app/identity.ts src/app/app-controller.ts sr
 git commit -m "feat: version SNEK CORE V3 authority"
 ```
 
-### Task 9: Retire continuous locomotion from the active codebase and prove determinism
+### Task 9: Retire continuous locomotion from active authority and prove determinism
 
 **Files:**
-- Candidate delete after zero-consumer check: `src/game/flight.ts`
-- Candidate delete after zero-consumer check: `src/game/grid-traversal.ts`
-- Candidate delete after zero-consumer check: `src/game/grid-direction.ts`
-- Candidate delete after zero-consumer check: `src/render/flight-presentation.ts`
-- Delete their dedicated tests when the corresponding module is deleted.
+- Audit: `src/game/flight.ts`
+- Audit: `src/game/grid-traversal.ts`
+- Audit: `src/game/grid-direction.ts`
+- Audit: `src/render/flight-presentation.ts`
 - Create: `tests/integration/v3-determinism.test.ts`
-- Modify: `tests/metrics/grid-tuning.test.ts` and/or `tests/integration/grid-tuning-metrics.test.ts` only where they reference retired flight authority.
+- Modify: `tests/metrics/grid-tuning.test.ts` and/or `tests/integration/grid-tuning-metrics.test.ts` only where they reference retired active flight authority.
 
 **Interfaces:**
 - Consumes: completed V3 strategic core from Tasks 1–8.
-- Produces: no active continuous-locomotion module; deterministic long-run proof.
+- Produces: zero active production dependency on continuous locomotion and deterministic long-run proof.
 
-- [ ] **Step 1: Run an active-consumer audit before deletion**
+- [ ] **Step 1: Run an active-consumer audit**
 
 Run searches equivalent to:
 
@@ -514,15 +514,15 @@ Run searches equivalent to:
 rg "FlightPose|advanceFlightPose|traverseGridSegment|quantizeForwardToGridDirection|FlightPresentation" src tests
 ```
 
-Classify every remaining occurrence as historical test/documentation or an invalid active dependency. No active dependency may remain.
+Every occurrence must be classified. Any occurrence reachable from active V3 runtime is a failure and must be removed. Historical tests/modules may remain only when they have no import path into active V3 runtime.
 
-- [ ] **Step 2: Delete continuous locomotion modules whose only remaining consumers are their own historical tests**
+- [ ] **Step 2: Remove truly orphaned flight modules only when the audit proves zero consumers**
 
-Delete dedicated tests in the same commit. Do not delete generic utilities still used outside flight authority.
+If one of the audited modules is consumed only by its own dedicated historical tests, delete that module and those dedicated tests in the same commit. If it still supports unrelated historical tooling/tests, leave it physically present but unreachable from active V3 production paths. Do not broaden this task into unrelated cleanup.
 
 - [ ] **Step 3: Write a deterministic 1,000-step integration harness**
 
-Use a deliberately non-colliding scripted turn sequence on the toroidal grid and deterministic RNG. Run the same scenario twice and assert identical frame/head/body/food/score sequences.
+Use a straight toroidal path with deterministic initial food placed off that path so no terminal collision/growth is introduced. Run the same scenario twice and assert identical frame/head/body/food/score sequences for at least 1,000 strategic steps.
 
 - [ ] **Step 4: Assert face adjacency for every committed step**
 
