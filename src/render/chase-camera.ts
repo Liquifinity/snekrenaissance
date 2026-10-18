@@ -11,6 +11,9 @@ export const CAMERA_ZOOM_MIN = 0.65;
 export const CAMERA_ZOOM_MAX = 5;
 export const CAMERA_ZOOM_DEFAULT = 1;
 
+const STABLE_WORLD_FORWARD: Vec3 = Object.freeze({ x: 0, y: 0, z: 1 });
+const STABLE_WORLD_UP: Vec3 = Object.freeze({ x: 0, y: 1, z: 0 });
+
 export type ChaseCameraSnapshot = Readonly<{
   headWorld: Vec3;
   forwardWorld: Vec3;
@@ -24,12 +27,6 @@ export type CameraPose = Readonly<{
 
 function clone(value: Vec3): Vec3 {
   return { x: value.x, y: value.y, z: value.z };
-}
-
-function normalize(value: Vec3, fallback: Vec3): Vec3 {
-  const length = Math.hypot(value.x, value.y, value.z);
-  if (!Number.isFinite(length) || length < 1e-10) return clone(fallback);
-  return { x: value.x / length, y: value.y / length, z: value.z / length };
 }
 
 function add(a: Vec3, b: Vec3): Vec3 {
@@ -57,18 +54,16 @@ function desiredPose(
   config: GridConfig,
   zoomFactor: number
 ): CameraPose {
-  const forward = normalize(snapshot.forwardWorld, { x: 0, y: 0, z: 1 });
-  const up = normalize(snapshot.upWorld, { x: 0, y: 1, z: 0 });
   const distance = CAMERA_DISTANCE_CELLS * config.cellSize * zoomFactor;
   const height = CAMERA_HEIGHT_CELLS * config.cellSize * zoomFactor;
   const lookAhead = CAMERA_LOOK_AHEAD_CELLS * config.cellSize;
 
   return {
     position: add(
-      subtract(snapshot.headWorld, scale(forward, distance)),
-      scale(up, height)
+      subtract(snapshot.headWorld, scale(STABLE_WORLD_FORWARD, distance)),
+      scale(STABLE_WORLD_UP, height)
     ),
-    target: add(snapshot.headWorld, scale(forward, lookAhead))
+    target: add(snapshot.headWorld, scale(STABLE_WORLD_FORWARD, lookAhead))
   };
 }
 

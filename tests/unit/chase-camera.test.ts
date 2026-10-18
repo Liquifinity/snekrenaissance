@@ -56,21 +56,24 @@ describe('SNEK CORE V3 chase camera', () => {
     expect(finitePose(pose)).toBe(true);
   });
 
-  it('preserves full vertical-frame up instead of assuming world +Y', () => {
-    const plusZUp = new ChaseCameraController().update(snapshot(
-      { x: 0, y: 1, z: 0 },
-      { x: 0, y: 0, z: 1 }
+  it('keeps the same world-space camera offsets when the snake frame rotates', () => {
+    const baseline = new ChaseCameraController().update(snapshot(
+      { x: 0, y: 0, z: 1 },
+      { x: 0, y: 1, z: 0 }
     ), 0);
-    const minusZUp = new ChaseCameraController().update(snapshot(
+    const vertical = new ChaseCameraController().update(snapshot(
       { x: 0, y: 1, z: 0 },
       { x: 0, y: 0, z: -1 }
     ), 0);
+    const sideways = new ChaseCameraController().update(snapshot(
+      { x: 1, y: 0, z: 0 },
+      { x: 0, y: 1, z: 0 }
+    ), 0);
 
-    expect(plusZUp.position.y).toBeCloseTo(-CAMERA_DISTANCE_CELLS * GRID_CONFIG.cellSize, 8);
-    expect(plusZUp.position.z).toBeGreaterThan(0);
-    expect(minusZUp.position.z).toBeLessThan(0);
-    expect(plusZUp.target.y).toBeGreaterThan(0);
-    expect(minusZUp.target.y).toBeGreaterThan(0);
+    expect(vertical.position).toEqual(baseline.position);
+    expect(vertical.target).toEqual(baseline.target);
+    expect(sideways.position).toEqual(baseline.position);
+    expect(sideways.target).toEqual(baseline.target);
   });
 
   it('smoothly converges toward an ordinary adjacent snapped head without overshooting', () => {
@@ -94,7 +97,7 @@ describe('SNEK CORE V3 chase camera', () => {
     expect(second.position.x).toBeLessThan(0.4);
   });
 
-  it('rebases its own pose by one worldSize on 8→0 wrap before damping', () => {
+  it('rebases its own pose across the world boundary before damping', () => {
     const controller = new ChaseCameraController();
     const edge = GRID_CONFIG.worldSize / 2 - GRID_CONFIG.cellSize / 2;
 
@@ -110,8 +113,8 @@ describe('SNEK CORE V3 chase camera', () => {
       { x: -edge, y: 0, z: 0 }
     ), 1 / 60);
 
-    expect(pose.position.x).toBeLessThan(-3);
-    expect(pose.target.x).toBeLessThan(-0.8);
+    expect(pose.position.x).toBeLessThan(-GRID_CONFIG.worldSize / 2);
+    expect(pose.target.x).toBeLessThan(-GRID_CONFIG.worldSize / 2);
   });
 
   it('does not treat an ordinary one-cell move as a wrap', () => {
@@ -128,8 +131,8 @@ describe('SNEK CORE V3 chase camera', () => {
       { x: GRID_CONFIG.cellSize, y: 0, z: 0 }
     ), 1 / 60);
 
-    expect(pose.position.x).toBeGreaterThan(-1.6);
-    expect(pose.position.x).toBeLessThan(0);
+    expect(pose.position.x).toBeGreaterThan(0);
+    expect(pose.position.x).toBeLessThan(GRID_CONFIG.cellSize);
   });
 
   it('applies the approved FOV to a supplied Three.js camera', () => {
