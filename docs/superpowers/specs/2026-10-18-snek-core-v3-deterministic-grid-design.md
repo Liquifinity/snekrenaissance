@@ -240,11 +240,11 @@ LEFT        RIGHT
 Required state machine:
 
 ```text
-NEUTRAL -> RIGHT  => emit RIGHT once
-RIGHT   -> RIGHT  => emit nothing
-RIGHT   -> UP     => emit UP once
+NEUTRAL -> RIGHT   => emit RIGHT once
+RIGHT   -> RIGHT   => emit nothing
+RIGHT   -> UP      => emit UP once
 UP      -> NEUTRAL => emit nothing
-NEUTRAL -> UP     => emit UP once
+NEUTRAL -> UP      => emit UP once
 ```
 
 A sector transition may replace `pendingTurn` immediately before the next strategic step.
@@ -271,6 +271,25 @@ The exact implementation may reuse the existing timing infrastructure, but there
 A display running at 60 Hz, 120 Hz, or 144 Hz must produce the same strategic trajectory for the same ordered input events and elapsed gameplay steps.
 
 No hidden 60 Hz locomotion simulation may move a continuous snake between strategic steps.
+
+### 8.1 Catch-up semantics
+
+A delayed render frame may require the gameplay clock to execute more than one strategic step in order to catch up. That MUST NOT replay one buffered turn across multiple steps.
+
+Normative behavior:
+
+```text
+pendingTurn = RIGHT
+clock owes 3 strategic steps
+
+step 1: consume RIGHT, turn once, pendingTurn -> none
+step 2: no new input, continue forward
+step 3: no new input, continue forward
+```
+
+One input event can therefore affect at most one strategic step.
+
+Inputs that arrive only after catch-up processing begins are not retroactively inserted into already-due steps. The implementation must use one deterministic event-to-step ordering and test it explicitly.
 
 ## 9. Strategic movement transaction
 
@@ -514,6 +533,7 @@ RIGHT once -> one RIGHT transform
 RIGHT held -> no repeated transform
 RIGHT then UP before step -> UP wins
 pending turn consumed -> none
+one buffered turn + multi-step catch-up -> turn affects first step only
 ```
 
 ### 20.4 Keyboard
@@ -554,6 +574,7 @@ Browser-level tests must prove:
 - one keyboard press causes exactly one relative turn;
 - holding a key does not continuously spin the snake;
 - a newer turn before the next step replaces the older pending turn;
+- multi-step clock catch-up does not repeat a buffered turn;
 - joystick sector transitions are predictable;
 - mobile sector changes work without pointer-up;
 - food pickup is visibly cell-coincident;
