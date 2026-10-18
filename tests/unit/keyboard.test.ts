@@ -55,6 +55,23 @@ describe('KeyboardInput V5 edge-triggered view commands', () => {
     expect(commands).toEqual([]);
   });
 
+  it('does not consume Q at the window listener', () => {
+    const commands: ViewCommand[] = [];
+    const keyboard = new KeyboardInput({ onCommand: (command) => commands.push(command) });
+    const detach = keyboard.attach(window);
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'q',
+      bubbles: true,
+      cancelable: true
+    });
+    document.body.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(commands).toEqual([]);
+    detach();
+  });
+
   it('does not capture WASD while a text input is focused', () => {
     const commands: ViewCommand[] = [];
     const keyboard = new KeyboardInput({ onCommand: (command) => commands.push(command) });
