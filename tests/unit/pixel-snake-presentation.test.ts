@@ -1,23 +1,33 @@
 import { Quaternion, Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
-import { cellToWorld } from '../../src/game/grid-topology';
-import type { GridDirection } from '../../src/game/grid-types';
+import { cellToWorld, directionVector } from '../../src/game/grid-topology';
+import type { GridFrame } from '../../src/game/grid-types';
 import { createRun } from '../../src/game/run-state';
 import {
   buildPixelSnakeRenderSnapshot,
-  quaternionForGridDirection
+  quaternionForGridFrame
 } from '../../src/render/pixel-snake-presentation';
 
 const stableRng = () => 0.75;
 
-function rotatedForward(direction: GridDirection): Vector3 {
-  const value = quaternionForGridDirection(direction);
-  const quaternion = new Quaternion(value.x, value.y, value.z, value.w);
-  return new Vector3(0, 0, 1).applyQuaternion(quaternion);
+function quaternion(frame: GridFrame): Quaternion {
+  const value = quaternionForGridFrame(frame);
+  return new Quaternion(value.x, value.y, value.z, value.w);
 }
 
-describe('V2.2 pixel snake presentation', () => {
-  it('derives head and body positions exactly from strategic GridCell centers', () => {
+function expectedVector(direction: GridFrame['forward']): Vector3 {
+  const value = directionVector(direction);
+  return new Vector3(value.x, value.y, value.z);
+}
+
+function expectVector(actual: Vector3, expected: Vector3): void {
+  expect(actual.x).toBeCloseTo(expected.x, 10);
+  expect(actual.y).toBeCloseTo(expected.y, 10);
+  expect(actual.z).toBeCloseTo(expected.z, 10);
+}
+
+describe('SNEK CORE V3 pixel snake presentation', () => {
+  it('derives head and body positions exactly from strategic GridCell centers with stable ids', () => {
     const run = createRun(stableRng);
     const snapshot = buildPixelSnakeRenderSnapshot(run);
     const [head, ...body] = run.snake.segments;
@@ -30,36 +40,46 @@ describe('V2.2 pixel snake presentation', () => {
     }
   });
 
-  it('cannot change when only continuous FlightPose state changes inside the same cells', () => {
-    const run = createRun(stableRng);
-    const before = buildPixelSnakeRenderSnapshot(run);
-
-    run.flight = {
-      unwrappedPosition: { x: 4.91, y: 4.13, z: 4.72 },
-      wrappedPosition: { x: 4.91, y: 4.13, z: 4.72 },
-      orientation: { yaw: 1.2, pitch: -0.4, roll: 0 },
-      forward: { x: 0.85, y: -0.38, z: 0.36 }
-    };
-
-    const after = buildPixelSnakeRenderSnapshot(run);
-    expect(after).toEqual(before);
+  it('uses exact identity orientation for the approved initial GridFrame', () => {
+    const frame: GridFrame = { forward: '+Z', right: '-X', up: '+Y' };
+    expect(quaternionForGridFrame(frame)).toEqual({ x: 0, y: 0, z: 0, w: 1 });
   });
 
   it.each([
-    ['+X', [1, 0, 0]],
-    ['-X', [-1, 0, 0]],
-    ['+Y', [0, 1, 0]],
-    ['-Y', [0, -1, 0]],
-    ['+Z', [0, 0, 1]],
-    ['-Z', [0, 0, -1]]
-  ] as const)('rotates local +Z to %s', (direction, expected) => {
-    const forward = rotatedForward(direction);
-    expect(forward.x).toBeCloseTo(expected[0], 10);
-    expect(forward.y).toBeCloseTo(expected[1], 10);
-    expect(forward.z).toBeCloseTo(expected[2], 10);
-  });
+    [{ forward: '+X', right: '+Z', up: '+Y' }, '+X', '+Y'],
+    [{ forward: '-X', right: '-Z', up: '+Y' }, '-X', '+Y'],
+    [{ forward: '+Y', right: '+X', up: '+Z' }, '+Y', '+Z'],
+    [{ forward: '+Y', right: '-X', up: '-Z' }, '+Y', '-Z'],
+    [{ forward: '-Y', right: '-X', up: '+Z' }, '-Y', '+Z'],
+    [{ forward: '-Z', right: '+X', up: '+Y' }, '-Z', '+Y']
+  ] as const)(
+    'maps local forward/up to full cardinal frame %#',
+    (frame, forward, up) => {
+      const q = quaternion(frame);
+      const displayedForward = new Vector3(0, 0, 1).applyQuaternion(q);
+      const displayedUp = new Vector3(0, 1, 0).applyQuaternion(q);
 
-  it('uses exact identity quaternion for initial +Z direction', () => {
-    expect(quaternionForGridDirection('+Z')).toEqual({ x: 0, y: 0, z: 0, w: 1 });
+      expectVector(displayedForward, expectedVector(forward));
+      expectVector(displayedUp, expectedVector(up));
+      expect(q.length()).toBeCloseTo(1, 10);
+    }
+  );
+
+  it('distinguishes vertical frames that share forward but have different local up', () => {
+    const upZ: GridFrame = { forward: '+Y', right: '+X', up: '+Z' };
+    const downZ: GridFrame = { forward: '+Y', right: '-X', up: '-Z' };
+
+    const a = quaternionForGridFrame(upZ);
+    const b = quaternionForGridFrame(downZ);
+    expect(a).not.toEqual(b);
+
+    expectVector(
+      new Vector3(0, 1, 0).applyQuaternion(new Quaternion(a.x, a.y, a.z, a.w)),
+      expectedVector('+Z')
+    );
+    expectVector(
+      new Vector3(0, 1, 0).applyQuaternion(new Quaternion(b.x, b.y, b.z, b.w)),
+      expectedVector('-Z')
+    );
   });
 });
