@@ -1,56 +1,75 @@
 import { describe, expect, it } from 'vitest';
 import { KeyboardInput } from '../../src/input/keyboard';
 
-describe('KeyboardInput continuous steering state', () => {
+describe('KeyboardInput V3 edge-triggered turn events', () => {
   it.each([
-    ['ArrowRight', { yaw: 1, pitch: 0 }],
-    ['d', { yaw: 1, pitch: 0 }],
-    ['ArrowLeft', { yaw: -1, pitch: 0 }],
-    ['a', { yaw: -1, pitch: 0 }],
-    ['ArrowUp', { yaw: 0, pitch: 1 }],
-    ['w', { yaw: 0, pitch: 1 }],
-    ['ArrowDown', { yaw: 0, pitch: -1 }],
-    ['s', { yaw: 0, pitch: -1 }]
-  ] as const)('holds %s continuously until release', (key, expected) => {
-    const input = new KeyboardInput();
+    ['ArrowRight', 'right'],
+    ['d', 'right'],
+    ['ArrowLeft', 'left'],
+    ['a', 'left'],
+    ['ArrowUp', 'up'],
+    ['w', 'up'],
+    ['ArrowDown', 'down'],
+    ['s', 'down']
+  ] as const)('maps %s to one %s intent per press edge', (key, expected) => {
+    const intents: string[] = [];
+    const input = new KeyboardInput({ onTurnIntent: (intent) => intents.push(intent) });
+
     input.handleKeyDown(key);
-    expect(input.state).toEqual(expected);
-    expect(input.state).toEqual(expected);
+    input.handleKeyDown(key);
+    input.handleKeyDown(key);
+    expect(intents).toEqual([expected]);
 
     input.handleKeyUp(key);
-    expect(input.state).toEqual({ yaw: 0, pitch: 0 });
+    input.handleKeyDown(key);
+    expect(intents).toEqual([expected, expected]);
   });
 
-  it('cancels opposing keys on each axis', () => {
-    const input = new KeyboardInput();
-    input.handleKeyDown('ArrowRight');
-    input.handleKeyDown('a');
-    input.handleKeyDown('ArrowUp');
-    input.handleKeyDown('s');
-    expect(input.state).toEqual({ yaw: 0, pitch: 0 });
-  });
+  it('allows a newer different key to emit before earlier keys are released', () => {
+    const intents: string[] = [];
+    const input = new KeyboardInput({ onTurnIntent: (intent) => intents.push(intent) });
 
-  it('blur neutralizes held steering', () => {
-    const input = new KeyboardInput();
     input.handleKeyDown('d');
     input.handleKeyDown('w');
-    input.handleBlur();
-    expect(input.state).toEqual({ yaw: 0, pitch: 0 });
+    input.handleKeyDown('a');
+
+    expect(intents).toEqual(['right', 'up', 'left']);
   });
 
-  it('toggles camera once per X press edge without changing steering', () => {
-    let toggles = 0;
-    const input = new KeyboardInput({ onCameraToggle: () => { toggles += 1; } });
+  it('blur clears pressed edges so the same physical key can emit again', () => {
+    const intents: string[] = [];
+    const input = new KeyboardInput({ onTurnIntent: (intent) => intents.push(intent) });
 
     input.handleKeyDown('d');
+    input.handleBlur();
+    input.handleKeyDown('d');
+
+    expect(intents).toEqual(['right', 'right']);
+  });
+
+  it('toggles camera once per X press without emitting a turn', () => {
+    let toggles = 0;
+    const intents: string[] = [];
+    const input = new KeyboardInput({
+      onTurnIntent: (intent) => intents.push(intent),
+      onCameraToggle: () => { toggles += 1; }
+    });
+
     input.handleKeyDown('x');
     input.handleKeyDown('x');
     expect(toggles).toBe(1);
-    expect(input.state).toEqual({ yaw: 1, pitch: 0 });
+    expect(intents).toEqual([]);
 
     input.handleKeyUp('x');
     input.handleKeyDown('x');
     expect(toggles).toBe(2);
-    expect(input.state).toEqual({ yaw: 1, pitch: 0 });
+    expect(intents).toEqual([]);
+  });
+
+  it('ignores unrelated keys', () => {
+    const intents: string[] = [];
+    const input = new KeyboardInput({ onTurnIntent: (intent) => intents.push(intent) });
+    input.handleKeyDown('q');
+    expect(intents).toEqual([]);
   });
 });
