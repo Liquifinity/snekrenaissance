@@ -4,12 +4,13 @@ import { createSessionGateway } from './app/gateway-selection';
 import { RuntimeLifecycle } from './app/runtime-lifecycle';
 import { cellToWorld } from './game/grid-topology';
 import {
+  queueTurn,
   stepRun,
   type RunResult,
   type RunState
 } from './game/run-state';
 import { FixedStepClock } from './game/simulation';
-import { clampInputAxis, type InputState } from './input/input-state';
+import type { InputState } from './input/input-state';
 import { JoystickInput } from './input/joystick';
 import { KeyboardInput } from './input/keyboard';
 import { ChaseCameraController } from './render/chase-camera';
@@ -82,7 +83,13 @@ function toggleCamera(): void {
   setCameraMode(cameraMode === 'chase' ? 'overview' : 'chase');
 }
 
-const keyboard = new KeyboardInput({ onCameraToggle: toggleCamera });
+const keyboard = new KeyboardInput({
+  onTurnIntent: (intent) => {
+    const run = controller.currentRun;
+    if (run && run.phase === 'playing') queueTurn(run, intent);
+  },
+  onCameraToggle: toggleCamera
+});
 
 const joystickShell = document.createElement('div');
 joystickShell.className = 'joystick-shell';
@@ -174,12 +181,7 @@ const lifecycle = new RuntimeLifecycle(fixedClock, {
 });
 
 function readSteeringInput(): InputState {
-  const keyboardState = keyboard.state;
-  const joystickState = joystick.state;
-  return {
-    yaw: clampInputAxis(keyboardState.yaw + joystickState.yaw),
-    pitch: clampInputAxis(keyboardState.pitch + joystickState.pitch)
-  };
+  return joystick.state;
 }
 
 function exposeSteeringInput(input: InputState): void {
@@ -242,11 +244,11 @@ function frame(timestamp: number): void {
   lastTimestamp = timestamp;
 
   if (run?.phase === 'playing') {
-    lifecycle.consumeFrame(frameDeltaSeconds, (dt) => {
+    lifecycle.consumeFrame(frameDeltaSeconds, () => {
       const previousLength = run.snake.segments.length;
       const previousFoods = run.foodsCollected;
       const consumedFood = run.food ? { ...run.food } : null;
-      stepRun(run, steering, dt);
+      stepRun(run);
 
       if (consumedFood && run.foodsCollected > previousFoods) {
         exposeFoodPickupTelemetry(run, consumedFood);
