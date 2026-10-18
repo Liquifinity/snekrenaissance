@@ -1,8 +1,27 @@
 import { expect, test } from '@playwright/test';
 
-const RULESET = 'pixel-flight-grid-v2-1' as const;
+const RULESET = 'pixel-flight-grid-v2-2' as const;
 
-test('V2.1 stays local-first even when an HTTP ranking base is configured', async ({ page }) => {
+type RankedHarness = {
+  apiBase: string;
+  gatewayKind: string;
+  setFoodCell: (cell: { x: number; y: number; z: number }) => void;
+  forceGameOver: (result: {
+    rulesetId: typeof RULESET;
+    score: number;
+    foodsCollected: number;
+    length: number;
+    maxLength: number;
+    foodEaten: number;
+    durationMs: number;
+  }) => void;
+};
+
+function harnessExpression(): string {
+  return '__SNEK_TEST__';
+}
+
+test('V2.2 stays local-first even when an HTTP ranking base is configured', async ({ page }) => {
   const apiRequests: string[] = [];
   page.on('request', (request) => {
     if (request.url().includes('/api/')) {
@@ -12,27 +31,13 @@ test('V2.1 stays local-first even when an HTTP ranking base is configured', asyn
 
   await page.goto('/');
   const runtime = await page.evaluate(() => {
-    const harness = (window as unknown as {
-      __SNEK_TEST__?: {
-        apiBase: string;
-        gatewayKind: string;
-        forceGameOver: (result: {
-          rulesetId: 'pixel-flight-grid-v2-1';
-          score: number;
-          foodsCollected: number;
-          length: number;
-          maxLength: number;
-          foodEaten: number;
-          durationMs: number;
-        }) => void;
-      };
-    }).__SNEK_TEST__;
+    const harness = (window as unknown as { __SNEK_TEST__?: RankedHarness }).__SNEK_TEST__;
     return harness ? { apiBase: harness.apiBase, gatewayKind: harness.gatewayKind } : null;
   });
   expect(runtime).toEqual({ apiBase: '/rank', gatewayKind: 'HttpSessionGateway' });
 
   await page.locator('[data-action="continue"]').click();
-  await page.locator('input[name="username"]').fill('v21-local');
+  await page.locator('input[name="username"]').fill('v22-local');
   await page.locator('[data-action="play"]').click();
 
   await expect(page.locator('[data-hud-score]')).toHaveText('SCORE 0');
@@ -41,19 +46,7 @@ test('V2.1 stays local-first even when an HTTP ranking base is configured', asyn
   expect(apiRequests.filter((entry) => entry.includes('/api/games'))).toEqual([]);
 
   await page.evaluate((ruleset) => {
-    const harness = (window as unknown as {
-      __SNEK_TEST__?: {
-        forceGameOver: (result: {
-          rulesetId: 'pixel-flight-grid-v2-1';
-          score: number;
-          foodsCollected: number;
-          length: number;
-          maxLength: number;
-          foodEaten: number;
-          durationMs: number;
-        }) => void;
-      };
-    }).__SNEK_TEST__;
+    const harness = (window as unknown as { __SNEK_TEST__?: RankedHarness }).__SNEK_TEST__;
     if (!harness) throw new Error('missing ranked E2E harness');
     harness.forceGameOver({
       rulesetId: ruleset,
@@ -78,4 +71,32 @@ test('V2.1 stays local-first even when an HTTP ranking base is configured', asyn
   await expect(page.locator('[data-view="rank"]')).toContainText('PERSONAL BEST');
   await expect(page.locator('[data-view="rank"]')).toContainText('7');
   expect(apiRequests.filter((entry) => entry.includes('/api/'))).toEqual([]);
+});
+
+test('V2.2 pickup visibly coincides with the exact committed head cell center', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('[data-action="continue"]').click();
+  await page.locator('input[name="username"]').fill('pickup-v22');
+  await page.locator('[data-action="play"]').click();
+  await expect(page.locator('[data-hud-score]')).toHaveText('SCORE 0');
+
+  const app = page.locator('#app');
+  const currentCell = await app.getAttribute('data-head-cell');
+  if (!currentCell) throw new Error('missing head cell telemetry');
+  const [x, y, z] = currentCell.split(',').map(Number);
+  const foodCell = { x, y, z: (z + 2) % 9 };
+
+  await page.evaluate((cell) => {
+    const harness = (window as unknown as { __SNEK_TEST__?: RankedHarness }).__SNEK_TEST__;
+    if (!harness) throw new Error(`missing ranked E2E harness: ${harnessExpression()}`);
+    harness.setFoodCell(cell);
+  }, foodCell);
+
+  await expect.poll(() => app.getAttribute('data-last-food-pickup-cell'), { timeout: 2_000 })
+    .toBe(`${foodCell.x},${foodCell.y},${foodCell.z}`);
+
+  const foodWorld = await app.getAttribute('data-last-food-pickup-world');
+  const headWorld = await app.getAttribute('data-last-food-pickup-head-world');
+  expect(foodWorld).not.toBeNull();
+  expect(headWorld).toBe(foodWorld);
 });
