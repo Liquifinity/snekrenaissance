@@ -1,9 +1,9 @@
 import { wouldSelfCollide } from './collision';
 import { isGridFoodCollected, spawnGridFood } from './food';
 import { GRID_CONFIG, RULESET_ID, type GridConfig } from './grid-config';
-import { INITIAL_GRID_FRAME } from './grid-frame';
-import { advanceGridMovement } from './grid-movement';
-import type { GridCell, GridFrame, TurnIntent } from './grid-types';
+import { isOppositeGridDirection } from './grid-direction';
+import { advanceGridStep } from './grid-topology';
+import type { GridCell, GridDirection } from './grid-types';
 import { COMPLETION_FOOD_TARGET } from './progress';
 import {
   addGrowth,
@@ -30,8 +30,8 @@ export type RunState = {
   phase: RunPhase;
   config: GridConfig;
   snake: GridSnakeState;
-  frame: GridFrame;
-  pendingTurn: TurnIntent;
+  heading: GridDirection;
+  pendingDirection: GridDirection | null;
   food: GridCell | null;
   foodsCollected: number;
   score: number;
@@ -71,8 +71,8 @@ export function createRun(
     phase: 'ready',
     config,
     snake,
-    frame: INITIAL_GRID_FRAME,
-    pendingTurn: 'none',
+    heading: '+Z',
+    pendingDirection: null,
     food: spawn.ok ? spawn.cell : null,
     foodsCollected: 0,
     score: 0,
@@ -89,11 +89,12 @@ export function startRun(state: RunState): RunState {
   return state;
 }
 
-export function queueTurn(
+export function queueDirection(
   state: RunState,
-  intent: Exclude<TurnIntent, 'none'>
+  direction: GridDirection
 ): RunState {
-  state.pendingTurn = intent;
+  if (isOppositeGridDirection(state.heading, direction)) return state;
+  state.pendingDirection = direction;
   return state;
 }
 
@@ -110,26 +111,25 @@ export function stepRun(
 
   state.elapsedMs += 1000 / state.config.stepsPerSecond;
 
-  const intent = state.pendingTurn;
-  state.pendingTurn = 'none';
-  const movement = advanceGridMovement(
+  const direction = state.pendingDirection ?? state.heading;
+  state.pendingDirection = null;
+  state.heading = direction;
+  const movement = advanceGridStep(
     snakeHead(state.snake).cell,
-    state.frame,
-    intent,
+    state.heading,
     config
   );
 
-  if (wouldSelfCollide(state.snake, movement.cell, state.config)) {
+  if (wouldSelfCollide(state.snake, movement.to, state.config)) {
     state.phase = 'game-over';
     state.result = buildResult(state);
     return state;
   }
 
-  commitSnakeStep(state.snake, movement.cell);
-  state.frame = movement.frame;
+  commitSnakeStep(state.snake, movement.to);
   state.maxLength = Math.max(state.maxLength, state.snake.segments.length);
 
-  if (state.food && isGridFoodCollected(movement.cell, state.food)) {
+  if (state.food && isGridFoodCollected(movement.to, state.food)) {
     state.foodsCollected += 1;
     state.score = state.foodsCollected;
     state.foodEaten = state.foodsCollected;
