@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "verify:pwa": "node scripts/verify-pwa-build.mjs",
     "test": "vitest run",
     "test:tuning": "vitest run tests/metrics/grid-tuning.test.ts --reporter=verbose",
     "test:worker": "vitest run --config vitest.worker.config.ts",
