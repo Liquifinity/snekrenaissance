@@ -91,16 +91,13 @@ describe('GridFrame rotations', () => {
     }
   });
 
-  it('returns to the original frame after four quarter turns', () => {
+  it.each(TURNS)('returns to the original frame after four %s quarter turns', (turn) => {
     for (const frame of allValidFrames()) {
-      let left = frame;
-      let up = frame;
+      let rotated = frame;
       for (let i = 0; i < 4; i += 1) {
-        left = rotateGridFrame(left, 'left');
-        up = rotateGridFrame(up, 'up');
+        rotated = rotateGridFrame(rotated, turn);
       }
-      expect(left).toEqual(frame);
-      expect(up).toEqual(frame);
+      expect(rotated).toEqual(frame);
     }
   });
 });
