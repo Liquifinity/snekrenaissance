@@ -16,7 +16,7 @@ function execute(frameChunks: readonly number[]) {
   return run;
 }
 
-describe('V2.1 fixed-step continuous game loop', () => {
+describe('fixed-step continuous navigation with discrete visible direction', () => {
   it('produces the same simulation for equivalent 60 Hz and 30 Hz frame chunking', () => {
     const sixtyHz = execute(Array.from({ length: 24 }, () => 1 / 60));
     const thirtyHz = execute(Array.from({ length: 12 }, () => 1 / 30));
@@ -27,11 +27,12 @@ describe('V2.1 fixed-step continuous game loop', () => {
     expect(thirtyHz.flight.unwrappedPosition.y).toBeCloseTo(sixtyHz.flight.unwrappedPosition.y, 12);
     expect(thirtyHz.flight.unwrappedPosition.z).toBeCloseTo(sixtyHz.flight.unwrappedPosition.z, 12);
     expect(thirtyHz.snake.segments).toEqual(sixtyHz.snake.segments);
+    expect(thirtyHz.visibleDirection).toBe(sixtyHz.visibleDirection);
     expect(thirtyHz.score).toBe(sixtyHz.score);
     expect(thirtyHz.phase).toBe(sixtyHz.phase);
   });
 
-  it('responds to held steering on every fixed tick before the first cell entry', () => {
+  it('responds to held steering on every fixed tick before the first cell entry without changing visible direction', () => {
     const run = startRun(createRun(stableRng));
     run.food = { x: 0, y: 0, z: 0 };
     const clock = new FixedStepClock();
@@ -41,6 +42,7 @@ describe('V2.1 fixed-step continuous game loop', () => {
     for (let tick = 0; tick < 4; tick += 1) {
       clock.consume(1 / 60, (dt) => stepRun(run, { yaw: 1, pitch: 0 }, dt, stableRng));
       expect(run.flight.orientation.yaw).toBeGreaterThan(previousYaw);
+      expect(run.visibleDirection).toBe('+Z');
       previousYaw = run.flight.orientation.yaw;
     }
 
