@@ -40,7 +40,12 @@ const cameraController = new ChaseCameraController(scene.camera);
 const sessionGateway = createSessionGateway(import.meta.env.VITE_RANKING_API_BASE);
 const controller = new AppController({ root: app, gateway: sessionGateway });
 const fixedClock = new FixedStepClock(1 / GRID_CONFIG.stepsPerSecond);
-const joystick = new JoystickInput();
+const joystick = new JoystickInput({
+  onTurnIntent: (intent) => {
+    const run = controller.currentRun;
+    if (run && run.phase === 'playing') queueTurn(run, intent);
+  }
+});
 
 type CameraMode = 'chase' | 'overview';
 let cameraMode: CameraMode = 'chase';
@@ -180,6 +185,11 @@ const lifecycle = new RuntimeLifecycle(fixedClock, {
   showError: showRuntimeError
 });
 
+function updateJoystickVisual(): void {
+  const vector = joystick.visualVector;
+  joystickKnob.style.transform = `translate(${vector.x * 28}px, ${-vector.y * 28}px)`;
+}
+
 function exposeFoodPickupTelemetry(run: RunState, food: Readonly<{ x: number; y: number; z: number }>): void {
   const head = run.snake.segments[0];
   if (!head) return;
@@ -218,6 +228,8 @@ let frameId = 0;
 let rendererFailed = false;
 
 function frame(timestamp: number): void {
+  updateJoystickVisual();
+
   const run = controller.currentRun;
   if (run !== activeRun) {
     activeRun = run;
