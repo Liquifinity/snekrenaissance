@@ -9,7 +9,6 @@ const KEY_COMMANDS: Readonly<Record<string, ViewCommand>> = Object.freeze({
   a: 'left',
   arrowright: 'right',
   d: 'right',
-  q: 'towardViewer',
   e: 'intoScreen'
 });
 
@@ -23,6 +22,16 @@ function normalizeKey(key: string): string {
 
 function commandForKey(key: string): ViewCommand | null {
   return KEY_COMMANDS[key] ?? null;
+}
+
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return (
+    target instanceof HTMLInputElement
+    || target instanceof HTMLTextAreaElement
+    || target instanceof HTMLSelectElement
+    || target.isContentEditable
+  );
 }
 
 export class KeyboardInput {
@@ -53,6 +62,8 @@ export class KeyboardInput {
 
   attach(target: Window = window): () => void {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (isEditableTarget(event.target)) return;
+
       const normalized = normalizeKey(event.key);
       if (commandForKey(normalized)) {
         event.preventDefault();
@@ -61,6 +72,11 @@ export class KeyboardInput {
     };
     const onKeyUp = (event: KeyboardEvent) => {
       const normalized = normalizeKey(event.key);
+      if (isEditableTarget(event.target)) {
+        this.handleKeyUp(normalized);
+        return;
+      }
+
       if (commandForKey(normalized)) {
         event.preventDefault();
         this.handleKeyUp(normalized);
