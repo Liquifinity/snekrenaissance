@@ -23,7 +23,10 @@ describe('PWA configuration contract', () => {
       '**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp}'
     );
 
-    expect(PWA_OPTIONS.manifest?.icons).toEqual([
+    const manifest = PWA_OPTIONS.manifest;
+    if (!manifest) throw new Error('PWA manifest must be enabled.');
+
+    expect(manifest.icons).toEqual([
       {
         src: 'icons/snek-192.png',
         sizes: '192x192',
