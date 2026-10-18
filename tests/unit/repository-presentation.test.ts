@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const readme = readFileSync('README.md', 'utf8');
@@ -41,5 +41,16 @@ describe('repository presentation', () => {
     expect(readme).toMatch(/## License/i);
     expect(readme).toMatch(/MIT/i);
     expect(readme).not.toMatch(/asset provenance|asset rights|license review|pending/i);
+  });
+
+  it('keeps only the current PWA design and R2 plan in the public documentation tree', () => {
+    expect(existsSync('.superpowers')).toBe(false);
+    expect(existsSync('docs/superpowers/execution')).toBe(false);
+    expect(readdirSync('docs/superpowers/specs').sort()).toEqual([
+      '2026-10-18-snek-pwa-fork-first-design.md'
+    ]);
+    expect(readdirSync('docs/superpowers/plans').sort()).toEqual([
+      '2026-10-18-snek-pwa-fork-first-r2.md'
+    ]);
   });
 });
