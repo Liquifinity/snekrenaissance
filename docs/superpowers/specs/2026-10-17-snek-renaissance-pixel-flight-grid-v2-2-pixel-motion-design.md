@@ -1,6 +1,6 @@
 # SNEK RENAISSANCE — Pixel Flight Grid V2.2 Pixel Motion Design
 
-Status: **DRAFT FOR HUMAN REVIEW**  
+Status: **APPROVED — CANONICAL DESIGN**  
 Date: 2026-10-17  
 Baseline `main`: `fd852aa54081a1026d146ead06c4778738c2f6ef`  
 Supersedes: presentation/motion portions of Pixel Flight Grid V2.1 only.  
