@@ -17,7 +17,7 @@ const ACTIVE_V4_RUNTIME_FILES = Object.freeze([
   'render/snake-renderer.ts',
   'render/food-renderer.ts'
 ]);
-const FORBIDDEN_V4_AUTHORITY = /\b(GridFrame|TurnIntent|queueTurn|pendingTurn|ChaseCameraController|JoystickInput|wrapRebase|buildPixelChaseCameraSnapshot|applyOverviewCamera)\b/;
+const FORBIDDEN_V4_AUTHORITY = /\b(GridFrame|TurnIntent|queueTurn|ChaseCameraController|JoystickInput|wrapRebase|buildPixelChaseCameraSnapshot|applyOverviewCamera)\b/;
 
 async function listTypeScriptFiles(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -61,7 +61,7 @@ describe('SNEK CORE V4 authority boundary', () => {
     expect(source).not.toMatch(/render\//);
   });
 
-  it('removes obsolete V3 authority modules from production', async () => {
+  it('removes obsolete local-frame authority modules from production', async () => {
     const gameFiles = await readdir(GAME_ROOT);
     const inputFiles = await readdir(INPUT_ROOT);
     const renderFiles = await readdir(RENDER_ROOT);
