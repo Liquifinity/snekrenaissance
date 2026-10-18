@@ -15,9 +15,9 @@ import { renderUsernameView } from '../ui/username-view';
 import type { AppScreen, AppState } from './app-state';
 import {
   getOrCreatePlayerId,
-  loadSnekCoreV3Best,
+  loadSnekCoreV4Best,
   loadUsername,
-  saveSnekCoreV3Best,
+  saveSnekCoreV4Best,
   saveUsername,
   type PlayerIdentity,
   type StorageLike
@@ -57,7 +57,7 @@ export class AppController {
       screen: 'intro',
       playerId: getOrCreatePlayerId(this.storage),
       username: loadUsername(this.storage),
-      localBest: loadSnekCoreV3Best(this.storage),
+      localBest: loadSnekCoreV4Best(this.storage),
       worldRank: null,
       ranked: false,
       activeSessionId: null,
@@ -88,7 +88,7 @@ export class AppController {
     this.state.run = run;
 
     if (run.phase === 'completed' && run.result) {
-      this.state.localBest = saveSnekCoreV3Best(this.storage, run.result.score);
+      this.state.localBest = saveSnekCoreV4Best(this.storage, run.result.score);
       this.state.screen = 'complete';
       this.setScreen('complete');
       renderCompletionView(this.ui, () => this.beginGame());
@@ -96,7 +96,7 @@ export class AppController {
     }
 
     if (run.phase === 'game-over' && run.result) {
-      this.state.localBest = saveSnekCoreV3Best(this.storage, run.result.score);
+      this.state.localBest = saveSnekCoreV4Best(this.storage, run.result.score);
       this.state.screen = 'game-over';
 
       if (
