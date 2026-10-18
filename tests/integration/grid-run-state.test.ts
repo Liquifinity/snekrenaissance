@@ -1,96 +1,75 @@
 import { describe, expect, it } from 'vitest';
-import { GRID_CONFIG } from '../../src/game/grid-config';
-import { createInitialFlightPose } from '../../src/game/flight';
+import { GRID_CONFIG, RULESET_ID } from '../../src/game/grid-config';
+import { INITIAL_GRID_FRAME } from '../../src/game/grid-frame';
 import { COMPLETION_FOOD_TARGET } from '../../src/game/progress';
 import {
   createRun,
-  processGridEntries,
+  queueTurn,
   startRun,
   stepRun
 } from '../../src/game/run-state';
 import { snakeHead } from '../../src/game/snake';
 
 const stableRng = () => 0.75;
-const neutral = { yaw: 0, pitch: 0 } as const;
 
-describe('Pixel Flight Grid V2.2 RunState', () => {
-  it('initializes flight at the strategic head center with +Z visible direction and no discrete movement authority', () => {
+function cells(run: ReturnType<typeof createRun>) {
+  return run.snake.segments.map((segment) => ({ id: segment.id, cell: { ...segment.cell } }));
+}
+
+describe('SNEK CORE V3 RunState', () => {
+  it('initializes only strategic grid movement authority', () => {
     const run = createRun(stableRng);
     expect(run.phase).toBe('ready');
     expect(run.snake.segments).toHaveLength(GRID_CONFIG.initialLength);
     expect(snakeHead(run.snake).cell).toEqual({ x: 4, y: 4, z: 4 });
-    expect(run.flight.unwrappedPosition).toEqual({ x: 4.5, y: 4.5, z: 4.5 });
-    expect(run.flight.forward).toEqual({ x: 0, y: 0, z: 1 });
-    expect(run.visibleDirection).toBe('+Z');
-    expect(run.previousFlight).toBe(run.flight);
-    expect(run).not.toHaveProperty('frame');
+    expect(run.frame).toEqual(INITIAL_GRID_FRAME);
+    expect(run.pendingTurn).toBe('none');
+    expect(run).not.toHaveProperty('flight');
+    expect(run).not.toHaveProperty('previousFlight');
+    expect(run).not.toHaveProperty('visibleDirection');
     expect(run).not.toHaveProperty('turnQueue');
     expect(run).not.toHaveProperty('movementClock');
-    expect(run).not.toHaveProperty('transition');
-    expect(run).not.toHaveProperty('renderAlpha');
   });
 
-  it('steers within a cell without advancing strategic occupancy or visible direction', () => {
+  it('stores exactly one pending turn and latest input wins', () => {
     const run = startRun(createRun(stableRng));
-    run.food = { x: 0, y: 0, z: 0 };
-    const before = run.snake.segments.map((segment) => ({ id: segment.id, cell: { ...segment.cell } }));
-
-    stepRun(run, { yaw: 1, pitch: 0 }, 1 / 60, stableRng);
-
-    expect(run.flight.orientation.yaw).toBeGreaterThan(0);
-    expect(run.flight.unwrappedPosition.x).toBeGreaterThan(4.5);
-    expect(run.snake.segments).toEqual(before);
-    expect(run.visibleDirection).toBe('+Z');
+    expect(queueTurn(run, 'right')).toBe(run);
+    expect(run.pendingTurn).toBe('right');
+    queueTurn(run, 'up');
+    expect(run.pendingTurn).toBe('up');
+    expect(run).not.toHaveProperty('turnQueue');
   });
 
-  it('updates visible direction only when a continuous trajectory entry commits', () => {
-    const run = startRun(createRun(stableRng));
-    run.food = { x: 0, y: 0, z: 0 };
-    run.flight = {
-      unwrappedPosition: { x: 4.5, y: 4.5, z: 4.5 },
-      wrappedPosition: { x: 4.5, y: 4.5, z: 4.5 },
-      orientation: { yaw: Math.PI / 2, pitch: 0, roll: 0 },
-      forward: { x: 1, y: 0, z: 0 }
-    };
-    run.previousFlight = run.flight;
-
-    stepRun(run, neutral, 1 / 12, stableRng);
-
-    expect(snakeHead(run.snake).cell).toEqual({ x: 5, y: 4, z: 4 });
-    expect(run.visibleDirection).toBe('+X');
-  });
-
-  it('commits exactly when the continuous head enters the next cell', () => {
+  it('commits exactly one forward cell per strategic step with no input', () => {
     const run = startRun(createRun(stableRng));
     run.food = { x: 0, y: 0, z: 0 };
 
-    for (let tick = 0; tick < 4; tick += 1) stepRun(run, neutral, 1 / 60, stableRng);
-    expect(snakeHead(run.snake).cell).toEqual({ x: 4, y: 4, z: 4 });
+    stepRun(run, stableRng);
 
-    stepRun(run, neutral, 1 / 60, stableRng);
     expect(snakeHead(run.snake).cell).toEqual({ x: 4, y: 4, z: 5 });
-    expect(run.visibleDirection).toBe('+Z');
+    expect(run.frame).toEqual(INITIAL_GRID_FRAME);
+    expect(run.pendingTurn).toBe('none');
+    expect(run.elapsedMs).toBeCloseTo(1000 / GRID_CONFIG.stepsPerSecond, 10);
   });
 
-  it('collects exact-cell food on entry and retains +2 growth for later entries', () => {
+  it('applies the newest pending turn once, then clears it', () => {
     const run = startRun(createRun(stableRng));
-    run.food = { x: 4, y: 4, z: 5 };
-
-    stepRun(run, neutral, 1 / 12, stableRng);
-    expect(run.foodsCollected).toBe(1);
-    expect(run.score).toBe(1);
-    expect(run.snake.pendingGrowth).toBe(2);
-    expect(run.snake.segments).toHaveLength(6);
-
     run.food = { x: 0, y: 0, z: 0 };
-    stepRun(run, neutral, 1 / 6, stableRng);
-    stepRun(run, neutral, 1 / 6, stableRng);
-    expect(run.snake.pendingGrowth).toBe(0);
-    expect(run.snake.segments).toHaveLength(8);
-    expect(run.maxLength).toBe(8);
+    queueTurn(run, 'right');
+    queueTurn(run, 'up');
+
+    stepRun(run, stableRng);
+
+    expect(run.frame).toEqual({ forward: '+Y', right: '-X', up: '-Z' });
+    expect(snakeHead(run.snake).cell).toEqual({ x: 4, y: 5, z: 4 });
+    expect(run.pendingTurn).toBe('none');
+
+    stepRun(run, stableRng);
+    expect(snakeHead(run.snake).cell).toEqual({ x: 4, y: 6, z: 4 });
+    expect(run.frame.forward).toBe('+Y');
   });
 
-  it('detects exact collision before committing the occupied candidate cell or visible direction', () => {
+  it('detects collision before committing either cell or frame', () => {
     const run = startRun(createRun(stableRng));
     run.food = { x: 0, y: 0, z: 0 };
     run.snake.segments = [
@@ -101,16 +80,17 @@ describe('Pixel Flight Grid V2.2 RunState', () => {
       { id: 4, cell: { x: 3, y: 4, z: 4 } },
       { id: 5, cell: { x: 3, y: 4, z: 3 } }
     ];
-    run.flight = createInitialFlightPose({ x: 4, y: 4, z: 4 }, run.config);
-    run.previousFlight = run.flight;
-    const before = run.snake.segments.map((segment) => ({ id: segment.id, cell: { ...segment.cell } }));
+    const before = cells(run);
+    const frameBefore = run.frame;
 
-    stepRun(run, neutral, 1 / 12, stableRng);
+    stepRun(run, stableRng);
+
     expect(run.phase).toBe('game-over');
     expect(run.snake.segments).toEqual(before);
-    expect(run.visibleDirection).toBe('+Z');
+    expect(run.frame).toEqual(frameBefore);
+    expect(run.pendingTurn).toBe('none');
     expect(run.result).toMatchObject({
-      rulesetId: 'pixel-flight-grid-v2-2',
+      rulesetId: RULESET_ID,
       score: 0,
       foodsCollected: 0,
       length: 6,
@@ -118,43 +98,45 @@ describe('Pixel Flight Grid V2.2 RunState', () => {
     });
   });
 
-  it('stops processing later entries immediately after the first collision and latches only accepted direction', () => {
+  it('collects food only on the committed destination and preserves +2 growth', () => {
     const run = startRun(createRun(stableRng));
-    run.food = { x: 0, y: 0, z: 0 };
-    run.snake.segments = [
-      { id: 0, cell: { x: 4, y: 4, z: 4 } },
-      { id: 1, cell: { x: 4, y: 4, z: 3 } },
-      { id: 2, cell: { x: 4, y: 4, z: 6 } },
-      { id: 3, cell: { x: 3, y: 4, z: 6 } },
-      { id: 4, cell: { x: 3, y: 4, z: 5 } },
-      { id: 5, cell: { x: 3, y: 4, z: 4 } }
-    ];
+    run.food = { x: 4, y: 4, z: 5 };
 
-    processGridEntries(run, [
-      { cell: { x: 4, y: 4, z: 5 }, tEnter: 0.25 },
-      { cell: { x: 4, y: 4, z: 6 }, tEnter: 0.75 },
-      { cell: { x: 4, y: 4, z: 7 }, tEnter: 1 }
-    ], '+Y', stableRng);
+    stepRun(run, stableRng);
 
-    expect(run.phase).toBe('game-over');
     expect(snakeHead(run.snake).cell).toEqual({ x: 4, y: 4, z: 5 });
-    expect(run.visibleDirection).toBe('+Y');
-    expect(run.snake.segments.some((segment) => segment.cell.z === 7 && segment.cell.x === 4)).toBe(false);
+    expect(run.foodsCollected).toBe(1);
+    expect(run.score).toBe(1);
+    expect(run.snake.pendingGrowth).toBe(GRID_CONFIG.growthPerFood);
+
+    run.food = { x: 0, y: 0, z: 0 };
+    stepRun(run, stableRng);
+    stepRun(run, stableRng);
+    expect(run.snake.pendingGrowth).toBe(0);
+    expect(run.snake.segments).toHaveLength(GRID_CONFIG.initialLength + GRID_CONFIG.growthPerFood);
+    expect(run.maxLength).toBe(GRID_CONFIG.initialLength + GRID_CONFIG.growthPerFood);
   });
 
-  it('preserves the 300-food completion contract with the V2.2 ruleset', () => {
+  it('preserves the completion target under the active ruleset', () => {
     const run = startRun(createRun(stableRng));
     run.foodsCollected = COMPLETION_FOOD_TARGET - 1;
     run.score = COMPLETION_FOOD_TARGET - 1;
     run.food = { x: 4, y: 4, z: 5 };
 
-    stepRun(run, neutral, 1 / 12, stableRng);
+    stepRun(run, stableRng);
+
     expect(run.phase).toBe('completed');
     expect(run.score).toBe(COMPLETION_FOOD_TARGET);
     expect(run.result).toMatchObject({
-      rulesetId: 'pixel-flight-grid-v2-2',
+      rulesetId: RULESET_ID,
       score: COMPLETION_FOOD_TARGET,
       foodsCollected: COMPLETION_FOOD_TARGET
     });
+  });
+
+  it('rejects changing GridConfig after run creation', () => {
+    const run = startRun(createRun(stableRng));
+    const otherConfig = { ...run.config };
+    expect(() => stepRun(run, stableRng, otherConfig)).toThrow(/config cannot change/i);
   });
 });

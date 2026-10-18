@@ -1,15 +1,9 @@
 import { wouldSelfCollide } from './collision';
 import { isGridFoodCollected, spawnGridFood } from './food';
-import {
-  advanceFlightPose,
-  createInitialFlightPose,
-  type FlightPose,
-  type SteeringInput
-} from './flight';
 import { GRID_CONFIG, RULESET_ID, type GridConfig } from './grid-config';
-import { quantizeForwardToGridDirection } from './grid-direction';
-import { traverseGridSegment, type GridCellEntry } from './grid-traversal';
-import type { GridDirection } from './grid-types';
+import { INITIAL_GRID_FRAME } from './grid-frame';
+import { advanceGridMovement } from './grid-movement';
+import type { GridCell, GridFrame, TurnIntent } from './grid-types';
 import { COMPLETION_FOOD_TARGET } from './progress';
 import {
   addGrowth,
@@ -28,7 +22,7 @@ export type RunResult = Readonly<{
   length: number;
   maxLength: number;
   durationMs: number;
-  /** Preserved legacy HTTP payload alias; V2.1 score authority is foodsCollected. */
+  /** Preserved legacy HTTP payload alias; score authority is foodsCollected. */
   foodEaten: number;
 }>;
 
@@ -36,10 +30,9 @@ export type RunState = {
   phase: RunPhase;
   config: GridConfig;
   snake: GridSnakeState;
-  flight: FlightPose;
-  previousFlight: FlightPose;
-  visibleDirection: GridDirection;
-  food: import('./grid-types').GridCell | null;
+  frame: GridFrame;
+  pendingTurn: TurnIntent;
+  food: GridCell | null;
   foodsCollected: number;
   score: number;
   /** Preserved UI/backend compatibility alias; gameplay authority is foodsCollected. */
@@ -73,15 +66,13 @@ export function createRun(
 ): RunState {
   const snake = createGridSnake(config);
   const spawn = spawnGridFood(snake, rng, config);
-  const flight = createInitialFlightPose(snakeHead(snake).cell, config);
 
   return {
     phase: 'ready',
     config,
     snake,
-    flight,
-    previousFlight: flight,
-    visibleDirection: '+Z',
+    frame: INITIAL_GRID_FRAME,
+    pendingTurn: 'none',
     food: spawn.ok ? spawn.cell : null,
     foodsCollected: 0,
     score: 0,
@@ -98,78 +89,62 @@ export function startRun(state: RunState): RunState {
   return state;
 }
 
-export function processGridEntries(
+export function queueTurn(
   state: RunState,
-  entries: readonly GridCellEntry[],
-  visibleDirection: GridDirection,
-  rng: () => number
-): void {
-  for (const entry of entries) {
-    if (state.phase !== 'playing') return;
-
-    if (wouldSelfCollide(state.snake, entry.cell, state.config)) {
-      state.phase = 'game-over';
-      state.result = buildResult(state);
-      return;
-    }
-
-    commitSnakeStep(state.snake, entry.cell);
-    state.visibleDirection = visibleDirection;
-    state.maxLength = Math.max(state.maxLength, state.snake.segments.length);
-
-    if (state.food && isGridFoodCollected(entry.cell, state.food)) {
-      state.foodsCollected += 1;
-      state.score = state.foodsCollected;
-      state.foodEaten = state.foodsCollected;
-      addGrowth(state.snake, state.config.growthPerFood);
-
-      if (state.foodsCollected >= COMPLETION_FOOD_TARGET) {
-        state.food = null;
-        state.phase = 'completed';
-        state.result = buildResult(state);
-        return;
-      }
-
-      respawnGridFood(state, rng);
-    } else if (!state.food) {
-      respawnGridFood(state, rng);
-    }
-  }
+  intent: Exclude<TurnIntent, 'none'>
+): RunState {
+  state.pendingTurn = intent;
+  return state;
 }
 
 export function stepRun(
   state: RunState,
-  input: SteeringInput,
-  dtSeconds: number,
   rng: () => number = Math.random,
   config: GridConfig = state.config
 ): RunState {
   if (state.phase !== 'playing') return state;
 
-  if (!Number.isFinite(dtSeconds) || dtSeconds < 0) {
-    throw new RangeError('Run dt must be a finite non-negative number.');
-  }
-
   if (config !== state.config) {
     throw new RangeError('RunState config cannot change after creation.');
   }
 
-  state.elapsedMs += dtSeconds * 1000;
-  const previousFlight = state.flight;
-  const nextFlight = advanceFlightPose(previousFlight, input, dtSeconds, config);
-  const entries = traverseGridSegment(
-    previousFlight.unwrappedPosition,
-    nextFlight.unwrappedPosition,
+  state.elapsedMs += 1000 / state.config.stepsPerSecond;
+
+  const intent = state.pendingTurn;
+  state.pendingTurn = 'none';
+  const movement = advanceGridMovement(
+    snakeHead(state.snake).cell,
+    state.frame,
+    intent,
     config
   );
-  const entryDirection = quantizeForwardToGridDirection(nextFlight.forward);
 
-  state.previousFlight = previousFlight;
-  processGridEntries(state, entries, entryDirection, rng);
+  if (wouldSelfCollide(state.snake, movement.cell, state.config)) {
+    state.phase = 'game-over';
+    state.result = buildResult(state);
+    return state;
+  }
 
-  const resultingPhase = state.phase as RunPhase;
-  if (resultingPhase !== 'game-over') {
-    state.flight = nextFlight;
+  commitSnakeStep(state.snake, movement.cell);
+  state.frame = movement.frame;
+  state.maxLength = Math.max(state.maxLength, state.snake.segments.length);
+
+  if (state.food && isGridFoodCollected(movement.cell, state.food)) {
+    state.foodsCollected += 1;
+    state.score = state.foodsCollected;
+    state.foodEaten = state.foodsCollected;
+    addGrowth(state.snake, state.config.growthPerFood);
+
+    if (state.foodsCollected >= COMPLETION_FOOD_TARGET) {
+      state.food = null;
+      state.phase = 'completed';
+      state.result = buildResult(state);
+      return state;
+    }
+
+    respawnGridFood(state, rng);
+  } else if (!state.food) {
+    respawnGridFood(state, rng);
   }
 
   return state;

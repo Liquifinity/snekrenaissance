@@ -1,7 +1,6 @@
 import type { PerspectiveCamera } from 'three';
 import { GRID_CONFIG, type GridConfig } from '../game/grid-config';
 import type { Vec3 } from '../game/types';
-import type { FlightPresentation } from './flight-presentation';
 
 export const CAMERA_DISTANCE_CELLS = 4;
 export const CAMERA_HEIGHT_CELLS = 2.8;
@@ -9,10 +8,11 @@ export const CAMERA_LOOK_AHEAD_CELLS = 2;
 export const CAMERA_FOV = 60;
 export const CAMERA_SMOOTHING = 8;
 
-export type ChaseCameraSnapshot = Pick<
-  FlightPresentation,
-  'headWorld' | 'forwardWorld' | 'upWorld' | 'displayWrapOffset'
->;
+export type ChaseCameraSnapshot = Readonly<{
+  headWorld: Vec3;
+  forwardWorld: Vec3;
+  upWorld: Vec3;
+}>;
 
 export type CameraPose = Readonly<{
   position: Vec3;
@@ -52,23 +52,37 @@ function lerp(a: Vec3, b: Vec3, t: number): Vec3 {
 function desiredPose(snapshot: ChaseCameraSnapshot, config: GridConfig): CameraPose {
   const forward = normalize(snapshot.forwardWorld, { x: 0, y: 0, z: 1 });
   const up = normalize(snapshot.upWorld, { x: 0, y: 1, z: 0 });
-  const displayedHead = add(snapshot.headWorld, snapshot.displayWrapOffset);
   const distance = CAMERA_DISTANCE_CELLS * config.cellSize;
   const height = CAMERA_HEIGHT_CELLS * config.cellSize;
   const lookAhead = CAMERA_LOOK_AHEAD_CELLS * config.cellSize;
 
   return {
     position: add(
-      subtract(displayedHead, scale(forward, distance)),
+      subtract(snapshot.headWorld, scale(forward, distance)),
       scale(up, height)
     ),
-    target: add(displayedHead, scale(forward, lookAhead))
+    target: add(snapshot.headWorld, scale(forward, lookAhead))
+  };
+}
+
+function wrapRebase(previous: Vec3, current: Vec3, worldSize: number): Vec3 {
+  const rebaseAxis = (from: number, to: number): number => {
+    const delta = to - from;
+    if (delta > worldSize / 2) return worldSize;
+    if (delta < -worldSize / 2) return -worldSize;
+    return 0;
+  };
+
+  return {
+    x: rebaseAxis(previous.x, current.x),
+    y: rebaseAxis(previous.y, current.y),
+    z: rebaseAxis(previous.z, current.z)
   };
 }
 
 export class ChaseCameraController {
   private pose: CameraPose | null = null;
-  private lastDisplayWrapOffset: Vec3 | null = null;
+  private lastHeadWorld: Vec3 | null = null;
 
   constructor(
     private readonly camera?: PerspectiveCamera,
@@ -87,21 +101,17 @@ export class ChaseCameraController {
 
     const desired = desiredPose(snapshot, this.config);
 
-    if (!this.pose || !this.lastDisplayWrapOffset) {
+    if (!this.pose || !this.lastHeadWorld) {
       this.pose = {
         position: clone(desired.position),
         target: clone(desired.target)
       };
     } else {
-      const wrapDelta = subtract(
-        snapshot.displayWrapOffset,
-        this.lastDisplayWrapOffset
-      );
-
-      if (wrapDelta.x !== 0 || wrapDelta.y !== 0 || wrapDelta.z !== 0) {
+      const rebase = wrapRebase(this.lastHeadWorld, snapshot.headWorld, this.config.worldSize);
+      if (rebase.x !== 0 || rebase.y !== 0 || rebase.z !== 0) {
         this.pose = {
-          position: add(this.pose.position, wrapDelta),
-          target: add(this.pose.target, wrapDelta)
+          position: add(this.pose.position, rebase),
+          target: add(this.pose.target, rebase)
         };
       }
 
@@ -114,7 +124,7 @@ export class ChaseCameraController {
       };
     }
 
-    this.lastDisplayWrapOffset = clone(snapshot.displayWrapOffset);
+    this.lastHeadWorld = clone(snapshot.headWorld);
 
     if (this.camera) {
       if (this.camera.fov !== CAMERA_FOV) {
@@ -141,6 +151,6 @@ export class ChaseCameraController {
 
   reset(): void {
     this.pose = null;
-    this.lastDisplayWrapOffset = null;
+    this.lastHeadWorld = null;
   }
 }

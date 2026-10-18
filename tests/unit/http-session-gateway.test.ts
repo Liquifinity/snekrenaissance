@@ -1,11 +1,12 @@
 import { describe, expect, test, vi } from 'vitest';
 import { HttpSessionGateway } from '../../src/app/http-session-gateway';
 import type { PlayerIdentity } from '../../src/app/identity';
+import { RULESET_ID } from '../../src/game/grid-config';
 import type { RunResult } from '../../src/game/run-state';
 
 const identity: PlayerIdentity = { playerId: 'player/with space', username: 'Ren <b>ato</b>' };
 const result: RunResult = {
-  rulesetId: 'pixel-flight-grid-v2-2',
+  rulesetId: RULESET_ID,
   score: 2,
   foodsCollected: 2,
   length: 20,
@@ -22,6 +23,15 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 describe('HttpSessionGateway', () => {
+  test('explicitly reports SNEK CORE V3 as unsupported without issuing a request', () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    const gateway = new HttpSessionGateway('/rank', fetchMock);
+
+    expect(RULESET_ID).toBe('snek-core-v3');
+    expect(gateway.supportsRuleset(RULESET_ID)).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   test('invokes fetch with the global receiver required by browser-native implementations', async () => {
     const fetchWithReceiver = function (this: typeof globalThis): Promise<Response> {
       if (this !== globalThis) throw new TypeError('Illegal invocation');

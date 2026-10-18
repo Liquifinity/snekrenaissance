@@ -5,9 +5,9 @@ import {
   createGridConfig
 } from '../../src/game/grid-config';
 
-describe('Pixel Flight Grid V2.2 config', () => {
+describe('SNEK CORE V3 config', () => {
   it('derives the approved baseline configuration', () => {
-    expect(RULESET_ID).toBe('pixel-flight-grid-v2-2');
+    expect(RULESET_ID).toBe('snek-core-v3');
     expect(GRID_CONFIG.resolution).toBe(9);
     expect(GRID_CONFIG.cellSize).toBe(0.4);
     expect(GRID_CONFIG.worldSize).toBeCloseTo(3.6, 10);

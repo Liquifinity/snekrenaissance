@@ -2,22 +2,19 @@ import './styles.css';
 import { AppController } from './app/app-controller';
 import { createSessionGateway } from './app/gateway-selection';
 import { RuntimeLifecycle } from './app/runtime-lifecycle';
+import { GRID_CONFIG } from './game/grid-config';
 import { cellToWorld } from './game/grid-topology';
 import {
+  queueTurn,
   stepRun,
   type RunResult,
   type RunState
 } from './game/run-state';
 import { FixedStepClock } from './game/simulation';
-import { clampInputAxis, type InputState } from './input/input-state';
 import { JoystickInput } from './input/joystick';
 import { KeyboardInput } from './input/keyboard';
 import { ChaseCameraController } from './render/chase-camera';
 import { FoodRenderer } from './render/food-renderer';
-import {
-  interpolateFlightPresentation,
-  type FlightPresentation
-} from './render/flight-presentation';
 import { applyOverviewCamera } from './render/overview-camera';
 import { buildPixelChaseCameraSnapshot } from './render/pixel-camera-presentation';
 import { buildPixelSnakeRenderSnapshot } from './render/pixel-snake-presentation';
@@ -38,29 +35,20 @@ const foodRenderer = new FoodRenderer(scene.scene);
 const cameraController = new ChaseCameraController(scene.camera);
 const sessionGateway = createSessionGateway(import.meta.env.VITE_RANKING_API_BASE);
 const controller = new AppController({ root: app, gateway: sessionGateway });
-const fixedClock = new FixedStepClock();
-const joystick = new JoystickInput();
+const fixedClock = new FixedStepClock(1 / GRID_CONFIG.stepsPerSecond);
+const joystick = new JoystickInput({
+  onTurnIntent: (intent) => {
+    const run = controller.currentRun;
+    if (run && run.phase === 'playing') queueTurn(run, intent);
+  }
+});
 
 type CameraMode = 'chase' | 'overview';
 let cameraMode: CameraMode = 'chase';
 app.dataset.cameraMode = cameraMode;
 
-function buildPresentation(run: RunState): FlightPresentation {
-  return interpolateFlightPresentation(
-    run.previousFlight,
-    run.flight,
-    fixedClock.alpha,
-    run.config
-  );
-}
-
-function updateChaseCamera(
-  run: RunState,
-  presentation: FlightPresentation,
-  dtSeconds: number
-): void {
-  const snapshot = buildPixelChaseCameraSnapshot(run, presentation);
-  cameraController.update(snapshot, dtSeconds);
+function updateChaseCamera(run: RunState, dtSeconds: number): void {
+  cameraController.update(buildPixelChaseCameraSnapshot(run), dtSeconds);
 }
 
 function setCameraMode(mode: CameraMode): void {
@@ -74,7 +62,7 @@ function setCameraMode(mode: CameraMode): void {
   }
 
   cameraController.reset();
-  if (run) updateChaseCamera(run, buildPresentation(run), 0);
+  if (run) updateChaseCamera(run, 0);
 }
 
 function toggleCamera(): void {
@@ -82,7 +70,13 @@ function toggleCamera(): void {
   setCameraMode(cameraMode === 'chase' ? 'overview' : 'chase');
 }
 
-const keyboard = new KeyboardInput({ onCameraToggle: toggleCamera });
+const keyboard = new KeyboardInput({
+  onTurnIntent: (intent) => {
+    const run = controller.currentRun;
+    if (run && run.phase === 'playing') queueTurn(run, intent);
+  },
+  onCameraToggle: toggleCamera
+});
 
 const joystickShell = document.createElement('div');
 joystickShell.className = 'joystick-shell';
@@ -112,19 +106,119 @@ const detachKeyboard = keyboard.attach(window);
 const detachJoystick = joystick.attach(joystickShell, window);
 controller.mount();
 
-if (import.meta.env.MODE === 'e2e-ranked') {
-  type TestFoodCell = Readonly<{ x: number; y: number; z: number }>;
+function resize(): void {
+  const rect = canvas.getBoundingClientRect();
+  scene.resize(rect.width, rect.height);
+}
+
+function showRuntimeError(message: string): void {
+  runtimeError.textContent = message;
+  runtimeError.hidden = false;
+  app.dataset.runtimeError = 'true';
+}
+
+const lifecycle = new RuntimeLifecycle(fixedClock, {
+  resize,
+  resetTouch: () => joystick.reset(),
+  showError: showRuntimeError
+});
+
+function updateJoystickVisual(): void {
+  const vector = joystick.visualVector;
+  joystickKnob.style.transform = `translate(${vector.x * 28}px, ${-vector.y * 28}px)`;
+  app.dataset.joystickSector = joystick.sector;
+}
+
+function exposeFoodPickupTelemetry(run: RunState, food: Readonly<{ x: number; y: number; z: number }>): void {
+  const head = run.snake.segments[0];
+  if (!head) return;
+  const foodWorld = cellToWorld(food, run.config);
+  const headWorld = cellToWorld(head.cell, run.config);
+  app.dataset.lastFoodPickupCell = `${food.x},${food.y},${food.z}`;
+  app.dataset.lastFoodPickupWorld = `${foodWorld.x},${foodWorld.y},${foodWorld.z}`;
+  app.dataset.lastFoodPickupHeadWorld = `${headWorld.x},${headWorld.y},${headWorld.z}`;
+}
+
+// Read-only browser diagnostics used by responsive/E2E verification. Never read back by gameplay.
+function exposeLogicalTelemetry(run: RunState): void {
+  const head = run.snake.segments[0];
+  if (!head) return;
+  app.dataset.headCell = `${head.cell.x},${head.cell.y},${head.cell.z}`;
+  app.dataset.headDirection = run.frame.forward;
+  app.dataset.headUp = run.frame.up;
+  app.dataset.pendingTurn = run.pendingTurn;
+  const headWorld = cellToWorld(head.cell, run.config);
+  app.dataset.headRenderWorld = `${headWorld.x},${headWorld.y},${headWorld.z}`;
+}
+
+function initializeRun(run: RunState): void {
+  fixedClock.reset();
+  cameraController.reset();
+  setCameraMode('chase');
+  exposeLogicalTelemetry(run);
+}
+
+function advanceStrategicRun(run: RunState): void {
+  const previousLength = run.snake.segments.length;
+  const previousFoods = run.foodsCollected;
+  const consumedFood = run.food ? { ...run.food } : null;
+  stepRun(run);
+
+  if (consumedFood && run.foodsCollected > previousFoods) {
+    exposeFoodPickupTelemetry(run, consumedFood);
+  }
+
+  if (
+    run.phase === 'game-over'
+    || run.phase === 'completed'
+    || run.snake.segments.length !== previousLength
+    || run.foodsCollected !== previousFoods
+  ) {
+    controller.handleRunState(run);
+  }
+}
+
+function consumeStrategicFrame(run: RunState, frameDeltaSeconds: number): number {
+  return lifecycle.consumeFrame(frameDeltaSeconds, () => advanceStrategicRun(run));
+}
+
+type TestFoodCell = Readonly<{ x: number; y: number; z: number }>;
+const e2eMode = import.meta.env.MODE === 'e2e' || import.meta.env.MODE === 'e2e-ranked';
+let manualClock = e2eMode;
+let activeRun: RunState | null = null;
+let lastTimestamp: number | null = null;
+let frameId = 0;
+let rendererFailed = false;
+
+if (e2eMode) {
   const testWindow = window as typeof window & {
     __SNEK_TEST__?: {
       apiBase: string;
       gatewayKind: string;
+      setManualClock: (enabled: boolean) => void;
+      consumeFrame: (frameDeltaSeconds: number) => number;
       setFoodCell: (cell: TestFoodCell) => void;
+      getCameraPosition: () => Readonly<{ x: number; y: number; z: number }>;
       forceGameOver: (result: RunResult) => void;
     };
   };
+
   testWindow.__SNEK_TEST__ = {
     apiBase: import.meta.env.VITE_RANKING_API_BASE ?? '',
     gatewayKind: sessionGateway.constructor.name,
+    setManualClock: (enabled) => {
+      manualClock = enabled;
+      fixedClock.reset();
+    },
+    consumeFrame: (frameDeltaSeconds) => {
+      const run = controller.currentRun;
+      if (!run || run.phase !== 'playing') {
+        throw new Error('No active playing run for deterministic frame consumption.');
+      }
+      const steps = consumeStrategicFrame(run, frameDeltaSeconds);
+      exposeLogicalTelemetry(run);
+      return steps;
+    },
     setFoodCell: (cell) => {
       const run = controller.currentRun;
       if (!run) throw new Error('No active run for deterministic food placement.');
@@ -145,6 +239,11 @@ if (import.meta.env.MODE === 'e2e-ranked') {
 
       run.food = { x: cell.x, y: cell.y, z: cell.z };
     },
+    getCameraPosition: () => ({
+      x: scene.camera.position.x,
+      y: scene.camera.position.y,
+      z: scene.camera.position.z
+    }),
     forceGameOver: (result) => {
       const run = controller.currentRun;
       if (!run) throw new Error('No active run to finish.');
@@ -156,78 +255,8 @@ if (import.meta.env.MODE === 'e2e-ranked') {
   };
 }
 
-function resize(): void {
-  const rect = canvas.getBoundingClientRect();
-  scene.resize(rect.width, rect.height);
-}
-
-function showRuntimeError(message: string): void {
-  runtimeError.textContent = message;
-  runtimeError.hidden = false;
-  app.dataset.runtimeError = 'true';
-}
-
-const lifecycle = new RuntimeLifecycle(fixedClock, {
-  resize,
-  resetTouch: () => joystick.reset(),
-  showError: showRuntimeError
-});
-
-function readSteeringInput(): InputState {
-  const keyboardState = keyboard.state;
-  const joystickState = joystick.state;
-  return {
-    yaw: clampInputAxis(keyboardState.yaw + joystickState.yaw),
-    pitch: clampInputAxis(keyboardState.pitch + joystickState.pitch)
-  };
-}
-
-function exposeSteeringInput(input: InputState): void {
-  app.dataset.inputYaw = String(input.yaw);
-  app.dataset.inputPitch = String(input.pitch);
-  joystickKnob.style.transform = `translate(${input.yaw * 28}px, ${-input.pitch * 28}px)`;
-}
-
-function exposeFoodPickupTelemetry(run: RunState, food: Readonly<{ x: number; y: number; z: number }>): void {
-  const head = run.snake.segments[0];
-  if (!head) return;
-  const foodWorld = cellToWorld(food, run.config);
-  const headWorld = cellToWorld(head.cell, run.config);
-  app.dataset.lastFoodPickupCell = `${food.x},${food.y},${food.z}`;
-  app.dataset.lastFoodPickupWorld = `${foodWorld.x},${foodWorld.y},${foodWorld.z}`;
-  app.dataset.lastFoodPickupHeadWorld = `${headWorld.x},${headWorld.y},${headWorld.z}`;
-}
-
-// Read-only browser diagnostics used by responsive/E2E verification. Never read back by gameplay.
-function exposeLogicalTelemetry(run: RunState): void {
-  const head = run.snake.segments[0];
-  if (!head) return;
-  app.dataset.headCell = `${head.cell.x},${head.cell.y},${head.cell.z}`;
-  app.dataset.headYaw = String(run.flight.orientation.yaw);
-  app.dataset.headPitch = String(run.flight.orientation.pitch);
-  const point = run.flight.wrappedPosition;
-  app.dataset.headPoint = `${point.x},${point.y},${point.z}`;
-  app.dataset.headDirection = run.visibleDirection;
-  const headWorld = cellToWorld(head.cell, run.config);
-  app.dataset.headRenderWorld = `${headWorld.x},${headWorld.y},${headWorld.z}`;
-}
-
-function initializeRun(run: RunState): void {
-  fixedClock.reset();
-  cameraController.reset();
-  setCameraMode('chase');
-  updateChaseCamera(run, buildPresentation(run), 0);
-  exposeLogicalTelemetry(run);
-}
-
-let activeRun: RunState | null = null;
-let lastTimestamp: number | null = null;
-let frameId = 0;
-let rendererFailed = false;
-
 function frame(timestamp: number): void {
-  const steering = readSteeringInput();
-  exposeSteeringInput(steering);
+  updateJoystickVisual();
 
   const run = controller.currentRun;
   if (run !== activeRun) {
@@ -241,36 +270,17 @@ function frame(timestamp: number): void {
     : Math.max(0, (timestamp - lastTimestamp) / 1000);
   lastTimestamp = timestamp;
 
-  if (run?.phase === 'playing') {
-    lifecycle.consumeFrame(frameDeltaSeconds, (dt) => {
-      const previousLength = run.snake.segments.length;
-      const previousFoods = run.foodsCollected;
-      const consumedFood = run.food ? { ...run.food } : null;
-      stepRun(run, steering, dt);
-
-      if (consumedFood && run.foodsCollected > previousFoods) {
-        exposeFoodPickupTelemetry(run, consumedFood);
-      }
-
-      if (
-        run.phase === 'game-over'
-        || run.phase === 'completed'
-        || run.snake.segments.length !== previousLength
-        || run.foodsCollected !== previousFoods
-      ) {
-        controller.handleRunState(run);
-      }
-    });
+  if (run?.phase === 'playing' && !manualClock) {
+    consumeStrategicFrame(run, frameDeltaSeconds);
   }
 
   if (run) {
     exposeLogicalTelemetry(run);
-    const presentation = buildPresentation(run);
     snakeRenderer.render(buildPixelSnakeRenderSnapshot(run));
     foodRenderer.render(run.food ? cellToWorld(run.food, run.config) : null);
 
     if (cameraMode === 'chase') {
-      updateChaseCamera(run, presentation, frameDeltaSeconds);
+      updateChaseCamera(run, frameDeltaSeconds);
     }
   }
 

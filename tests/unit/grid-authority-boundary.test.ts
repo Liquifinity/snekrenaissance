@@ -8,16 +8,15 @@ const INPUT_ROOT = join(SRC_ROOT, 'input');
 const RENDER_ROOT = join(SRC_ROOT, 'render');
 const WORLD_TO_CELL_DEFINITION = 'game/grid-topology.ts';
 const FORBIDDEN_RETIRED_V1_AUTHORITY = /\b(TrailBuffer|sampleBodyPositions|advanceHead|SNAKE_SPEED|SEGMENT_SPACING|FOOD_PICKUP_RADIUS|SELF_COLLISION_RADIUS|headWrapped|headUnwrapped|bodyPositions|LegacySteeringInput|LegacyChaseCameraSnapshot)\b/;
-const FORBIDDEN_V2_RUNSTATE_AUTHORITY = /\b(TurnIntentQueue|GridMovementClock|rotateGridFrame|queueTurnIntent|INITIAL_GRID_FRAME|LogicalTransition)\b/;
+const FORBIDDEN_V3_RUNSTATE_AUTHORITY = /\b(FlightPose|SteeringInput|advanceFlightPose|createInitialFlightPose|traverseGridSegment|GridCellEntry|quantizeForwardToGridDirection|visibleDirection|TurnIntentQueue|GridMovementClock|queueTurnIntent|LogicalTransition)\b/;
 const FORBIDDEN_DISCRETE_INPUT_BRIDGE = /\b(takeIntent|pendingIntent|legacyIntentArmed|LEGACY_INTENT_ACTIVATION_THRESHOLD|LEGACY_INTENT_REARM_THRESHOLD)\b/;
-const FORBIDDEN_ACTIVE_V2_AUTHORITY = /\b(TurnIntentQueue|GridMovementClock|queueTurnIntent|rotateGridFrame|JOYSTICK_ACTIVATION_THRESHOLD|JOYSTICK_REARM_THRESHOLD|LogicalTransition|buildRenderTransition|interpolateTransition)\b/;
-const ACTIVE_V22_RUNTIME_FILES = Object.freeze([
+const FORBIDDEN_ACTIVE_LEGACY_AUTHORITY = /\b(FlightPose|advanceFlightPose|traverseGridSegment|quantizeForwardToGridDirection|visibleDirection|TurnIntentQueue|GridMovementClock|queueTurnIntent|JOYSTICK_ACTIVATION_THRESHOLD|JOYSTICK_REARM_THRESHOLD|LogicalTransition|buildRenderTransition|interpolateTransition)\b/;
+const ACTIVE_V3_RUNTIME_FILES = Object.freeze([
   'main.ts',
   'game/run-state.ts',
   'input/keyboard.ts',
   'input/joystick.ts',
   'render/chase-camera.ts',
-  'render/flight-presentation.ts',
   'render/pixel-camera-presentation.ts',
   'render/pixel-snake-presentation.ts',
   'render/snake-renderer.ts',
@@ -62,15 +61,15 @@ describe('grid authority boundary', () => {
     expect(violations).toEqual([]);
   });
 
-  it('keeps active V2.2 RunState independent from retired steering and render authority', async () => {
+  it('keeps active V3 RunState exclusively grid-authoritative', async () => {
     const source = await readFile(join(GAME_ROOT, 'run-state.ts'), 'utf8');
-    expect(FORBIDDEN_V2_RUNSTATE_AUTHORITY.test(source)).toBe(false);
+    expect(FORBIDDEN_V3_RUNSTATE_AUTHORITY.test(source)).toBe(false);
     expect(source).not.toMatch(/from ['"]three['"]/);
     expect(source).not.toMatch(/render\//);
-    expect(source).toMatch(/advanceFlightPose/);
-    expect(source).toMatch(/traverseGridSegment/);
-    expect(source).toMatch(/visibleDirection/);
-    expect(source).toMatch(/quantizeForwardToGridDirection/);
+    expect(source).toMatch(/INITIAL_GRID_FRAME/);
+    expect(source).toMatch(/advanceGridMovement/);
+    expect(source).toMatch(/pendingTurn/);
+    expect(source).toMatch(/queueTurn/);
   });
 
   it('removes the legacy discrete movement bridge from active input adapters', async () => {
@@ -85,18 +84,18 @@ describe('grid authority boundary', () => {
     expect(violations).toEqual([]);
   });
 
-  it('keeps all active V2.2 runtime modules free of retired discrete V2 authority', async () => {
+  it('keeps all active V3 runtime modules free of retired locomotion authority', async () => {
     const violations: string[] = [];
 
-    for (const repoRelative of ACTIVE_V22_RUNTIME_FILES) {
+    for (const repoRelative of ACTIVE_V3_RUNTIME_FILES) {
       const source = await readFile(join(SRC_ROOT, repoRelative), 'utf8');
-      if (FORBIDDEN_ACTIVE_V2_AUTHORITY.test(source)) violations.push(repoRelative);
+      if (FORBIDDEN_ACTIVE_LEGACY_AUTHORITY.test(source)) violations.push(repoRelative);
     }
 
     expect(violations).toEqual([]);
   });
 
-  it('removes FlightTrail from the active V2.2 presentation architecture', async () => {
+  it('keeps FlightTrail out of the active V3 presentation architecture', async () => {
     const renderFiles = await readdir(RENDER_ROOT);
     expect(renderFiles).not.toContain('flight-trail.ts');
 
@@ -105,17 +104,23 @@ describe('grid authority boundary', () => {
     expect(mainSource).toContain('snakeRenderer.render(buildPixelSnakeRenderSnapshot(run))');
   });
 
-  it('keeps the pixel snake snapshot independent from continuous flight presentation', async () => {
+  it('keeps the pixel snake snapshot on GridCell + GridFrame only', async () => {
     const source = await readFile(join(RENDER_ROOT, 'pixel-snake-presentation.ts'), 'utf8');
-    expect(source).not.toMatch(/\b(FlightPose|FlightPresentation|FlightTrail|unwrappedGridPoint|displayedHeadWorld|sampleBehind)\b/);
+    expect(source).not.toMatch(/\b(FlightPose|FlightPresentation|FlightTrail|unwrappedGridPoint|displayedHeadWorld|sampleBehind|visibleDirection)\b/);
     expect(source).toMatch(/cellToWorld/);
-    expect(source).toMatch(/visibleDirection/);
+    expect(source).toMatch(/quaternionForGridFrame/);
+    expect(source).toMatch(/run\.frame/);
   });
 
-  it('allows continuous navigation only as camera guidance while preserving pixel placement', async () => {
-    const gameFiles = await readdir(GAME_ROOT);
-    expect(gameFiles).toContain('flight.ts');
-    expect(gameFiles).not.toContain('steering.ts');
-    expect(gameFiles).not.toContain('trail.ts');
+  it('keeps historical continuous-navigation modules unreachable from active V3 runtime', async () => {
+    const violations: string[] = [];
+    const forbidden = /\b(FlightPose|advanceFlightPose|traverseGridSegment|quantizeForwardToGridDirection|FlightPresentation)\b/;
+
+    for (const repoRelative of ACTIVE_V3_RUNTIME_FILES) {
+      const source = await readFile(join(SRC_ROOT, repoRelative), 'utf8');
+      if (forbidden.test(source)) violations.push(repoRelative);
+    }
+
+    expect(violations).toEqual([]);
   });
 });

@@ -1,66 +1,63 @@
 import { describe, expect, it } from 'vitest';
-import { createRun, startRun, stepRun } from '../../src/game/run-state';
+import { GRID_CONFIG } from '../../src/game/grid-config';
+import { createRun, queueTurn, startRun, stepRun } from '../../src/game/run-state';
 import { FixedStepClock } from '../../src/game/simulation';
 import { snakeHead } from '../../src/game/snake';
 
 const stableRng = () => 0.75;
-const steering = { yaw: 0.35, pitch: -0.2 } as const;
+const STEP_SECONDS = 1 / GRID_CONFIG.stepsPerSecond;
 
 function execute(frameChunks: readonly number[]) {
   const run = startRun(createRun(stableRng));
   run.food = { x: 0, y: 0, z: 0 };
-  const clock = new FixedStepClock();
+  const clock = new FixedStepClock(STEP_SECONDS);
   for (const frameDelta of frameChunks) {
-    clock.consume(frameDelta, (dt) => stepRun(run, steering, dt, stableRng));
+    clock.consume(frameDelta, () => stepRun(run, stableRng));
   }
   return run;
 }
 
-describe('fixed-step continuous navigation with discrete visible direction', () => {
-  it('produces the same simulation for equivalent 60 Hz and 30 Hz frame chunking', () => {
-    const sixtyHz = execute(Array.from({ length: 24 }, () => 1 / 60));
-    const thirtyHz = execute(Array.from({ length: 12 }, () => 1 / 30));
+describe('fixed-step deterministic V3 grid loop', () => {
+  it('produces the same strategic state for equivalent 60 Hz and 30 Hz frame chunking', () => {
+    const sixtyHz = execute(Array.from({ length: 60 }, () => 1 / 60));
+    const thirtyHz = execute(Array.from({ length: 30 }, () => 1 / 30));
 
-    expect(thirtyHz.flight.orientation.yaw).toBeCloseTo(sixtyHz.flight.orientation.yaw, 12);
-    expect(thirtyHz.flight.orientation.pitch).toBeCloseTo(sixtyHz.flight.orientation.pitch, 12);
-    expect(thirtyHz.flight.unwrappedPosition.x).toBeCloseTo(sixtyHz.flight.unwrappedPosition.x, 12);
-    expect(thirtyHz.flight.unwrappedPosition.y).toBeCloseTo(sixtyHz.flight.unwrappedPosition.y, 12);
-    expect(thirtyHz.flight.unwrappedPosition.z).toBeCloseTo(sixtyHz.flight.unwrappedPosition.z, 12);
     expect(thirtyHz.snake.segments).toEqual(sixtyHz.snake.segments);
-    expect(thirtyHz.visibleDirection).toBe(sixtyHz.visibleDirection);
+    expect(thirtyHz.frame).toEqual(sixtyHz.frame);
+    expect(thirtyHz.pendingTurn).toBe('none');
     expect(thirtyHz.score).toBe(sixtyHz.score);
     expect(thirtyHz.phase).toBe(sixtyHz.phase);
+    expect(thirtyHz.elapsedMs).toBeCloseTo(sixtyHz.elapsedMs, 10);
   });
 
-  it('responds to held steering on every fixed tick before the first cell entry without changing visible direction', () => {
+  it('does not move strategically before the 1/6-second cell boundary', () => {
     const run = startRun(createRun(stableRng));
     run.food = { x: 0, y: 0, z: 0 };
-    const clock = new FixedStepClock();
+    const clock = new FixedStepClock(STEP_SECONDS);
     const initialHead = { ...snakeHead(run.snake).cell };
-    let previousYaw = run.flight.orientation.yaw;
 
-    for (let tick = 0; tick < 4; tick += 1) {
-      clock.consume(1 / 60, (dt) => stepRun(run, { yaw: 1, pitch: 0 }, dt, stableRng));
-      expect(run.flight.orientation.yaw).toBeGreaterThan(previousYaw);
-      expect(run.visibleDirection).toBe('+Z');
-      previousYaw = run.flight.orientation.yaw;
+    for (let tick = 0; tick < 9; tick += 1) {
+      clock.consume(1 / 60, () => stepRun(run, stableRng));
     }
-
     expect(snakeHead(run.snake).cell).toEqual(initialHead);
+
+    clock.consume(1 / 60, () => stepRun(run, stableRng));
+    expect(snakeHead(run.snake).cell).toEqual({ x: 4, y: 4, z: 5 });
   });
 
-  it('neutral input creates no historical command that can execute later', () => {
+  it('consumes a queued turn on one strategic step and then continues straight', () => {
     const run = startRun(createRun(stableRng));
     run.food = { x: 0, y: 0, z: 0 };
-    const clock = new FixedStepClock();
+    const clock = new FixedStepClock(STEP_SECONDS);
 
-    clock.consume(1 / 60, (dt) => stepRun(run, { yaw: 1, pitch: 0 }, dt, stableRng));
-    const releasedYaw = run.flight.orientation.yaw;
+    queueTurn(run, 'right');
+    clock.consume(STEP_SECONDS, () => stepRun(run, stableRng));
+    expect(run.frame.forward).toBe('-X');
+    expect(snakeHead(run.snake).cell).toEqual({ x: 3, y: 4, z: 4 });
+    expect(run.pendingTurn).toBe('none');
 
-    for (let tick = 0; tick < 20; tick += 1) {
-      clock.consume(1 / 60, (dt) => stepRun(run, { yaw: 0, pitch: 0 }, dt, stableRng));
-    }
-
-    expect(run.flight.orientation.yaw).toBeCloseTo(releasedYaw, 12);
+    clock.consume(STEP_SECONDS, () => stepRun(run, stableRng));
+    expect(run.frame.forward).toBe('-X');
+    expect(snakeHead(run.snake).cell).toEqual({ x: 2, y: 4, z: 4 });
   });
 });

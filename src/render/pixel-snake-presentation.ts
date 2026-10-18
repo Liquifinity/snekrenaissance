@@ -1,29 +1,26 @@
-import { Quaternion, Vector3 } from 'three';
-import { cellToWorld } from '../game/grid-topology';
-import type { GridDirection } from '../game/grid-types';
+import { Matrix4, Quaternion, Vector3 } from 'three';
+import { cellToWorld, directionVector } from '../game/grid-topology';
+import type { GridDirection, GridFrame } from '../game/grid-types';
 import type { RunState } from '../game/run-state';
 import type { VoxelSnakeRenderSnapshot } from './snake-renderer';
 
-const LOCAL_FORWARD = new Vector3(0, 0, 1);
-const DIRECTION_VECTORS: Readonly<Record<GridDirection, readonly [number, number, number]>> = Object.freeze({
-  '+X': [1, 0, 0],
-  '-X': [-1, 0, 0],
-  '+Y': [0, 1, 0],
-  '-Y': [0, -1, 0],
-  '+Z': [0, 0, 1],
-  '-Z': [0, 0, -1]
-});
+function vectorFor(direction: GridDirection): Vector3 {
+  const vector = directionVector(direction);
+  return new Vector3(vector.x, vector.y, vector.z);
+}
 
-export function quaternionForGridDirection(
-  direction: GridDirection
+export function quaternionForGridFrame(
+  frame: GridFrame
 ): Readonly<{ x: number; y: number; z: number; w: number }> {
-  if (direction === '+Z') {
+  if (frame.forward === '+Z' && frame.right === '-X' && frame.up === '+Y') {
     return Object.freeze({ x: 0, y: 0, z: 0, w: 1 });
   }
 
-  const [x, y, z] = DIRECTION_VECTORS[direction];
+  const localXWorld = vectorFor(frame.right).multiplyScalar(-1);
+  const localYWorld = vectorFor(frame.up);
+  const localZWorld = vectorFor(frame.forward);
   const quaternion = new Quaternion()
-    .setFromUnitVectors(LOCAL_FORWARD, new Vector3(x, y, z))
+    .setFromRotationMatrix(new Matrix4().makeBasis(localXWorld, localYWorld, localZWorld))
     .normalize();
 
   return Object.freeze({
@@ -35,14 +32,14 @@ export function quaternionForGridDirection(
 }
 
 export function buildPixelSnakeRenderSnapshot(
-  run: Pick<RunState, 'snake' | 'visibleDirection' | 'config'>
+  run: Pick<RunState, 'snake' | 'frame' | 'config'>
 ): VoxelSnakeRenderSnapshot {
   const [head, ...body] = run.snake.segments;
   if (!head) throw new RangeError('Grid snake has no head segment');
 
   return Object.freeze({
     headPosition: Object.freeze(cellToWorld(head.cell, run.config)),
-    headQuaternion: quaternionForGridDirection(run.visibleDirection),
+    headQuaternion: quaternionForGridFrame(run.frame),
     body: Object.freeze(body.map((segment) => Object.freeze({
       id: segment.id,
       position: Object.freeze(cellToWorld(segment.cell, run.config))

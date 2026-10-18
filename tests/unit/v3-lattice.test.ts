@@ -8,22 +8,20 @@ import { CUBE_GRID_DIVISIONS } from '../../src/render/scene';
 import { SNAKE_VOXEL_SIZE } from '../../src/render/snake-renderer';
 
 const stableRng = () => 0.75;
-const neutral = { yaw: 0, pitch: 0 } as const;
 
-describe('V2.2 one-lattice presentation contract', () => {
+describe('SNEK CORE V3 one-lattice presentation contract', () => {
   it('maps an equal head/food GridCell to an identical world center', () => {
     const run = createRun(stableRng);
     const cell = snakeHead(run.snake).cell;
-    const headWorld = cellToWorld(cell, run.config);
-    const foodWorld = cellToWorld({ ...cell }, run.config);
-    expect(headWorld).toEqual(foodWorld);
+    expect(cellToWorld(cell, run.config)).toEqual(cellToWorld({ ...cell }, run.config));
   });
 
-  it('renders every strategic segment at the same cellToWorld center used by food', () => {
+  it('renders every strategic segment at the exact cellToWorld center used by food', () => {
     const run = createRun(stableRng);
     const snapshot = buildPixelSnakeRenderSnapshot(run);
     expect(snapshot.headPosition).toEqual(cellToWorld(run.snake.segments[0].cell, run.config));
     snapshot.body.forEach((sample, index) => {
+      expect(sample.id).toBe(run.snake.segments[index + 1].id);
       expect(sample.position).toEqual(cellToWorld(run.snake.segments[index + 1].cell, run.config));
     });
   });
@@ -34,20 +32,20 @@ describe('V2.2 one-lattice presentation contract', () => {
     const consumedWorld = cellToWorld(consumedCell, run.config);
     run.food = consumedCell;
 
-    stepRun(run, neutral, 1 / 12, stableRng);
+    stepRun(run, stableRng);
 
     expect(run.foodsCollected).toBe(1);
     expect(snakeHead(run.snake).cell).toEqual(consumedCell);
     expect(cellToWorld(snakeHead(run.snake).cell, run.config)).toEqual(consumedWorld);
   });
 
-  it('keeps growth, food voxel footprint and visible grid divisions registered to the same lattice', () => {
+  it('keeps growth, food voxel footprint and visible grid divisions registered to one lattice', () => {
     const run = startRun(createRun(stableRng));
     run.food = { x: 4, y: 4, z: 5 };
-    stepRun(run, neutral, 1 / 12, stableRng);
+    stepRun(run, stableRng);
     run.food = { x: 0, y: 0, z: 0 };
-    stepRun(run, neutral, 1 / 6, stableRng);
-    stepRun(run, neutral, 1 / 6, stableRng);
+    stepRun(run, stableRng);
+    stepRun(run, stableRng);
 
     const snapshot = buildPixelSnakeRenderSnapshot(run);
     expect(snapshot.body).toHaveLength(run.snake.segments.length - 1);

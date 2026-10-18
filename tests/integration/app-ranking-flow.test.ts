@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, test } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { AppController } from '../../src/app/app-controller';
+import { HttpSessionGateway } from '../../src/app/http-session-gateway';
 import type { PlayerIdentity } from '../../src/app/identity';
 import { LocalSessionGateway, type SessionGateway, type SessionStart, type SessionSubmission } from '../../src/app/session-gateway';
+import { RULESET_ID } from '../../src/game/grid-config';
 import type { RunResult } from '../../src/game/run-state';
 import type { LeaderboardResponse, PlayerRankResponse } from '../../src/shared/ranking-api';
 
@@ -23,9 +25,9 @@ function deferred<T>(): Deferred<T> {
   return { promise, resolve, reject };
 }
 
-function v2Result(maxLength: number, foodsCollected: number, durationMs: number): RunResult {
+function v3Result(maxLength: number, foodsCollected: number, durationMs: number): RunResult {
   return {
-    rulesetId: 'pixel-flight-grid-v2-2',
+    rulesetId: RULESET_ID,
     score: foodsCollected,
     foodsCollected,
     length: maxLength,
@@ -46,7 +48,7 @@ class ControlledRankedGateway implements SessionGateway {
   readonly rankCalls: string[] = [];
 
   supportsRuleset(rulesetId: string): boolean {
-    return rulesetId === 'pixel-flight-grid-v2-2';
+    return rulesetId === RULESET_ID;
   }
 
   startRun(identity: PlayerIdentity): Promise<SessionStart> {
@@ -124,7 +126,7 @@ async function reachAcceptedGameOver(
   enterAndPlay(root, 'ren');
   gateway.startQueue[0].resolve({ ranked: true, sessionId: 'session-1' });
   await flush();
-  forceGameOver(controller, v2Result(16, 1, 1_000));
+  forceGameOver(controller, v3Result(16, 1, 1_000));
   gateway.submitQueue[0].resolve({ ranked: true, worldRank: 2 });
   await flush();
 }
@@ -181,6 +183,16 @@ describe('ranked application lifecycle', () => {
     expect(controller.currentRun?.phase).toBe('playing');
   });
 
+  test('historical HTTP gateway falls back to local V3 gameplay without making a ranking request', () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    const { root, controller } = setup(new HttpSessionGateway('https://rank.example', fetchMock));
+    enterAndPlay(root, 'local-v3');
+
+    expect(controller.screen).toBe('game');
+    expect(controller.currentRun?.phase).toBe('playing');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   test('game over submits the exact captured session and failed submission is retryable', async () => {
     const gateway = new ControlledRankedGateway();
     const { root, controller } = setup(gateway);
@@ -188,7 +200,7 @@ describe('ranked application lifecycle', () => {
     gateway.startQueue[0].resolve({ ranked: true, sessionId: 'captured-session' });
     await flush();
 
-    const result = v2Result(20, 2, 4_000);
+    const result = v3Result(20, 2, 4_000);
     forceGameOver(controller, result);
 
     expect(gateway.submitCalls[0]).toMatchObject({ sessionId: 'captured-session', result });
@@ -228,7 +240,7 @@ describe('ranked application lifecycle', () => {
     gateway.startQueue[0].resolve({ ranked: true, sessionId: 'session-A' });
     await flush();
 
-    forceGameOver(controller, v2Result(12, 0, 0));
+    forceGameOver(controller, v3Result(12, 0, 0));
     expect(gateway.submitCalls[0].sessionId).toBe('session-B');
   });
 
@@ -238,12 +250,12 @@ describe('ranked application lifecycle', () => {
     enterAndPlay(root, 'ren');
     gateway.startQueue[0].resolve({ ranked: true, sessionId: 'session-A' });
     await flush();
-    forceGameOver(controller, v2Result(12, 0, 0));
+    forceGameOver(controller, v3Result(12, 0, 0));
 
     click(root, '[data-action="replay"]');
     gateway.startQueue[1].resolve({ ranked: true, sessionId: 'session-B' });
     await flush();
-    forceGameOver(controller, v2Result(16, 1, 1_000));
+    forceGameOver(controller, v3Result(16, 1, 1_000));
     expect(gateway.submitCalls[1].sessionId).toBe('session-B');
 
     gateway.submitQueue[0].resolve({ ranked: true, worldRank: 1 });
