@@ -210,6 +210,8 @@ keyup D
 -> D becomes eligible to generate a future RIGHT intent
 ```
 
+Browser/OS key autorepeat MUST NOT create additional turn intents while the key remains in the pressed set.
+
 If another turn key is pressed before the next gameplay step, that newer intent replaces the older pending intent.
 
 Example:
@@ -237,21 +239,43 @@ LEFT        RIGHT
       DOWN
 ```
 
+Normative constants for initial V3:
+
+```text
+JOYSTICK_DEADZONE = 0.15
+JOYSTICK_SECTOR_HYSTERESIS_DEGREES = 10
+```
+
+Pointer displacement is normalized by joystick radius and clamped to magnitude `<= 1`. If radial magnitude is `<= 0.15`, the logical joystick sector is `NEUTRAL`.
+
+When entering from `NEUTRAL`, sector choice uses the dominant normalized axis:
+
+```text
+abs(yaw) >= abs(pitch) -> horizontal sector from sign(yaw)
+abs(pitch) > abs(yaw)  -> vertical sector from sign(pitch)
+```
+
+Therefore exact diagonal ties deterministically prefer the horizontal axis.
+
+The equivalent nominal angular sectors are centered on RIGHT/UP/LEFT/DOWN with 45-degree boundaries. Once a non-neutral sector is latched, its angular ownership is expanded by 10 degrees on each adjacent boundary. A different adjacent sector becomes active only after the pointer moves at least 10 degrees beyond the nominal 45-degree boundary. On an exact hysteresis boundary, the currently latched sector wins.
+
+This hysteresis is presentation-input stability, not movement smoothing. It exists only to prevent finger jitter near diagonal boundaries from generating alternating turns.
+
 Required state machine:
 
 ```text
 NEUTRAL -> RIGHT   => emit RIGHT once
 RIGHT   -> RIGHT   => emit nothing
-RIGHT   -> UP      => emit UP once
+RIGHT   -> UP      => emit UP once, after hysteresis boundary is crossed
 UP      -> NEUTRAL => emit nothing
 NEUTRAL -> UP      => emit UP once
 ```
 
 A sector transition may replace `pendingTurn` immediately before the next strategic step.
 
-Returning to neutral re-enables emission of the same sector later. Moving directly from one non-neutral sector to another emits the new sector without requiring pointer-up.
+Returning to neutral re-enables emission of the same sector later. Moving directly from one non-neutral sector to another emits the new sector without requiring pointer-up once the hysteresis boundary has been crossed.
 
-The joystick may retain analog pointer coordinates for UI knob placement only. Magnitude and continuous angle MUST NOT influence `nextCell`.
+The joystick may retain analog pointer coordinates for UI knob placement only. Magnitude and continuous angle MUST NOT influence `nextCell`, movement speed, or `GridFrame` except through the emitted discrete turn intent.
 
 ## 8. Strategic step clock
 
@@ -384,15 +408,19 @@ segment.cell -> cellToWorld()
 
 There is no snake-position interpolation between cell centers.
 
+The visible head orientation is derived from `GridFrame.forward` and `GridFrame.up`, never from a continuous quaternion/yaw/pitch locomotion state.
+
 Stable segment IDs are preserved.
 
-The renderer MUST NOT import or consume continuous locomotion state to determine snake voxel positions.
+The renderer MUST NOT import or consume continuous locomotion state to determine snake voxel positions or strategic head orientation.
 
 ## 14. Camera
 
 The chase camera remains smooth and presentation-only.
 
-It may damp toward snapped snake targets using frame time.
+Its target position derives from the snapped head cell. Its target orientation derives from the cardinal `GridFrame`. Camera damping/interpolation may then smooth only the camera's own presentation state.
+
+The active V3 chase camera therefore does not require `FlightPose` or `FlightPresentation` as orientation authority.
 
 Camera state MUST NOT affect:
 
@@ -440,7 +468,7 @@ V3 should reuse proven components where their authority remains correct:
 - `cellToWorld()`;
 - voxel snake renderer;
 - food renderer;
-- chase/overview camera presentation infrastructure;
+- chase/overview camera presentation infrastructure after adapting chase orientation to `GridFrame`;
 - UI flow;
 - persistence framework;
 - CI, unit, integration, and Playwright infrastructure.
@@ -494,7 +522,7 @@ traverseGridSegment
 FlightPose
 SteeringInput yaw/pitch authority
 quantizeForwardToGridDirection for movement
-FlightPresentation for movement
+FlightPresentation for movement/camera authority
 camera state for movement
 ```
 
@@ -544,10 +572,13 @@ Prove one intent per keydown/release cycle and no autorepeat-induced additional 
 
 Prove:
 
+- radial deadzone boundary is deterministic;
 - neutral emits none;
 - neutral -> sector emits once;
+- exact diagonal ties choose horizontal on neutral entry;
 - same sector held emits no repeats;
-- sector -> different sector emits new intent immediately;
+- sector-boundary jitter inside the 10-degree hysteresis band emits no new turn;
+- sector -> different sector emits new intent after the hysteresis boundary is crossed;
 - neutral re-arms the same sector;
 - pointer-up/cancel returns neutral;
 - analog magnitude never changes strategic destination.
@@ -576,6 +607,7 @@ Browser-level tests must prove:
 - a newer turn before the next step replaces the older pending turn;
 - multi-step clock catch-up does not repeat a buffered turn;
 - joystick sector transitions are predictable;
+- diagonal-boundary finger jitter does not alternate turns;
 - mobile sector changes work without pointer-up;
 - food pickup is visibly cell-coincident;
 - camera remains smooth but cannot change strategic direction;
@@ -592,7 +624,7 @@ Human playtest acceptance requires all of the following:
 5. Every visible movement is one voxel step.
 6. No diagonal jumps occur.
 7. Food contact visually matches food collection.
-8. Mobile joystick changes feel immediate but not unstable.
+8. Mobile joystick changes feel immediate but not unstable near diagonal boundaries.
 9. Camera motion does not change steering behavior.
 10. Repeating the same deterministic test input produces the same path.
 
@@ -607,8 +639,8 @@ Recommended migration order:
 2. establish exact cardinal nextCell stepping with RED tests
 3. migrate RunState away from FlightPose/DDA movement authority
 4. migrate keyboard to edge-triggered turn intents
-5. migrate joystick to explicit sector-state intents
-6. render directly from strategic cells
+5. migrate joystick to explicit sector-state + hysteresis intents
+6. render directly from strategic cells and GridFrame orientation
 7. adapt chase camera to GridFrame/snapped head presentation only
 8. version ruleset/persistence as V3
 9. strengthen architecture scanner
