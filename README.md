@@ -7,69 +7,64 @@ conquer the space
 
 SNEK RENAISSANCE is an independent experimental browser game. It is not affiliated with, endorsed by, or presented as an official OpenAI or ChatGPT product.
 
-## Active Pixel Flight Grid V2.2
+## SNEK CORE V3 candidate
 
-The active game is a single-player 3D Snake with continuous flight steering and exact strategic occupancy on a finite toroidal voxel grid. Input and the internal `FlightPose` remain continuous at a fixed 60 Hz simulation cadence, but the visible snake is deliberately quantized: the head and every body voxel render only at exact strategic `GridCell` centers.
+The current implementation candidate replaces Pixel Flight Grid V2.2 locomotion authority with a deterministic 3D Snake core. Gameplay movement is now governed only by:
 
-A deterministic voxel traversal bridge enumerates every logical cell entered by the continuous trajectory. Only accepted cell entries modify strategic occupancy, visible snake position, food collection, growth, self-collision, and the cardinal visible head direction.
+```text
+GridCell + GridFrame + pendingTurn
+```
 
-Baseline ruleset:
+There is no active `FlightPose`, continuous yaw/pitch, DDA traversal, or hidden subcell position in the V3 movement path. One strategic clock advances the snake at `6 steps/s`; every accepted step commits exactly one face-adjacent logical cell, including one-axis toroidal wrap.
 
-- `RULESET_ID = pixel-flight-grid-v2-2`;
+Baseline V3 rules:
+
+- `RULESET_ID = snek-core-v3`;
 - `9 × 9 × 9` toroidal logical cells;
+- initial frame `F=+Z, R=-X, U=+Y` with `right = cross(forward, up)`;
 - six-cell initial strategic snake;
-- continuous yaw/pitch steering at 60 Hz;
-- flight speed baseline of `6 cells/s`;
-- steering rate baseline of `π × 0.9 rad/s` with pitch clamped to `±80°`;
-- deterministic unwrapped voxel traversal prevents tunneling and canonicalizes toroidal cell entry;
-- exact occupied-cell self-collision with tail-vacate semantics;
-- visible head/body positions are exclusively `GridCell → cellToWorld()`;
-- visible head direction is cardinal and changes only on an accepted cell entry;
-- food occupies exactly one free logical cell and uses the same `cellToWorld()` center as the snake;
-- a valid pickup therefore implies exact visible head/food world-center coincidence;
+- exactly one `pendingTurn`; newest valid input before the next step wins;
+- one pending turn can affect at most one strategic step, including clock catch-up;
+- exact cell self-collision with existing tail-vacate semantics;
+- snake and food render only through `GridCell → cellToWorld()`;
+- head orientation derives from cardinal `GridFrame.forward + GridFrame.up`;
+- food pickup requires exact head/food cell equality and therefore exact visible world-center coincidence;
 - food adds two cells of pending growth;
-- canonical score is `foodsCollected`; occupied length is a separate metric;
-- `300 foods = 100%` remains the provisional completion contract;
+- canonical score is `foodsCollected`;
+- `300 foods = 100%` remains the completion contract;
 - snake and food voxel footprints remain `0.8 × cellSize`;
-- visual grid divisions exactly match logical grid resolution.
+- camera smoothing is presentation-only and cannot influence movement.
 
-Desktop controls remain continuous while held: `A/←` steers left, `D/→` steers right, `W/↑` steers up, and `S/↓` steers down. `X` remains an edge-triggered camera toggle between chase and overview modes. There is no movement FIFO, no one-turn-per-keypress latch, and no secondary movement clock.
+Desktop turn controls are edge-triggered: `A/←` = left, `D/→` = right, `W/↑` = up, `S/↓` = down. Holding a key does not repeatedly rotate the snake. `X` remains an edge-triggered chase/overview camera toggle.
 
-Mobile uses a proportional virtual joystick with radial deadzone `0.15`. Physical right/left/up/down map to the same signed yaw/pitch convention as keyboard input. The stick is sampled continuously while the pointer remains active and does not require recenter/rearm before accepting an opposite or diagonal direction.
+Mobile uses a four-sector joystick state machine rather than continuous yaw/pitch. The deadzone is `0.15`; sector hysteresis is `10°`; exact diagonal ties entering from neutral prefer the horizontal sector. Remaining in the same sector emits no repeated turn, while crossing into a new sector emits one new turn intent.
 
-The strategic body is an ordered stable-ID chain of occupied `GridCell` values. V2.2 renders that chain directly; the V2.1 `FlightTrail` presentation layer is retired from the active architecture. Continuous flight presentation remains only for navigation/camera guidance and never determines visible snake placement.
+The chase camera remains smooth even though strategic snake motion is voxel-stepped. Its target is derived from the snapped head cell and cardinal `GridFrame`; damping affects only camera presentation.
 
-The chase camera remains smooth even though the snake moves in discrete voxel steps. Its target uses the snapped strategic head center, while continuous flight forward/up vectors guide framing. Toroidal display offsets relocate camera space before damping so wrap does not produce a full-cube sweep.
-
-The presentation keeps voxel snake/food geometry, antialiasing disabled, a reduced internal framebuffer (`RENDER_SCALE = 0.50` baseline), CSS pixelated upscale, and toroidal wrap handling.
+Historical V2.1/V2.2 flight/DDA modules and their dedicated evidence may remain in the repository, but architecture tests require them to be unreachable from active V3 runtime paths.
 
 ## Local-first identity and score
 
-V2.2 requires no account or ranking server. The browser stores:
+V3 requires no account or V3 ranking server. The browser stores:
 
 - the chosen username;
 - the anonymous player ID reserved for future connected ranking;
-- the historical V1 local best under its existing key;
-- the historical V2 personal best under `snek.localBest.pixelGridV2`;
-- the historical V2.1 personal best under `snek.localBest.pixelGridV2_1`;
-- the active V2.2 personal best separately under `snek.localBest.pixelGridV2_2`.
+- historical V1 best under `snek.localBest`;
+- historical V2 best under `snek.localBest.pixelGridV2`;
+- historical V2.1 best under `snek.localBest.pixelGridV2_1`;
+- historical V2.2 best under `snek.localBest.pixelGridV2_2`;
+- V3 best separately under `snek.localBest.coreV3`.
 
-V2.2 personal best is the highest `foodsCollected` score. A later lower score never replaces it. Historical V1/V2/V2.1 records remain intact and are not compared with or overwritten by V2.2.
+V3 personal best is the highest `foodsCollected` score. Historical keys are retained byte-for-byte and are not compared with or overwritten by V3.
 
-The repository retains the existing HTTP/Cloudflare ranking seam, but that validator is the historical unversioned backend and explicitly does **not** advertise support for `pixel-flight-grid-v2-2`. Even when an HTTP API base is configured, V2.2 remains local-first until a future server validator explicitly supports this ruleset.
+The existing HTTP/Cloudflare ranking seam is historical and explicitly does not advertise support for `snek-core-v3`. Even when an HTTP API base is configured, V3 remains local-first until a future ruleset-aware server validator is designed and enabled.
 
-## Local development
+## Verification
 
-Install and run:
+Local verification commands:
 
 ```bash
 npm ci
-npm run dev
-```
-
-Core verification:
-
-```bash
 npm audit --omit=dev --audit-level=moderate
 npm test
 npm run test:worker
@@ -80,23 +75,30 @@ npx playwright install --with-deps chromium
 npm run test:e2e
 ```
 
-The retained 8³/9³/10³ 32-seed greedy-turn harness is **historical V2 discrete evidence**. It is not a V2.2 control autopilot and must not be interpreted as a V2.2 tuning verdict. V2.2 preserves V2.1 continuous-control metrics such as grid-cell entries, average steering magnitude, and longest non-zero steering streak. Human playtesting remains mandatory for final game-feel acceptance.
+The V3 test suite includes:
+
+- complete `GridFrame` algebra and one-axis movement/wrap checks;
+- latest-wins pending-turn semantics and single-use catch-up behavior;
+- edge-triggered keyboard and deterministic joystick sector/hysteresis tests;
+- exact collision/food/growth regression coverage;
+- a deterministic 1,000-step replay harness with face-adjacent assertions;
+- strategic framerate-independence checks across equivalent frame partitions;
+- architectural scanners that reject active Flight/DDA authority;
+- Playwright desktop/mobile tests for one-turn input, catch-up, lattice/wrap, exact pickup, joystick hysteresis, camera independence, smooth chase presentation, pixel framebuffer, and responsive/orientation behavior.
+
+Automated verification does not replace the required human game-feel playtest. V3 must not merge to `main` until the exact candidate SHA is green and the human playtest explicitly accepts the behavior.
 
 ## Architecture documents
 
-Canonical V2.2 design:
+Canonical V3 design:
 
-`docs/superpowers/specs/2026-10-17-snek-renaissance-pixel-flight-grid-v2-2-pixel-motion-design.md`
+`docs/superpowers/specs/2026-10-18-snek-core-v3-deterministic-grid-design.md`
 
-Canonical V2.2 orientation amendment:
+Canonical V3 implementation plan:
 
-`docs/superpowers/specs/2026-10-17-snek-renaissance-pixel-flight-grid-v2-2-pixel-motion-amendment-r1.md`
+`docs/superpowers/plans/2026-10-18-snek-core-v3-deterministic-grid-r1.md`
 
-Canonical V2.2 implementation plan:
-
-`docs/superpowers/plans/2026-10-17-snek-renaissance-pixel-flight-grid-v2-2-pixel-motion-r1.md`
-
-Earlier V1, V2, and V2.1 specifications remain historical documentation and are not rewritten to imply that those versions always used the V2.2 presentation architecture.
+Earlier V1/V2/V2.1/V2.2 specifications remain historical documentation and are not rewritten to imply V3 semantics.
 
 ## Preserved online-ranking seam
 
@@ -108,7 +110,7 @@ The repository intentionally retains:
 - leaderboard UI and validation tests;
 - production release tooling.
 
-These components are preserved for a future ruleset-aware global ranking system. The active V2.2 does not submit scores to the current legacy validator.
+These components are preserved for a future ruleset-aware global ranking system. The V3 candidate does not submit scores to the current legacy validator.
 
 For backend development:
 
