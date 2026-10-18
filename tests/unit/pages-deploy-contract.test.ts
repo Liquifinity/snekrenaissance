@@ -10,14 +10,15 @@ describe('GitHub Pages static V1 contract', () => {
     expect(cloudflareWorkflow).not.toContain('VITE_BASE_PATH');
   });
 
-  test('publishes only the static dist artifact from main with the repository subpath', () => {
+  test('publishes only the static dist artifact from main with the fork-safe repository subpath', () => {
     const workflowPath = '.github/workflows/deploy-pages.yml';
     expect(existsSync(workflowPath)).toBe(true);
     if (!existsSync(workflowPath)) return;
 
     const workflow = readFileSync(workflowPath, 'utf8');
     expect(workflow).toContain('branches: [main]');
-    expect(workflow).toContain('VITE_BASE_PATH: /snekrenaissance/');
+    expect(workflow).toContain('VITE_BASE_PATH: /${{ github.event.repository.name }}/');
+    expect(workflow).not.toContain('VITE_BASE_PATH: /snekrenaissance/');
     expect(workflow).toContain('actions/upload-pages-artifact@v3');
     expect(workflow).toContain('path: dist');
     expect(workflow).toContain('actions/deploy-pages@v5');
