@@ -302,9 +302,9 @@ matching the snake voxel footprint.
 
 ### Pickup
 
-Pickup remains exact-cell based, but V2.2 adds the visual invariant that the pre-respawn food position and current head position are identical for the pickup cell.
+Pickup remains exact-cell based, but V2.2 adds the visual invariant that the consumed food cell and committed head cell have identical world-center coordinates at collection time.
 
-The food must not respawn before tests/diagnostics can verify the consumed-cell coincidence contract.
+The runtime may respawn food immediately after collection. Verification must capture the consumed cell/world center as part of the collection event or test fixture; no gameplay delay is introduced solely for observability.
 
 ---
 
