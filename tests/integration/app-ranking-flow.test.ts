@@ -25,7 +25,7 @@ function deferred<T>(): Deferred<T> {
 
 function v2Result(maxLength: number, foodsCollected: number, durationMs: number): RunResult {
   return {
-    rulesetId: 'pixel-flight-grid-v2-1',
+    rulesetId: 'pixel-flight-grid-v2-2',
     score: foodsCollected,
     foodsCollected,
     length: maxLength,
@@ -46,7 +46,7 @@ class ControlledRankedGateway implements SessionGateway {
   readonly rankCalls: string[] = [];
 
   supportsRuleset(rulesetId: string): boolean {
-    return rulesetId === 'pixel-flight-grid-v2-1';
+    return rulesetId === 'pixel-flight-grid-v2-2';
   }
 
   startRun(identity: PlayerIdentity): Promise<SessionStart> {
