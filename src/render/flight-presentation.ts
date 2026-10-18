@@ -22,7 +22,10 @@ function wrapAxis(value: number, resolution: number): number {
   return ((value % resolution) + resolution) % resolution;
 }
 
-function worldForUnwrappedPoint(point: GridPoint, config: GridConfig): Vec3 {
+export function unwrappedWorldForGridPoint(
+  point: GridPoint,
+  config: GridConfig = GRID_CONFIG
+): Vec3 {
   const half = config.worldSize / 2;
   return Object.freeze({
     x: point.x * config.cellSize - half,
@@ -35,7 +38,7 @@ export function displayWorldForGridPoint(
   point: GridPoint,
   config: GridConfig = GRID_CONFIG
 ): Vec3 {
-  return worldForUnwrappedPoint({
+  return unwrappedWorldForGridPoint({
     x: wrapAxis(point.x, config.resolution),
     y: wrapAxis(point.y, config.resolution),
     z: wrapAxis(point.z, config.resolution)
@@ -82,7 +85,7 @@ export function interpolateFlightPresentation(
   const quaternion = quaternionFromOrientation(orientation);
   const forwardWorld = toVec3(new Vector3(0, 0, 1).applyQuaternion(quaternion).normalize());
   const upWorld = toVec3(new Vector3(0, 1, 0).applyQuaternion(quaternion).normalize());
-  const headWorld = worldForUnwrappedPoint(unwrappedGridPoint, config);
+  const headWorld = unwrappedWorldForGridPoint(unwrappedGridPoint, config);
   const displayedHeadWorld = displayWorldForGridPoint(unwrappedGridPoint, config);
   const displayWrapOffset = Object.freeze({
     x: displayedHeadWorld.x - headWorld.x,

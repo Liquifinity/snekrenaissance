@@ -2,7 +2,6 @@ import './styles.css';
 import { AppController } from './app/app-controller';
 import { createSessionGateway } from './app/gateway-selection';
 import { RuntimeLifecycle } from './app/runtime-lifecycle';
-import type { GridPoint } from './game/flight';
 import { cellToWorld } from './game/grid-topology';
 import {
   stepRun,
@@ -16,17 +15,14 @@ import { KeyboardInput } from './input/keyboard';
 import { ChaseCameraController } from './render/chase-camera';
 import { FoodRenderer } from './render/food-renderer';
 import {
-  displayWorldForGridPoint,
   interpolateFlightPresentation,
   type FlightPresentation
 } from './render/flight-presentation';
-import { FlightTrail } from './render/flight-trail';
 import { applyOverviewCamera } from './render/overview-camera';
+import { buildPixelChaseCameraSnapshot } from './render/pixel-camera-presentation';
+import { buildPixelSnakeRenderSnapshot } from './render/pixel-snake-presentation';
 import { createScene } from './render/scene';
-import {
-  SnakeRenderer,
-  type VoxelBodySample
-} from './render/snake-renderer';
+import { SnakeRenderer } from './render/snake-renderer';
 
 const appCandidate = document.querySelector<HTMLElement>('#app');
 const canvasCandidate = document.querySelector<HTMLCanvasElement>('#game-canvas');
@@ -43,9 +39,7 @@ const cameraController = new ChaseCameraController(scene.camera);
 const sessionGateway = createSessionGateway(import.meta.env.VITE_RANKING_API_BASE);
 const controller = new AppController({ root: app, gateway: sessionGateway });
 const fixedClock = new FixedStepClock();
-const flightTrail = new FlightTrail();
 const joystick = new JoystickInput();
-const TRAIL_RESERVE_CELLS = 2;
 
 type CameraMode = 'chase' | 'overview';
 let cameraMode: CameraMode = 'chase';
@@ -60,8 +54,13 @@ function buildPresentation(run: RunState): FlightPresentation {
   );
 }
 
-function updateChaseCamera(presentation: FlightPresentation, dtSeconds: number): void {
-  cameraController.update(presentation, dtSeconds);
+function updateChaseCamera(
+  run: RunState,
+  presentation: FlightPresentation,
+  dtSeconds: number
+): void {
+  const snapshot = buildPixelChaseCameraSnapshot(run, presentation);
+  cameraController.update(snapshot, dtSeconds);
 }
 
 function setCameraMode(mode: CameraMode): void {
@@ -75,7 +74,7 @@ function setCameraMode(mode: CameraMode): void {
   }
 
   cameraController.reset();
-  if (run) updateChaseCamera(buildPresentation(run), 0);
+  if (run) updateChaseCamera(run, buildPresentation(run), 0);
 }
 
 function toggleCamera(): void {
@@ -114,16 +113,38 @@ const detachJoystick = joystick.attach(joystickShell, window);
 controller.mount();
 
 if (import.meta.env.MODE === 'e2e-ranked') {
+  type TestFoodCell = Readonly<{ x: number; y: number; z: number }>;
   const testWindow = window as typeof window & {
     __SNEK_TEST__?: {
       apiBase: string;
       gatewayKind: string;
+      setFoodCell: (cell: TestFoodCell) => void;
       forceGameOver: (result: RunResult) => void;
     };
   };
   testWindow.__SNEK_TEST__ = {
     apiBase: import.meta.env.VITE_RANKING_API_BASE ?? '',
     gatewayKind: sessionGateway.constructor.name,
+    setFoodCell: (cell) => {
+      const run = controller.currentRun;
+      if (!run) throw new Error('No active run for deterministic food placement.');
+
+      for (const axis of ['x', 'y', 'z'] as const) {
+        const value = cell[axis];
+        if (!Number.isInteger(value) || value < 0 || value >= run.config.resolution) {
+          throw new RangeError(`Test food ${axis} must be an integer in 0..${run.config.resolution - 1}.`);
+        }
+      }
+
+      const occupied = run.snake.segments.some((segment) => (
+        segment.cell.x === cell.x
+        && segment.cell.y === cell.y
+        && segment.cell.z === cell.z
+      ));
+      if (occupied) throw new Error('Cannot place deterministic test food on an occupied snake cell.');
+
+      run.food = { x: cell.x, y: cell.y, z: cell.z };
+    },
     forceGameOver: (result) => {
       const run = controller.currentRun;
       if (!run) throw new Error('No active run to finish.');
@@ -167,43 +188,14 @@ function exposeSteeringInput(input: InputState): void {
   joystickKnob.style.transform = `translate(${input.yaw * 28}px, ${-input.pitch * 28}px)`;
 }
 
-function unwrapCellCenterNear(
-  cell: Readonly<{ x: number; y: number; z: number }>,
-  anchor: GridPoint,
-  resolution: number
-): GridPoint {
-  const point = { x: cell.x + 0.5, y: cell.y + 0.5, z: cell.z + 0.5 };
-  for (const axis of ['x', 'y', 'z'] as const) {
-    point[axis] += Math.round((anchor[axis] - point[axis]) / resolution) * resolution;
-  }
-  return point;
-}
-
-function initialTrailPoints(run: RunState): GridPoint[] {
-  let anchor: GridPoint = run.flight.unwrappedPosition;
-  return run.snake.segments.map((segment, index) => {
-    if (index === 0) return { ...anchor };
-    const point = unwrapCellCenterNear(segment.cell, anchor, run.config.resolution);
-    anchor = point;
-    return point;
-  });
-}
-
-function retainedTrailDistance(run: RunState): number {
-  return run.snake.segments.length + run.snake.pendingGrowth + TRAIL_RESERVE_CELLS;
-}
-
-function buildBodySamples(run: RunState, presentation: FlightPresentation): VoxelBodySample[] {
-  const samples: VoxelBodySample[] = [];
-  for (let index = 1; index < run.snake.segments.length; index += 1) {
-    const segment = run.snake.segments[index];
-    const gridPoint = flightTrail.sampleBehind(index, presentation.unwrappedGridPoint);
-    samples.push({
-      id: segment.id,
-      position: displayWorldForGridPoint(gridPoint, run.config)
-    });
-  }
-  return samples;
+function exposeFoodPickupTelemetry(run: RunState, food: Readonly<{ x: number; y: number; z: number }>): void {
+  const head = run.snake.segments[0];
+  if (!head) return;
+  const foodWorld = cellToWorld(food, run.config);
+  const headWorld = cellToWorld(head.cell, run.config);
+  app.dataset.lastFoodPickupCell = `${food.x},${food.y},${food.z}`;
+  app.dataset.lastFoodPickupWorld = `${foodWorld.x},${foodWorld.y},${foodWorld.z}`;
+  app.dataset.lastFoodPickupHeadWorld = `${headWorld.x},${headWorld.y},${headWorld.z}`;
 }
 
 // Read-only browser diagnostics used by responsive/E2E verification. Never read back by gameplay.
@@ -215,15 +207,16 @@ function exposeLogicalTelemetry(run: RunState): void {
   app.dataset.headPitch = String(run.flight.orientation.pitch);
   const point = run.flight.wrappedPosition;
   app.dataset.headPoint = `${point.x},${point.y},${point.z}`;
+  app.dataset.headDirection = run.visibleDirection;
+  const headWorld = cellToWorld(head.cell, run.config);
+  app.dataset.headRenderWorld = `${headWorld.x},${headWorld.y},${headWorld.z}`;
 }
 
 function initializeRun(run: RunState): void {
   fixedClock.reset();
-  flightTrail.reset(initialTrailPoints(run));
-  flightTrail.trimToDistance(retainedTrailDistance(run));
   cameraController.reset();
   setCameraMode('chase');
-  updateChaseCamera(buildPresentation(run), 0);
+  updateChaseCamera(run, buildPresentation(run), 0);
   exposeLogicalTelemetry(run);
 }
 
@@ -252,11 +245,11 @@ function frame(timestamp: number): void {
     lifecycle.consumeFrame(frameDeltaSeconds, (dt) => {
       const previousLength = run.snake.segments.length;
       const previousFoods = run.foodsCollected;
+      const consumedFood = run.food ? { ...run.food } : null;
       stepRun(run, steering, dt);
 
-      if (run.phase !== 'game-over') {
-        flightTrail.push(run.flight.unwrappedPosition);
-        flightTrail.trimToDistance(retainedTrailDistance(run));
+      if (consumedFood && run.foodsCollected > previousFoods) {
+        exposeFoodPickupTelemetry(run, consumedFood);
       }
 
       if (
@@ -273,15 +266,11 @@ function frame(timestamp: number): void {
   if (run) {
     exposeLogicalTelemetry(run);
     const presentation = buildPresentation(run);
-    snakeRenderer.render({
-      headPosition: presentation.displayedHeadWorld,
-      headQuaternion: presentation.quaternion,
-      body: buildBodySamples(run, presentation)
-    });
+    snakeRenderer.render(buildPixelSnakeRenderSnapshot(run));
     foodRenderer.render(run.food ? cellToWorld(run.food, run.config) : null);
 
     if (cameraMode === 'chase') {
-      updateChaseCamera(presentation, frameDeltaSeconds);
+      updateChaseCamera(run, presentation, frameDeltaSeconds);
     }
   }
 
