@@ -2,6 +2,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import { AppController } from '../../src/app/app-controller';
+import { RULESET_ID } from '../../src/game/grid-config';
 
 function setup(options: { clearStorage?: boolean } = {}): { root: HTMLElement; controller: AppController } {
   document.body.innerHTML = '<main id="app"><canvas id="game-canvas"></canvas></main>';
@@ -33,7 +34,7 @@ function finishRun(controller: AppController, score: number): void {
   const length = run.snake.segments.length;
   run.phase = 'game-over';
   run.result = {
-    rulesetId: 'pixel-flight-grid-v2-2',
+    rulesetId: RULESET_ID,
     score,
     foodsCollected: score,
     length,
@@ -84,12 +85,13 @@ describe('meme-first application flow', () => {
     expect(root.querySelector('[role="alert"]')?.textContent).toContain('username');
   });
 
-  it('starts a V2.2 run with score, length, progress bar, and stored identity', () => {
+  it('starts a V3 run with score, length, progress bar, and stored identity', () => {
     const { root, controller } = setup();
     enterUsernameAndPlay(root, 'snekboi');
 
     expect(controller.screen).toBe('game');
     expect(controller.currentRun?.phase).toBe('playing');
+    expect(controller.currentRun?.result).toBeNull();
     expect(root.querySelector('[data-hud-score]')?.textContent).toBe('SCORE 0');
     expect(root.querySelector('[data-hud-length]')?.textContent).toBe('LENGTH 6');
     expect(root.querySelector('[data-progress-track]')).not.toBeNull();
@@ -129,7 +131,7 @@ describe('meme-first application flow', () => {
     run.score = 300;
     run.foodEaten = 300;
     run.result = {
-      rulesetId: 'pixel-flight-grid-v2-2',
+      rulesetId: RULESET_ID,
       score: 300,
       foodsCollected: 300,
       length: run.snake.segments.length,
@@ -147,7 +149,7 @@ describe('meme-first application flow', () => {
     expect(root.textContent).not.toContain('GAME OVER');
   });
 
-  it('shows V2.2 food score and personal best for a local game over', () => {
+  it('shows V3 food score and personal best for a local game over', () => {
     const { root, controller } = setup();
     enterUsernameAndPlay(root, 'ren');
     finishRun(controller, 24);
@@ -162,7 +164,7 @@ describe('meme-first application flow', () => {
     expect(root.querySelector('[data-action="rank"]')).not.toBeNull();
   });
 
-  it('shows the local V2.2 score record without public leaderboard language', () => {
+  it('shows the local V3 score record without public leaderboard language', () => {
     const { root, controller } = setup();
     enterUsernameAndPlay(root, 'ren');
     finishRun(controller, 24);
@@ -186,10 +188,11 @@ describe('meme-first application flow', () => {
     expect(input?.value).toBe('renato');
   });
 
-  it('keeps the highest V2.2 food-score best without overwriting V1, V2 or V2.1 history', () => {
-    localStorage.setItem('snek.localBest', '68');
-    localStorage.setItem('snek.localBest.pixelGridV2', '19');
-    localStorage.setItem('snek.localBest.pixelGridV2_1', '13');
+  it('keeps the highest V3 food-score best without overwriting V1, V2, V2.1 or V2.2 history', () => {
+    localStorage.setItem('snek.localBest', '0068');
+    localStorage.setItem('snek.localBest.pixelGridV2', '0019');
+    localStorage.setItem('snek.localBest.pixelGridV2_1', '0013');
+    localStorage.setItem('snek.localBest.pixelGridV2_2', '0017');
     const first = setup({ clearStorage: false });
     enterUsernameAndPlay(first.root, 'ren');
     finishRun(first.controller, 24);
@@ -200,10 +203,11 @@ describe('meme-first application flow', () => {
 
     expect(second.root.textContent).toContain('PERSONAL BEST');
     expect(second.root.textContent).toContain('24');
-    expect(localStorage.getItem('snek.localBest.pixelGridV2_2')).toBe('24');
-    expect(localStorage.getItem('snek.localBest.pixelGridV2_1')).toBe('13');
-    expect(localStorage.getItem('snek.localBest.pixelGridV2')).toBe('19');
-    expect(localStorage.getItem('snek.localBest')).toBe('68');
+    expect(localStorage.getItem('snek.localBest.coreV3')).toBe('24');
+    expect(localStorage.getItem('snek.localBest.pixelGridV2_2')).toBe('0017');
+    expect(localStorage.getItem('snek.localBest.pixelGridV2_1')).toBe('0013');
+    expect(localStorage.getItem('snek.localBest.pixelGridV2')).toBe('0019');
+    expect(localStorage.getItem('snek.localBest')).toBe('0068');
 
     const third = setup({ clearStorage: false });
     click('[data-action="continue"]', third.root);
