@@ -1,5 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
-import { HttpSessionGateway } from '../../src/app/http-session-gateway';
+import { describe, expect, it } from 'vitest';
 import {
   LOCAL_BEST_KEY,
   V2_LOCAL_BEST_KEY,
@@ -9,8 +8,6 @@ import {
   savePixelGridV2_2Best,
   type StorageLike
 } from '../../src/app/identity';
-import { LocalSessionGateway } from '../../src/app/session-gateway';
-import { RULESET_ID } from '../../src/game/grid-config';
 
 class MemoryStorage implements StorageLike {
   readonly values = new Map<string, string>();
@@ -18,8 +15,8 @@ class MemoryStorage implements StorageLike {
   setItem(key: string, value: string): void { this.values.set(key, value); }
 }
 
-describe('V2.2 persistence and ranking boundary', () => {
-  it('stores V2.2 best independently from V1, V2 and V2.1 history', () => {
+describe('historical V2.2 persistence', () => {
+  it('keeps the V2.2 helper independently addressable without mutating older history', () => {
     const storage = new MemoryStorage();
     storage.setItem(LOCAL_BEST_KEY, '68');
     storage.setItem(V2_LOCAL_BEST_KEY, '19');
@@ -32,13 +29,5 @@ describe('V2.2 persistence and ranking boundary', () => {
     expect(storage.getItem(V2_1_LOCAL_BEST_KEY)).toBe('12');
     expect(storage.getItem(V2_LOCAL_BEST_KEY)).toBe('19');
     expect(storage.getItem(LOCAL_BEST_KEY)).toBe('68');
-  });
-
-  it('uses the V2.2 ruleset locally while legacy HTTP ranking remains unsupported', () => {
-    expect(RULESET_ID).toBe('pixel-flight-grid-v2-2');
-    expect(new LocalSessionGateway().supportsRuleset(RULESET_ID)).toBe(true);
-    const fetchMock = vi.fn<typeof fetch>();
-    expect(new HttpSessionGateway('/rank', fetchMock).supportsRuleset(RULESET_ID)).toBe(false);
-    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
