@@ -19,6 +19,7 @@ import {
   type FlightPresentation
 } from './render/flight-presentation';
 import { applyOverviewCamera } from './render/overview-camera';
+import { buildPixelChaseCameraSnapshot } from './render/pixel-camera-presentation';
 import { buildPixelSnakeRenderSnapshot } from './render/pixel-snake-presentation';
 import { createScene } from './render/scene';
 import { SnakeRenderer } from './render/snake-renderer';
@@ -53,8 +54,13 @@ function buildPresentation(run: RunState): FlightPresentation {
   );
 }
 
-function updateChaseCamera(presentation: FlightPresentation, dtSeconds: number): void {
-  cameraController.update(presentation, dtSeconds);
+function updateChaseCamera(
+  run: RunState,
+  presentation: FlightPresentation,
+  dtSeconds: number
+): void {
+  const snapshot = buildPixelChaseCameraSnapshot(run, presentation);
+  cameraController.update(snapshot, dtSeconds);
 }
 
 function setCameraMode(mode: CameraMode): void {
@@ -68,7 +74,7 @@ function setCameraMode(mode: CameraMode): void {
   }
 
   cameraController.reset();
-  if (run) updateChaseCamera(buildPresentation(run), 0);
+  if (run) updateChaseCamera(run, buildPresentation(run), 0);
 }
 
 function toggleCamera(): void {
@@ -178,7 +184,7 @@ function initializeRun(run: RunState): void {
   fixedClock.reset();
   cameraController.reset();
   setCameraMode('chase');
-  updateChaseCamera(buildPresentation(run), 0);
+  updateChaseCamera(run, buildPresentation(run), 0);
   exposeLogicalTelemetry(run);
 }
 
@@ -227,7 +233,7 @@ function frame(timestamp: number): void {
     foodRenderer.render(run.food ? cellToWorld(run.food, run.config) : null);
 
     if (cameraMode === 'chase') {
-      updateChaseCamera(presentation, frameDeltaSeconds);
+      updateChaseCamera(run, presentation, frameDeltaSeconds);
     }
   }
 
