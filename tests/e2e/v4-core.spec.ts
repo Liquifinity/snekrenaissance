@@ -79,10 +79,13 @@ test('desktop V4 newest valid pre-step direction wins and catch-up consumes it o
   await startGame(page, 'v4-latest');
   const app = page.locator('#app');
   const before = parseCell(await app.getAttribute('data-head-cell'));
+
+  expect(await consume(page, 1 / 12)).toBe(0);
   await page.keyboard.press('d');
   await page.keyboard.press('w');
   await expect(app).toHaveAttribute('data-pending-direction', '+Y');
-  expect(await consume(page, 1 / 3)).toBe(2);
+
+  expect(await consume(page, 0.25)).toBe(2);
   await expect(app).toHaveAttribute('data-head-direction', '+Y');
   await expect(app).toHaveAttribute('data-pending-direction', 'none');
   expect(parseCell(await app.getAttribute('data-head-cell'))).toEqual({ x: before.x, y: (before.y + 2) % 9, z: before.z });
