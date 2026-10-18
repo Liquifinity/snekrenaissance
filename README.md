@@ -41,4 +41,4 @@ The project also contains the preserved Worker/ranking seam and its validation t
 
 ## License
 
-Open-source licensing is pending the final asset provenance and asset rights review. No MIT grant is claimed until every distributable asset has been verified for redistribution.
+SNEK RENAISSANCE is released under the MIT License. See [`LICENSE`](LICENSE).
