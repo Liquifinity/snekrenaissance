@@ -28,6 +28,12 @@ describe('browser main loop V2.2 authority boundary', () => {
     expect(source).not.toContain('interpolateTransition(');
   });
 
+  it('feeds chase camera a snapped head target plus continuous navigation guidance', () => {
+    expect(source).toContain('buildPixelChaseCameraSnapshot(run, presentation)');
+    expect(source).toContain('cameraController.update(snapshot, dtSeconds)');
+    expect(source).not.toContain('cameraController.update(presentation, dtSeconds)');
+  });
+
   it('exposes continuous navigation plus discrete visible-direction/world telemetry', () => {
     expect(source).toContain('app.dataset.headYaw');
     expect(source).toContain('app.dataset.headPitch');
