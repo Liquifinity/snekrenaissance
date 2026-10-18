@@ -109,8 +109,14 @@ test('desktop V5 rejects direct reversal after a rotated view mapping', async ({
   test.skip(testInfo.project.name !== 'desktop-chromium');
   await startGame(page, 'v5-rotated-reversal');
   const app = page.locator('#app');
-  await orbitQuarterTurnRightwardView(page);
 
+  await page.keyboard.press('d');
+  await expect(app).toHaveAttribute('data-pending-direction', '+X');
+  expect(await consume(page, 1 / 6)).toBe(1);
+  await expect(app).toHaveAttribute('data-head-direction', '+X');
+
+  await orbitQuarterTurnRightwardView(page);
+  await expect(app).toHaveAttribute('data-view-right', '-Z');
   await page.keyboard.press('d');
   await expect(app).toHaveAttribute('data-pending-direction', '-Z');
   expect(await consume(page, 1 / 6)).toBe(1);
