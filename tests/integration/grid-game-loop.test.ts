@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GRID_CONFIG } from '../../src/game/grid-config';
-import { createRun, queueTurn, startRun, stepRun } from '../../src/game/run-state';
+import { createRun, queueDirection, startRun, stepRun } from '../../src/game/run-state';
 import { FixedStepClock } from '../../src/game/simulation';
 import { snakeHead } from '../../src/game/snake';
 
@@ -11,20 +11,17 @@ function execute(frameChunks: readonly number[]) {
   const run = startRun(createRun(stableRng));
   run.food = { x: 0, y: 0, z: 0 };
   const clock = new FixedStepClock(STEP_SECONDS);
-  for (const frameDelta of frameChunks) {
-    clock.consume(frameDelta, () => stepRun(run, stableRng));
-  }
+  for (const frameDelta of frameChunks) clock.consume(frameDelta, () => stepRun(run, stableRng));
   return run;
 }
 
-describe('fixed-step deterministic V3 grid loop', () => {
+describe('fixed-step deterministic V4 grid loop', () => {
   it('produces the same strategic state for equivalent 60 Hz and 30 Hz frame chunking', () => {
     const sixtyHz = execute(Array.from({ length: 60 }, () => 1 / 60));
     const thirtyHz = execute(Array.from({ length: 30 }, () => 1 / 30));
-
     expect(thirtyHz.snake.segments).toEqual(sixtyHz.snake.segments);
-    expect(thirtyHz.frame).toEqual(sixtyHz.frame);
-    expect(thirtyHz.pendingTurn).toBe('none');
+    expect(thirtyHz.heading).toBe(sixtyHz.heading);
+    expect(thirtyHz.pendingDirection).toBeNull();
     expect(thirtyHz.score).toBe(sixtyHz.score);
     expect(thirtyHz.phase).toBe(sixtyHz.phase);
     expect(thirtyHz.elapsedMs).toBeCloseTo(sixtyHz.elapsedMs, 10);
@@ -35,29 +32,23 @@ describe('fixed-step deterministic V3 grid loop', () => {
     run.food = { x: 0, y: 0, z: 0 };
     const clock = new FixedStepClock(STEP_SECONDS);
     const initialHead = { ...snakeHead(run.snake).cell };
-
-    for (let tick = 0; tick < 9; tick += 1) {
-      clock.consume(1 / 60, () => stepRun(run, stableRng));
-    }
+    for (let tick = 0; tick < 9; tick += 1) clock.consume(1 / 60, () => stepRun(run, stableRng));
     expect(snakeHead(run.snake).cell).toEqual(initialHead);
-
     clock.consume(1 / 60, () => stepRun(run, stableRng));
     expect(snakeHead(run.snake).cell).toEqual({ x: 4, y: 4, z: 5 });
   });
 
-  it('consumes a queued turn on one strategic step and then continues straight', () => {
+  it('consumes a queued absolute direction on one strategic step and then continues straight', () => {
     const run = startRun(createRun(stableRng));
     run.food = { x: 0, y: 0, z: 0 };
     const clock = new FixedStepClock(STEP_SECONDS);
-
-    queueTurn(run, 'right');
+    queueDirection(run, '-X');
     clock.consume(STEP_SECONDS, () => stepRun(run, stableRng));
-    expect(run.frame.forward).toBe('-X');
+    expect(run.heading).toBe('-X');
     expect(snakeHead(run.snake).cell).toEqual({ x: 3, y: 4, z: 4 });
-    expect(run.pendingTurn).toBe('none');
-
+    expect(run.pendingDirection).toBeNull();
     clock.consume(STEP_SECONDS, () => stepRun(run, stableRng));
-    expect(run.frame.forward).toBe('-X');
+    expect(run.heading).toBe('-X');
     expect(snakeHead(run.snake).cell).toEqual({ x: 2, y: 4, z: 4 });
   });
 });

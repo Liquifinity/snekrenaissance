@@ -46,8 +46,8 @@ describe('SNEK CORE V4 six-direction mobile pad', () => {
     expect(button).not.toBeNull();
     if (!button) return;
 
-    button.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
-    button.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }));
+    button.dispatchEvent(new Event('pointerdown', { bubbles: true, cancelable: true }));
+    button.dispatchEvent(new Event('pointermove', { bubbles: true, cancelable: true }));
     expect(onDirection).toHaveBeenCalledTimes(1);
     expect(onDirection).toHaveBeenCalledWith('+X');
   });

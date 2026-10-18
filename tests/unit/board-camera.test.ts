@@ -34,6 +34,15 @@ function normalized(value: Readonly<{ x: number; y: number; z: number }>) {
   return { x: value.x / length, y: value.y / length, z: value.z / length };
 }
 
+function expectVecClose(
+  actual: Readonly<{ x: number; y: number; z: number }>,
+  expected: Readonly<{ x: number; y: number; z: number }>
+): void {
+  expect(actual.x).toBeCloseTo(expected.x, 12);
+  expect(actual.y).toBeCloseTo(expected.y, 12);
+  expect(actual.z).toBeCloseTo(expected.z, 12);
+}
+
 const EXPECTED_RAY = normalized({ x: 0.65, y: 0.55, z: 1.0 });
 
 describe('SNEK CORE V4 fixed board camera', () => {
@@ -54,10 +63,7 @@ describe('SNEK CORE V4 fixed board camera', () => {
     if (!module) return;
     const controller = new module.BoardCameraController();
     const pose = controller.apply(aspect);
-    const ray = normalized(pose.position);
-    expect(ray.x).toBeCloseTo(EXPECTED_RAY.x, 10);
-    expect(ray.y).toBeCloseTo(EXPECTED_RAY.y, 10);
-    expect(ray.z).toBeCloseTo(EXPECTED_RAY.z, 10);
+    expectVecClose(normalized(pose.position), EXPECTED_RAY);
     expect(pose.target).toEqual({ x: 0, y: 0, z: 0 });
   });
 
@@ -83,7 +89,7 @@ describe('SNEK CORE V4 fixed board camera', () => {
     expect(controller.zoomFactor).toBe(5);
     const far = controller.apply(1);
     expect(far.distance).toBeCloseTo(baseline.distance * 5, 10);
-    expect(normalized(far.position)).toEqual(normalized(baseline.position));
+    expectVecClose(normalized(far.position), normalized(baseline.position));
     controller.setZoomFactor(0.01);
     expect(controller.zoomFactor).toBe(0.65);
   });
@@ -98,7 +104,7 @@ describe('SNEK CORE V4 fixed board camera', () => {
     const landscape = controller.apply(16 / 9);
     const portrait = controller.apply(9 / 16);
     expect(controller.zoomFactor).toBe(2);
-    expect(normalized(portrait.position)).toEqual(normalized(landscape.position));
+    expectVecClose(normalized(portrait.position), normalized(landscape.position));
     expect(portrait.distance).not.toBeCloseTo(landscape.distance, 8);
     expect(camera.fov).toBe(60);
   });
