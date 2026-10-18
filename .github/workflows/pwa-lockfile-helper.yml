@@ -1,0 +1,26 @@
+name: pwa lockfile helper
+
+on:
+  push:
+    branches: [feat/pwa-fork-first]
+    paths:
+      - '.github/workflows/pwa-lockfile-helper.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --save-dev --save-exact vite-plugin-pwa@2.0.0 --package-lock-only
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pwa-package-files
+          path: |
+            package.json
+            package-lock.json
