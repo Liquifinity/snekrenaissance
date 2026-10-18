@@ -12,19 +12,19 @@ async function startGame(page: import('@playwright/test').Page, username: string
   await expect(page.locator('#game-canvas')).toBeVisible();
 }
 
-test('desktop V4 exposes one board camera and no camera toggle', async ({ page }, testInfo) => {
+test('desktop V5 exposes one manual orbit-board camera and no camera toggle', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-chromium');
-  await startGame(page, 'desktop-v4');
+  await startGame(page, 'desktop-v5');
   const app = page.locator('#app');
-  await expect(app).toHaveAttribute('data-camera-mode', 'board');
+  await expect(app).toHaveAttribute('data-camera-mode', 'orbit-board');
   await expect(page.locator('[data-camera-toggle]')).toHaveCount(0);
   await page.keyboard.press('x');
-  await expect(app).toHaveAttribute('data-camera-mode', 'board');
+  await expect(app).toHaveAttribute('data-camera-mode', 'orbit-board');
   expect(await app.getAttribute('data-runtime-error')).not.toBe('true');
 });
 
 test('pixel backing buffer stays reduced and independent of high DPR', async ({ page }) => {
-  await startGame(page, 'pixel-v4');
+  await startGame(page, 'pixel-v5');
   const dimensions = await page.evaluate(() => {
     const canvas = document.querySelector<HTMLCanvasElement>('#game-canvas');
     if (!canvas) throw new Error('missing canvas');
@@ -38,29 +38,30 @@ test('pixel backing buffer stays reduced and independent of high DPR', async ({ 
   expect(dimensions.backingHeight).toBeLessThan(dimensions.cssHeight);
 });
 
-test('mobile V4 exposes six explicit world-direction controls', async ({ page }, testInfo) => {
+test('mobile V5 exposes six explicit view-relative controls without world-axis labels', async ({ page }, testInfo) => {
   test.skip(!testInfo.project.name.startsWith('mobile-'));
-  await startGame(page, `mobile-v4-${testInfo.project.name}`);
+  await startGame(page, `mobile-v5-${testInfo.project.name}`);
   const pad = page.locator('[data-direction-pad]');
   await expect(pad).toBeVisible();
-  const buttons = pad.locator('[data-world-direction]');
+  const buttons = pad.locator('[data-view-command]');
   await expect(buttons).toHaveCount(6);
-  for (const direction of ['+X', '-X', '+Y', '-Y', '+Z', '-Z']) {
-    await expect(pad.locator(`[data-world-direction="${direction}"]`)).toBeVisible();
+  for (const command of ['up', 'down', 'left', 'right', 'towardViewer', 'intoScreen']) {
+    await expect(pad.locator(`[data-view-command="${command}"]`)).toBeVisible();
   }
-  await expect(pad.locator('[data-world-direction="+Z"]')).toHaveText('FRENTE');
-  await expect(pad.locator('[data-world-direction="-Z"]')).toHaveText('FUNDO');
+  await expect(pad.locator('[data-view-command="towardViewer"]')).toHaveText('FRENTE');
+  await expect(pad.locator('[data-view-command="intoScreen"]')).toHaveText('FUNDO');
+  await expect(pad.locator('[data-world-direction]')).toHaveCount(0);
 });
 
-test('mobile V4 remains responsive and fitted after orientation change', async ({ page }, testInfo) => {
+test('mobile V5 remains responsive and preserves orbit mode after orientation change', async ({ page }, testInfo) => {
   test.skip(!testInfo.project.name.startsWith('mobile-'));
-  await startGame(page, `orientation-v4-${testInfo.project.name}`);
+  await startGame(page, `orientation-v5-${testInfo.project.name}`);
   const app = page.locator('#app');
   const current = page.viewportSize();
   if (!current) throw new Error('missing viewport');
   await page.setViewportSize({ width: current.height, height: current.width });
   await page.evaluate(() => window.dispatchEvent(new Event('orientationchange')));
-  await expect(app).toHaveAttribute('data-camera-mode', 'board');
+  await expect(app).toHaveAttribute('data-camera-mode', 'orbit-board');
   await expect(page.locator('[data-direction-pad]')).toBeVisible();
   const dimensions = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.innerWidth);
