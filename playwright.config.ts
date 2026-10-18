@@ -8,7 +8,7 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: 'npm run build && npx vite preview --host 127.0.0.1 --port 4173',
+      command: 'npx vite build --mode e2e && npx vite preview --host 127.0.0.1 --port 4173',
       port: 4173,
       reuseExistingServer: !process.env.CI
     },
