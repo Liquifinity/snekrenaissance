@@ -79,7 +79,7 @@ describe('meme-first application flow', () => {
     expect(root.querySelector('[role="alert"]')?.textContent).toContain('username');
   });
 
-  it('starts a V4 run with score, length, progress bar, and stored identity', () => {
+  it('starts a V5 run with score, length, progress bar, and stored identity', () => {
     const { root, controller } = setup();
     enterUsernameAndPlay(root, 'snekboi');
     expect(controller.screen).toBe('game');
@@ -138,7 +138,7 @@ describe('meme-first application flow', () => {
     expect(root.textContent).not.toContain('GAME OVER');
   });
 
-  it('shows V4 food score and personal best for a local game over', () => {
+  it('shows V5 food score and personal best for a local game over', () => {
     const { root, controller } = setup();
     enterUsernameAndPlay(root, 'ren');
     finishRun(controller, 24);
@@ -152,7 +152,7 @@ describe('meme-first application flow', () => {
     expect(root.querySelector('[data-action="rank"]')).not.toBeNull();
   });
 
-  it('shows the local V4 score record without public leaderboard language', () => {
+  it('shows the local V5 score record without public leaderboard language', () => {
     const { root, controller } = setup();
     enterUsernameAndPlay(root, 'ren');
     finishRun(controller, 24);
@@ -173,12 +173,13 @@ describe('meme-first application flow', () => {
     expect(input?.value).toBe('renato');
   });
 
-  it('keeps the highest V4 food-score best without overwriting V3 or older history', () => {
+  it('keeps the highest V5 food-score best without overwriting V4, V3, or older history', () => {
     localStorage.setItem('snek.localBest', '0068');
     localStorage.setItem('snek.localBest.pixelGridV2', '0019');
     localStorage.setItem('snek.localBest.pixelGridV2_1', '0013');
     localStorage.setItem('snek.localBest.pixelGridV2_2', '0017');
     localStorage.setItem('snek.localBest.coreV3', '0031');
+    localStorage.setItem('snek.localBest.coreV4', '0041');
     const first = setup({ clearStorage: false });
     enterUsernameAndPlay(first.root, 'ren');
     finishRun(first.controller, 24);
@@ -187,7 +188,8 @@ describe('meme-first application flow', () => {
     finishRun(second.controller, 18);
     expect(second.root.textContent).toContain('PERSONAL BEST');
     expect(second.root.textContent).toContain('24');
-    expect(localStorage.getItem('snek.localBest.coreV4')).toBe('24');
+    expect(localStorage.getItem('snek.localBest.coreV5')).toBe('24');
+    expect(localStorage.getItem('snek.localBest.coreV4')).toBe('0041');
     expect(localStorage.getItem('snek.localBest.coreV3')).toBe('0031');
     expect(localStorage.getItem('snek.localBest.pixelGridV2_2')).toBe('0017');
     expect(localStorage.getItem('snek.localBest.pixelGridV2_1')).toBe('0013');

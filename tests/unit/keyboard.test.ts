@@ -1,51 +1,51 @@
 import { describe, expect, it } from 'vitest';
-import type { GridDirection } from '../../src/game/grid-types';
+import type { ViewCommand } from '../../src/render/view-frame';
 import { KeyboardInput } from '../../src/input/keyboard';
 
-describe('KeyboardInput V4 edge-triggered world directions', () => {
+describe('KeyboardInput V5 edge-triggered view commands', () => {
   it.each([
-    ['ArrowUp', '+Y'], ['w', '+Y'],
-    ['ArrowDown', '-Y'], ['s', '-Y'],
-    ['ArrowLeft', '-X'], ['a', '-X'],
-    ['ArrowRight', '+X'], ['d', '+X'],
-    ['q', '+Z'], ['e', '-Z']
-  ] as const)('maps %s to one %s direction per press edge', (key, expected) => {
-    const directions: GridDirection[] = [];
-    const input = new KeyboardInput({ onDirection: (direction: GridDirection) => directions.push(direction) });
+    ['ArrowUp', 'up'], ['w', 'up'],
+    ['ArrowDown', 'down'], ['s', 'down'],
+    ['ArrowLeft', 'left'], ['a', 'left'],
+    ['ArrowRight', 'right'], ['d', 'right'],
+    ['q', 'towardViewer'], ['e', 'intoScreen']
+  ] as const)('maps %s to one %s command per press edge', (key, expected) => {
+    const commands: ViewCommand[] = [];
+    const input = new KeyboardInput({ onCommand: (command: ViewCommand) => commands.push(command) });
 
     input.handleKeyDown(key);
     input.handleKeyDown(key);
     input.handleKeyDown(key);
-    expect(directions).toEqual([expected]);
+    expect(commands).toEqual([expected]);
 
     input.handleKeyUp(key);
     input.handleKeyDown(key);
-    expect(directions).toEqual([expected, expected]);
+    expect(commands).toEqual([expected, expected]);
   });
 
-  it('allows a newer different world direction before earlier keys are released', () => {
-    const directions: GridDirection[] = [];
-    const input = new KeyboardInput({ onDirection: (direction) => directions.push(direction) });
+  it('allows a newer different view command before earlier keys are released', () => {
+    const commands: ViewCommand[] = [];
+    const input = new KeyboardInput({ onCommand: (command) => commands.push(command) });
     input.handleKeyDown('d');
     input.handleKeyDown('w');
     input.handleKeyDown('q');
-    expect(directions).toEqual(['+X', '+Y', '+Z']);
+    expect(commands).toEqual(['right', 'up', 'towardViewer']);
   });
 
   it('blur clears pressed edges so the same physical key can emit again', () => {
-    const directions: GridDirection[] = [];
-    const input = new KeyboardInput({ onDirection: (direction) => directions.push(direction) });
+    const commands: ViewCommand[] = [];
+    const input = new KeyboardInput({ onCommand: (command) => commands.push(command) });
     input.handleKeyDown('d');
     input.handleBlur();
     input.handleKeyDown('d');
-    expect(directions).toEqual(['+X', '+X']);
+    expect(commands).toEqual(['right', 'right']);
   });
 
   it('ignores X and unrelated keys instead of toggling camera', () => {
-    const directions: GridDirection[] = [];
-    const input = new KeyboardInput({ onDirection: (direction) => directions.push(direction) });
+    const commands: ViewCommand[] = [];
+    const input = new KeyboardInput({ onCommand: (command) => commands.push(command) });
     input.handleKeyDown('x');
     input.handleKeyDown('r');
-    expect(directions).toEqual([]);
+    expect(commands).toEqual([]);
   });
 });

@@ -8,23 +8,7 @@ import { snakeHead } from '../../src/game/snake';
 const source = readFileSync(new URL('../../src/main.ts', import.meta.url), 'utf8');
 const stableRng = () => 0.75;
 
-describe('browser main loop V4 board-space authority', () => {
-  it('wires keyboard world directions directly into pendingDirection', () => {
-    expect(source).toContain('queueDirection');
-    expect(source).toContain('onDirection:');
-    expect(source).toMatch(/run\.phase === ['"]playing['"]/);
-    expect(source).toMatch(/queueDirection\(run, direction\)/);
-    expect(source).not.toContain('queueTurn');
-  });
-
-  it('uses one board camera with no chase/overview toggle route', () => {
-    expect(source).toContain('BoardCameraController');
-    expect(source).toContain("app.dataset.cameraMode = 'board'");
-    expect(source).not.toContain('ChaseCameraController');
-    expect(source).not.toContain('toggleCamera');
-    expect(source).not.toContain('dataCameraToggle');
-  });
-
+describe('browser strategic loop invariants', () => {
   it('applies only the latest valid absolute direction before a step', () => {
     const run = startRun(createRun(stableRng));
     run.food = { x: 0, y: 0, z: 0 };

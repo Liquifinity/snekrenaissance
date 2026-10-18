@@ -13,6 +13,7 @@ export const V2_1_LOCAL_BEST_KEY = 'snek.localBest.pixelGridV2_1';
 export const V2_2_LOCAL_BEST_KEY = 'snek.localBest.pixelGridV2_2';
 export const V3_LOCAL_BEST_KEY = 'snek.localBest.coreV3';
 export const V4_LOCAL_BEST_KEY = 'snek.localBest.coreV4';
+export const V5_LOCAL_BEST_KEY = 'snek.localBest.coreV5';
 
 function defaultId(): string {
   if (typeof globalThis.crypto?.randomUUID === 'function') {
@@ -99,15 +100,25 @@ export function loadSnekCoreV3Best(storage: StorageLike): number {
   return loadNonNegativeInteger(storage, V3_LOCAL_BEST_KEY);
 }
 
-/** Historical SNEK CORE V3 best. V4 code must not write this key. */
+/** Historical SNEK CORE V3 best. V4+ code must not write this key. */
 export function saveSnekCoreV3Best(storage: StorageLike, score: number): number {
   return saveBest(storage, V3_LOCAL_BEST_KEY, score);
 }
 
+/** Historical SNEK CORE V4 best. */
 export function loadSnekCoreV4Best(storage: StorageLike): number {
   return loadNonNegativeInteger(storage, V4_LOCAL_BEST_KEY);
 }
 
+/** Historical SNEK CORE V4 best. V5+ code must not write this key. */
 export function saveSnekCoreV4Best(storage: StorageLike, score: number): number {
   return saveBest(storage, V4_LOCAL_BEST_KEY, score);
+}
+
+export function loadSnekCoreV5Best(storage: StorageLike): number {
+  return loadNonNegativeInteger(storage, V5_LOCAL_BEST_KEY);
+}
+
+export function saveSnekCoreV5Best(storage: StorageLike, score: number): number {
+  return saveBest(storage, V5_LOCAL_BEST_KEY, score);
 }

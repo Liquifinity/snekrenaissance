@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 type Cell = { x: number; y: number; z: number };
 type Vec3 = { x: number; y: number; z: number };
-type V4Harness = {
+type StrategicHarness = {
   setManualClock: (enabled: boolean) => void;
   consumeFrame: (frameDeltaSeconds: number) => number;
   setFoodCell: (cell: Cell) => void;
@@ -16,8 +16,8 @@ async function startGame(page: Page, username: string): Promise<void> {
   await page.locator('[data-action="play"]').click();
   await expect(page.locator('#game-canvas')).toBeVisible();
   await page.evaluate(() => {
-    const harness = (window as unknown as { __SNEK_TEST__?: V4Harness }).__SNEK_TEST__;
-    if (!harness) throw new Error('missing V4 E2E harness');
+    const harness = (window as unknown as { __SNEK_TEST__?: StrategicHarness }).__SNEK_TEST__;
+    if (!harness) throw new Error('missing strategic E2E harness');
     harness.setManualClock(true);
     harness.setFoodCell({ x: 0, y: 0, z: 0 });
   });
@@ -25,8 +25,8 @@ async function startGame(page: Page, username: string): Promise<void> {
 
 async function consume(page: Page, seconds: number): Promise<number> {
   return page.evaluate((value) => {
-    const harness = (window as unknown as { __SNEK_TEST__?: V4Harness }).__SNEK_TEST__;
-    if (!harness) throw new Error('missing V4 E2E harness');
+    const harness = (window as unknown as { __SNEK_TEST__?: StrategicHarness }).__SNEK_TEST__;
+    if (!harness) throw new Error('missing strategic E2E harness');
     return harness.consumeFrame(value);
   }, seconds);
 }
@@ -39,8 +39,8 @@ function parseCell(value: string | null): Cell {
 
 async function cameraPosition(page: Page): Promise<Vec3> {
   return page.evaluate(() => {
-    const harness = (window as unknown as { __SNEK_TEST__?: V4Harness }).__SNEK_TEST__;
-    if (!harness) throw new Error('missing V4 E2E harness');
+    const harness = (window as unknown as { __SNEK_TEST__?: StrategicHarness }).__SNEK_TEST__;
+    if (!harness) throw new Error('missing strategic E2E harness');
     return harness.getCameraPosition();
   });
 }
@@ -51,9 +51,9 @@ function expectVecClose(actual: Vec3, expected: Vec3): void {
   expect(actual.z).toBeCloseTo(expected.z, 8);
 }
 
-test('desktop V4 keys command absolute world directions and reject direct reversal', async ({ page }, testInfo) => {
+test('default view commands expected axes and rejects direct reversal', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-chromium');
-  await startGame(page, 'v4-absolute');
+  await startGame(page, 'strategic-default');
   const app = page.locator('#app');
   await expect(app).toHaveAttribute('data-head-direction', '+Z');
   await expect(app).toHaveAttribute('data-pending-direction', 'none');
@@ -74,9 +74,9 @@ test('desktop V4 keys command absolute world directions and reject direct revers
   expect(parseCell(await app.getAttribute('data-head-cell'))).toEqual({ x: 5, y: 5, z: 4 });
 });
 
-test('desktop V4 newest valid pre-step direction wins and catch-up consumes it once', async ({ page }, testInfo) => {
+test('newest valid pre-step direction wins and catch-up consumes it once', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-chromium');
-  await startGame(page, 'v4-latest');
+  await startGame(page, 'strategic-latest');
   const app = page.locator('#app');
   const before = parseCell(await app.getAttribute('data-head-cell'));
 
@@ -91,13 +91,13 @@ test('desktop V4 newest valid pre-step direction wins and catch-up consumes it o
   expect(parseCell(await app.getAttribute('data-head-cell'))).toEqual({ x: before.x, y: (before.y + 2) % 9, z: before.z });
 });
 
-test('V4 board camera is invariant while the snake moves through a toroidal wrap', async ({ page }) => {
-  await startGame(page, 'v4-camera-wrap');
+test('orbit-board camera is invariant while the snake moves through a toroidal wrap', async ({ page }) => {
+  await startGame(page, 'strategic-camera-wrap');
   const app = page.locator('#app');
-  await expect(app).toHaveAttribute('data-camera-mode', 'board');
+  await expect(app).toHaveAttribute('data-camera-mode', 'orbit-board');
   const before = await cameraPosition(page);
   for (let index = 0; index < 9; index += 1) expect(await consume(page, 1 / 6)).toBe(1);
   const after = await cameraPosition(page);
   expectVecClose(after, before);
-  await expect(app).toHaveAttribute('data-camera-mode', 'board');
+  await expect(app).toHaveAttribute('data-camera-mode', 'orbit-board');
 });

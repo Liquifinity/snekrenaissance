@@ -3,7 +3,8 @@ import { GRID_CONFIG } from '../../src/game/grid-config';
 import { createRun, queueDirection, startRun, stepRun } from '../../src/game/run-state';
 import { FixedStepClock } from '../../src/game/simulation';
 import { snakeHead } from '../../src/game/snake';
-import type { GridCell } from '../../src/game/grid-types';
+import type { GridCell, GridDirection } from '../../src/game/grid-types';
+import { BoardCameraController } from '../../src/render/board-camera';
 
 const stableRng = () => 0.375;
 const STEPS = 1_000;
@@ -68,7 +69,47 @@ function runFramePartition(frameDeltas: readonly number[]) {
   return path;
 }
 
-describe('SNEK CORE V4 deterministic strategic runtime', () => {
+const INPUT_CYCLE: readonly GridDirection[] = ['+X', '+Y', '-Z', '-X', '-Y', '+Z'];
+
+function runWithOptionalCameraOperations(useCamera: boolean) {
+  const run = startRun(createRun(stableRng));
+  run.snake.segments = [{ id: 0, cell: { x: 4, y: 4, z: 4 } }];
+  run.snake.pendingGrowth = 0;
+  run.snake.nextSegmentId = 1;
+  run.heading = '+Z';
+  run.pendingDirection = null;
+  run.food = { x: 8, y: 8, z: 8 };
+  const camera = new BoardCameraController();
+
+  for (let step = 0; step < 300 && run.phase === 'playing'; step += 1) {
+    if (step % 17 === 0) {
+      const direction = INPUT_CYCLE[Math.floor(step / 17) % INPUT_CYCLE.length]!;
+      queueDirection(run, direction);
+    }
+    if (useCamera) {
+      camera.orbitBy(((step % 7) - 3) * 0.031, ((step % 5) - 2) * 0.017);
+      if (step % 11 === 0) camera.setZoomFactor(0.65 + (step % 23) / 10);
+      camera.apply(step % 2 === 0 ? 16 / 9 : 9 / 16);
+    }
+    stepRun(run, stableRng);
+  }
+
+  return {
+    phase: run.phase,
+    heading: run.heading,
+    pendingDirection: run.pendingDirection,
+    snake: run.snake.segments.map((segment) => ({ id: segment.id, cell: cloneCell(segment.cell) })),
+    food: run.food ? cloneCell(run.food) : null,
+    score: run.score,
+    foodsCollected: run.foodsCollected,
+    foodEaten: run.foodEaten,
+    maxLength: run.maxLength,
+    elapsedMs: run.elapsedMs,
+    result: run.result
+  };
+}
+
+describe('SNEK CORE V5 deterministic strategic runtime', () => {
   it('replays at least 1,000 strategic steps identically with face-adjacent commits only', () => {
     const first = deterministicRun();
     const second = deterministicRun();
@@ -84,5 +125,9 @@ describe('SNEK CORE V4 deterministic strategic runtime', () => {
     expect(sixtyHz).toHaveLength(12);
     expect(thirtyHz).toEqual(sixtyHz);
     expect(irregular).toEqual(sixtyHz);
+  });
+
+  it('produces identical strategic state when arbitrary camera orbit/zoom operations occur between the same absolute inputs and steps', () => {
+    expect(runWithOptionalCameraOperations(true)).toEqual(runWithOptionalCameraOperations(false));
   });
 });

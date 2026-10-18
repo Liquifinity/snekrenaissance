@@ -1,46 +1,46 @@
-import type { GridDirection } from '../game/grid-types';
+import type { ViewCommand } from '../render/view-frame';
 
-const KEY_DIRECTIONS: Readonly<Record<string, GridDirection>> = Object.freeze({
-  arrowup: '+Y',
-  w: '+Y',
-  arrowdown: '-Y',
-  s: '-Y',
-  arrowleft: '-X',
-  a: '-X',
-  arrowright: '+X',
-  d: '+X',
-  q: '+Z',
-  e: '-Z'
+const KEY_COMMANDS: Readonly<Record<string, ViewCommand>> = Object.freeze({
+  arrowup: 'up',
+  w: 'up',
+  arrowdown: 'down',
+  s: 'down',
+  arrowleft: 'left',
+  a: 'left',
+  arrowright: 'right',
+  d: 'right',
+  q: 'towardViewer',
+  e: 'intoScreen'
 });
 
 export type KeyboardInputOptions = {
-  onDirection?: (direction: GridDirection) => void;
+  onCommand?: (command: ViewCommand) => void;
 };
 
 function normalizeKey(key: string): string {
   return key.toLowerCase();
 }
 
-function directionForKey(key: string): GridDirection | null {
-  return KEY_DIRECTIONS[key] ?? null;
+function commandForKey(key: string): ViewCommand | null {
+  return KEY_COMMANDS[key] ?? null;
 }
 
 export class KeyboardInput {
   private readonly pressed = new Set<string>();
-  private readonly onDirection?: (direction: GridDirection) => void;
+  private readonly onCommand?: (command: ViewCommand) => void;
 
   constructor(options: KeyboardInputOptions = {}) {
-    this.onDirection = options.onDirection;
+    this.onCommand = options.onCommand;
   }
 
   handleKeyDown(key: string): void {
     const normalized = normalizeKey(key);
-    const direction = directionForKey(normalized);
-    if (!direction) return;
+    const command = commandForKey(normalized);
+    if (!command) return;
     if (this.pressed.has(normalized)) return;
 
     this.pressed.add(normalized);
-    this.onDirection?.(direction);
+    this.onCommand?.(command);
   }
 
   handleKeyUp(key: string): void {
@@ -54,14 +54,14 @@ export class KeyboardInput {
   attach(target: Window = window): () => void {
     const onKeyDown = (event: KeyboardEvent) => {
       const normalized = normalizeKey(event.key);
-      if (directionForKey(normalized)) {
+      if (commandForKey(normalized)) {
         event.preventDefault();
         this.handleKeyDown(normalized);
       }
     };
     const onKeyUp = (event: KeyboardEvent) => {
       const normalized = normalizeKey(event.key);
-      if (directionForKey(normalized)) {
+      if (commandForKey(normalized)) {
         event.preventDefault();
         this.handleKeyUp(normalized);
       }

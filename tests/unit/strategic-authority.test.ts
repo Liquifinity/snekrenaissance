@@ -14,31 +14,31 @@ const EXPECTED_FROM_CENTER: Readonly<Record<GridDirection, Readonly<{ x: number;
   '-Z': { x: 4, y: 4, z: 3 }
 };
 
-type V4Run = ReturnType<typeof runStateModule.createRun> & {
+type StrategicRun = ReturnType<typeof runStateModule.createRun> & {
   heading?: GridDirection;
   pendingDirection?: GridDirection | null;
 };
 
-type QueueDirection = (state: V4Run, direction: GridDirection) => V4Run;
+type QueueDirection = (state: StrategicRun, direction: GridDirection) => StrategicRun;
 
 function queueDirection(): QueueDirection | undefined {
   return (runStateModule as unknown as { queueDirection?: QueueDirection }).queueDirection;
 }
 
-function playingRun(): V4Run {
-  return runStateModule.startRun(runStateModule.createRun(stableRng)) as V4Run;
+function playingRun(): StrategicRun {
+  return runStateModule.startRun(runStateModule.createRun(stableRng)) as StrategicRun;
 }
 
-function isolateHead(run: V4Run): void {
+function isolateHead(run: StrategicRun): void {
   run.snake.segments = [{ id: 0, cell: { x: 4, y: 4, z: 4 } }];
   run.snake.pendingGrowth = 0;
   run.snake.nextSegmentId = 1;
   run.food = { x: 0, y: 0, z: 0 };
 }
 
-describe('SNEK CORE V4 board-space strategic authority', () => {
+describe('absolute board-space strategic authority', () => {
   it('starts with +Z heading and no pending world direction', () => {
-    const run = runStateModule.createRun(stableRng) as V4Run;
+    const run = runStateModule.createRun(stableRng) as StrategicRun;
     expect(run.heading).toBe('+Z');
     expect(run.pendingDirection).toBeNull();
   });

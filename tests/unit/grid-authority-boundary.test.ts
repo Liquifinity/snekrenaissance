@@ -7,17 +7,24 @@ const GAME_ROOT = join(SRC_ROOT, 'game');
 const RENDER_ROOT = join(SRC_ROOT, 'render');
 const INPUT_ROOT = join(SRC_ROOT, 'input');
 const WORLD_TO_CELL_DEFINITION = 'game/grid-topology.ts';
-const ACTIVE_V4_RUNTIME_FILES = Object.freeze([
+const ACTIVE_V5_RUNTIME_FILES = Object.freeze([
   'main.ts',
   'game/run-state.ts',
   'input/keyboard.ts',
   'input/direction-pad.ts',
   'render/board-camera.ts',
+  'render/board-orbit.ts',
+  'render/view-frame.ts',
   'render/pixel-snake-presentation.ts',
   'render/snake-renderer.ts',
   'render/food-renderer.ts'
 ]);
-const FORBIDDEN_V4_AUTHORITY = /\b(GridFrame|TurnIntent|queueTurn|ChaseCameraController|JoystickInput|wrapRebase|buildPixelChaseCameraSnapshot|applyOverviewCamera)\b/;
+const CAMERA_VIEW_MODULES = Object.freeze([
+  'board-camera.ts',
+  'board-orbit.ts',
+  'view-frame.ts'
+]);
+const FORBIDDEN_LEGACY_AUTHORITY = /\b(GridFrame|TurnIntent|queueTurn|ChaseCameraController|JoystickInput|wrapRebase|buildPixelChaseCameraSnapshot|applyOverviewCamera)\b/;
 
 async function listTypeScriptFiles(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -29,7 +36,7 @@ async function listTypeScriptFiles(directory: string): Promise<string[]> {
   return nested.flat();
 }
 
-describe('SNEK CORE V4 authority boundary', () => {
+describe('SNEK CORE V5 authority boundary', () => {
   it('keeps worldToCell out of production consumers', async () => {
     const violations: string[] = [];
     for (const file of await listTypeScriptFiles(SRC_ROOT)) {
@@ -41,11 +48,11 @@ describe('SNEK CORE V4 authority boundary', () => {
     expect(violations).toEqual([]);
   });
 
-  it('keeps active V4 runtime free of local-frame, joystick and chase authority', async () => {
+  it('keeps active V5 runtime free of local-frame, joystick and chase authority', async () => {
     const violations: string[] = [];
-    for (const repoRelative of ACTIVE_V4_RUNTIME_FILES) {
+    for (const repoRelative of ACTIVE_V5_RUNTIME_FILES) {
       const source = await readFile(join(SRC_ROOT, repoRelative), 'utf8');
-      if (FORBIDDEN_V4_AUTHORITY.test(source)) violations.push(repoRelative);
+      if (FORBIDDEN_LEGACY_AUTHORITY.test(source)) violations.push(repoRelative);
     }
     expect(violations).toEqual([]);
   });
@@ -56,9 +63,29 @@ describe('SNEK CORE V4 authority boundary', () => {
     expect(source).toMatch(/pendingDirection/);
     expect(source).toMatch(/queueDirection/);
     expect(source).toMatch(/advanceGridStep/);
-    expect(source).not.toMatch(/\b(GridFrame|TurnIntent|queueTurn|advanceGridMovement|INITIAL_GRID_FRAME)\b/);
+    expect(source).not.toMatch(/\b(GridFrame|TurnIntent|queueTurn|advanceGridMovement|INITIAL_GRID_FRAME|ViewFrame|cameraBasis|camera)\b/);
     expect(source).not.toMatch(/from ['"]three['"]/);
     expect(source).not.toMatch(/render\//);
+  });
+
+  it('keeps every camera/view module independent from RunState', async () => {
+    const violations: string[] = [];
+    for (const file of CAMERA_VIEW_MODULES) {
+      const source = await readFile(join(RENDER_ROOT, file), 'utf8');
+      if (/run-state/.test(source) || /\bRunState\b/.test(source)) violations.push(file);
+    }
+    expect(violations).toEqual([]);
+  });
+
+  it('keeps all strategic game modules independent from render/orbit modules', async () => {
+    const violations: string[] = [];
+    for (const file of await listTypeScriptFiles(GAME_ROOT)) {
+      const source = await readFile(file, 'utf8');
+      if (/['"]\.\.\/render\//.test(source) || /board-orbit|view-frame|board-camera/.test(source)) {
+        violations.push(relative(GAME_ROOT, file).replaceAll('\\', '/'));
+      }
+    }
+    expect(violations).toEqual([]);
   });
 
   it('removes obsolete local-frame authority modules from production', async () => {
@@ -81,10 +108,20 @@ describe('SNEK CORE V4 authority boundary', () => {
     expect(source).not.toMatch(/\b(GridFrame|run\.frame|quaternionForGridFrame)\b/);
   });
 
-  it('keeps one board camera route in the browser runtime', async () => {
+  it('keeps one orbit-board camera route in the browser runtime', async () => {
     const source = await readFile(join(SRC_ROOT, 'main.ts'), 'utf8');
     expect(source).toMatch(/BoardCameraController/);
-    expect(source).toContain("app.dataset.cameraMode = 'board'");
-    expect(source).not.toMatch(/\b(ChaseCameraController|applyOverviewCamera|toggleCamera|JoystickInput)\b/);
+    expect(source).toMatch(/attachBoardOrbit/);
+    expect(source).toContain("app.dataset.cameraMode = 'orbit-board'");
+    expect(source).not.toMatch(/\b(ChaseCameraController|applyOverviewCamera|toggleCamera|JoystickInput|wrapRebase)\b/);
+  });
+
+  it('uses DOM telemetry only as write-only diagnostics, never as gameplay input', async () => {
+    const source = await readFile(join(SRC_ROOT, 'main.ts'), 'utf8');
+    expect(source).toMatch(/app\.dataset\.viewUp\s*=/);
+    expect(source).toMatch(/app\.dataset\.viewRight\s*=/);
+    expect(source).toMatch(/app\.dataset\.viewInto\s*=/);
+    expect(source).not.toMatch(/=\s*app\.dataset\./);
+    expect(source).not.toMatch(/getAttribute\(['"]data-(?:view|head|pending|camera)/);
   });
 });

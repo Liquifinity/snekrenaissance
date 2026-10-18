@@ -9,7 +9,7 @@ import { SNAKE_VOXEL_SIZE } from '../../src/render/snake-renderer';
 
 const stableRng = () => 0.75;
 
-describe('SNEK CORE V4 one-lattice presentation contract', () => {
+describe('one-lattice presentation contract', () => {
   it('maps an equal head/food GridCell to an identical world center', () => {
     const run = createRun(stableRng);
     const cell = snakeHead(run.snake).cell;

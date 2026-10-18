@@ -4,7 +4,6 @@ import { createSessionGateway } from './app/gateway-selection';
 import { RuntimeLifecycle } from './app/runtime-lifecycle';
 import { GRID_CONFIG } from './game/grid-config';
 import { cellToWorld } from './game/grid-topology';
-import type { GridDirection } from './game/grid-types';
 import {
   queueDirection,
   stepRun,
@@ -15,10 +14,18 @@ import { FixedStepClock } from './game/simulation';
 import { createDirectionPad } from './input/direction-pad';
 import { KeyboardInput } from './input/keyboard';
 import { BoardCameraController } from './render/board-camera';
+import { attachBoardOrbit } from './render/board-orbit';
 import { FoodRenderer } from './render/food-renderer';
 import { buildPixelSnakeRenderSnapshot } from './render/pixel-snake-presentation';
 import { createScene } from './render/scene';
 import { SnakeRenderer } from './render/snake-renderer';
+import {
+  INITIAL_VIEW_FRAME,
+  mapViewCommand,
+  selectViewFrame,
+  type ViewCommand,
+  type ViewFrame
+} from './render/view-frame';
 
 const appCandidate = document.querySelector<HTMLElement>('#app');
 const canvasCandidate = document.querySelector<HTMLCanvasElement>('#game-canvas');
@@ -36,72 +43,48 @@ const sessionGateway = createSessionGateway(import.meta.env.VITE_RANKING_API_BAS
 const controller = new AppController({ root: app, gateway: sessionGateway });
 const fixedClock = new FixedStepClock(1 / GRID_CONFIG.stepsPerSecond);
 
-type TouchPoint = Readonly<{ x: number; y: number }>;
 const CAMERA_WHEEL_SENSITIVITY = 0.001;
-const cameraTouchPoints = new Map<number, TouchPoint>();
-let pinchStartDistance: number | null = null;
-let pinchStartZoomFactor = boardCamera.zoomFactor;
-app.dataset.cameraMode = 'board';
+let currentViewFrame: ViewFrame = INITIAL_VIEW_FRAME;
+let detachBoardOrbit: () => void = () => {};
+app.dataset.cameraMode = 'orbit-board';
 app.dataset.cameraZoomFactor = boardCamera.zoomFactor.toFixed(4);
 
-function submitDirection(direction: GridDirection): void {
-  const run = controller.currentRun;
-  if (run && run.phase === 'playing') queueDirection(run, direction);
+function exposeViewFrame(): void {
+  app.dataset.viewUp = currentViewFrame.up;
+  app.dataset.viewRight = currentViewFrame.right;
+  app.dataset.viewInto = currentViewFrame.intoScreen;
 }
 
-function setCameraZoomFactor(factor: number): void {
-  boardCamera.setZoomFactor(factor);
+function applyBoardCamera(): void {
+  const pose = boardCamera.apply(scene.camera.aspect);
+  currentViewFrame = selectViewFrame(pose.basis, currentViewFrame);
   app.dataset.cameraZoomFactor = boardCamera.zoomFactor.toFixed(4);
-  boardCamera.apply(scene.camera.aspect);
+  exposeViewFrame();
 }
 
-function touchDistance(): number | null {
-  if (cameraTouchPoints.size !== 2) return null;
-  const [first, second] = [...cameraTouchPoints.values()];
-  if (!first || !second) return null;
-  const distance = Math.hypot(second.x - first.x, second.y - first.y);
-  return Number.isFinite(distance) && distance > 0 ? distance : null;
+function submitViewCommand(command: ViewCommand): void {
+  const run = controller.currentRun;
+  if (!run || run.phase !== 'playing') return;
+  const direction = mapViewCommand(currentViewFrame, command);
+  queueDirection(run, direction);
+  exposeLogicalTelemetry(run);
 }
 
-function restartPinchBaseline(): void {
-  pinchStartDistance = touchDistance();
-  pinchStartZoomFactor = boardCamera.zoomFactor;
+function resetBoardOrbitInteraction(): void {
+  detachBoardOrbit();
+  detachBoardOrbit = attachBoardOrbit(canvas, boardCamera, applyBoardCamera);
 }
 
 function handleCameraWheel(event: WheelEvent): void {
   if (controller.screen !== 'game') return;
   event.preventDefault();
   const multiplier = Math.exp(event.deltaY * CAMERA_WHEEL_SENSITIVITY);
-  setCameraZoomFactor(boardCamera.zoomFactor * multiplier);
+  boardCamera.setZoomFactor(boardCamera.zoomFactor * multiplier);
+  applyBoardCamera();
 }
 
-function handleCameraPointerDown(event: PointerEvent): void {
-  if (controller.screen !== 'game' || event.pointerType !== 'touch') return;
-  cameraTouchPoints.set(event.pointerId, { x: event.clientX, y: event.clientY });
-  if (cameraTouchPoints.size === 2) restartPinchBaseline();
-  else if (cameraTouchPoints.size > 2) pinchStartDistance = null;
-  if (cameraTouchPoints.size >= 2) event.preventDefault();
-}
-
-function handleCameraPointerMove(event: PointerEvent): void {
-  if (!cameraTouchPoints.has(event.pointerId)) return;
-  cameraTouchPoints.set(event.pointerId, { x: event.clientX, y: event.clientY });
-  if (cameraTouchPoints.size !== 2 || pinchStartDistance === null) return;
-
-  const distance = touchDistance();
-  if (distance === null) return;
-  setCameraZoomFactor(pinchStartZoomFactor * (distance / pinchStartDistance));
-  event.preventDefault();
-}
-
-function handleCameraPointerEnd(event: PointerEvent): void {
-  if (!cameraTouchPoints.delete(event.pointerId)) return;
-  if (cameraTouchPoints.size === 2) restartPinchBaseline();
-  else pinchStartDistance = null;
-}
-
-const keyboard = new KeyboardInput({ onDirection: submitDirection });
-const directionPad = createDirectionPad(submitDirection);
+const keyboard = new KeyboardInput({ onCommand: submitViewCommand });
+const directionPad = createDirectionPad(submitViewCommand);
 app.append(directionPad);
 
 const runtimeError = document.createElement('div');
@@ -112,11 +95,12 @@ app.append(runtimeError);
 
 const detachKeyboard = keyboard.attach(window);
 controller.mount();
+resetBoardOrbitInteraction();
 
 function resize(): void {
   const rect = canvas.getBoundingClientRect();
   scene.resize(rect.width, rect.height);
-  boardCamera.apply(scene.camera.aspect);
+  applyBoardCamera();
 }
 
 function showRuntimeError(message: string): void {
@@ -127,10 +111,7 @@ function showRuntimeError(message: string): void {
 
 const lifecycle = new RuntimeLifecycle(fixedClock, {
   resize,
-  resetTouch: () => {
-    cameraTouchPoints.clear();
-    pinchStartDistance = null;
-  },
+  resetTouch: resetBoardOrbitInteraction,
   showError: showRuntimeError
 });
 
@@ -163,7 +144,7 @@ function exposeLogicalTelemetry(run: RunState): void {
 
 function initializeRun(run: RunState): void {
   fixedClock.reset();
-  boardCamera.apply(scene.camera.aspect);
+  applyBoardCamera();
   exposeLogicalTelemetry(run);
 }
 
@@ -208,6 +189,7 @@ if (e2eMode) {
       consumeFrame: (frameDeltaSeconds: number) => number;
       setFoodCell: (cell: TestFoodCell) => void;
       getCameraPosition: () => Readonly<{ x: number; y: number; z: number }>;
+      getViewFrame: () => ViewFrame;
       forceGameOver: (result: RunResult) => void;
     };
   };
@@ -253,6 +235,7 @@ if (e2eMode) {
       y: scene.camera.position.y,
       z: scene.camera.position.z
     }),
+    getViewFrame: () => ({ ...currentViewFrame }),
     forceGameOver: (result) => {
       const run = controller.currentRun;
       if (!run) throw new Error('No active run to finish.');
@@ -313,10 +296,6 @@ function handleOrientationChange(): void {
 }
 
 canvas.addEventListener('wheel', handleCameraWheel, { passive: false });
-canvas.addEventListener('pointerdown', handleCameraPointerDown);
-canvas.addEventListener('pointermove', handleCameraPointerMove);
-canvas.addEventListener('pointerup', handleCameraPointerEnd);
-canvas.addEventListener('pointercancel', handleCameraPointerEnd);
 canvas.addEventListener('webglcontextlost', (event) => {
   event.preventDefault();
   rendererFailed = true;
@@ -333,12 +312,9 @@ frameId = requestAnimationFrame(frame);
 window.addEventListener('pagehide', () => {
   cancelAnimationFrame(frameId);
   detachKeyboard();
+  detachBoardOrbit();
   directionPad.remove();
   canvas.removeEventListener('wheel', handleCameraWheel);
-  canvas.removeEventListener('pointerdown', handleCameraPointerDown);
-  canvas.removeEventListener('pointermove', handleCameraPointerMove);
-  canvas.removeEventListener('pointerup', handleCameraPointerEnd);
-  canvas.removeEventListener('pointercancel', handleCameraPointerEnd);
   document.removeEventListener('visibilitychange', handleVisibilityChange);
   window.removeEventListener('resize', handleResize);
   window.removeEventListener('orientationchange', handleOrientationChange);
