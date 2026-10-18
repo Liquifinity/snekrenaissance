@@ -4,19 +4,18 @@ import { createSessionGateway } from './app/gateway-selection';
 import { RuntimeLifecycle } from './app/runtime-lifecycle';
 import { GRID_CONFIG } from './game/grid-config';
 import { cellToWorld } from './game/grid-topology';
+import type { GridDirection } from './game/grid-types';
 import {
-  queueTurn,
+  queueDirection,
   stepRun,
   type RunResult,
   type RunState
 } from './game/run-state';
 import { FixedStepClock } from './game/simulation';
-import { JoystickInput } from './input/joystick';
+import { createDirectionPad } from './input/direction-pad';
 import { KeyboardInput } from './input/keyboard';
-import { ChaseCameraController } from './render/chase-camera';
+import { BoardCameraController } from './render/board-camera';
 import { FoodRenderer } from './render/food-renderer';
-import { applyOverviewCamera } from './render/overview-camera';
-import { buildPixelChaseCameraSnapshot } from './render/pixel-camera-presentation';
 import { buildPixelSnakeRenderSnapshot } from './render/pixel-snake-presentation';
 import { createScene } from './render/scene';
 import { SnakeRenderer } from './render/snake-renderer';
@@ -32,62 +31,28 @@ const canvas = canvasCandidate;
 const scene = createScene(canvas);
 const snakeRenderer = new SnakeRenderer(scene.scene);
 const foodRenderer = new FoodRenderer(scene.scene);
-const cameraController = new ChaseCameraController(scene.camera);
+const boardCamera = new BoardCameraController(scene.camera);
 const sessionGateway = createSessionGateway(import.meta.env.VITE_RANKING_API_BASE);
 const controller = new AppController({ root: app, gateway: sessionGateway });
 const fixedClock = new FixedStepClock(1 / GRID_CONFIG.stepsPerSecond);
-const joystick = new JoystickInput({
-  onTurnIntent: (intent) => {
-    const run = controller.currentRun;
-    if (run && run.phase === 'playing') queueTurn(run, intent);
-  }
-});
 
-type CameraMode = 'chase' | 'overview';
 type TouchPoint = Readonly<{ x: number; y: number }>;
 const CAMERA_WHEEL_SENSITIVITY = 0.001;
 const cameraTouchPoints = new Map<number, TouchPoint>();
 let pinchStartDistance: number | null = null;
-let pinchStartZoomFactor = cameraController.zoomFactor;
-let cameraMode: CameraMode = 'chase';
-app.dataset.cameraMode = cameraMode;
-app.dataset.cameraZoomFactor = cameraController.zoomFactor.toFixed(4);
+let pinchStartZoomFactor = boardCamera.zoomFactor;
+app.dataset.cameraMode = 'board';
+app.dataset.cameraZoomFactor = boardCamera.zoomFactor.toFixed(4);
 
-function updateChaseCamera(run: RunState, dtSeconds: number): void {
-  cameraController.update(buildPixelChaseCameraSnapshot(run), dtSeconds);
-}
-
-function applyCurrentOverviewCamera(): void {
-  applyOverviewCamera(
-    scene.camera,
-    controller.currentRun?.config,
-    cameraController.zoomFactor
-  );
+function submitDirection(direction: GridDirection): void {
+  const run = controller.currentRun;
+  if (run && run.phase === 'playing') queueDirection(run, direction);
 }
 
 function setCameraZoomFactor(factor: number): void {
-  cameraController.setZoomFactor(factor);
-  app.dataset.cameraZoomFactor = cameraController.zoomFactor.toFixed(4);
-  if (cameraMode === 'overview') applyCurrentOverviewCamera();
-}
-
-function setCameraMode(mode: CameraMode): void {
-  cameraMode = mode;
-  app.dataset.cameraMode = mode;
-  const run = controller.currentRun;
-
-  if (mode === 'overview') {
-    applyCurrentOverviewCamera();
-    return;
-  }
-
-  cameraController.reset();
-  if (run) updateChaseCamera(run, 0);
-}
-
-function toggleCamera(): void {
-  if (controller.screen !== 'game') return;
-  setCameraMode(cameraMode === 'chase' ? 'overview' : 'chase');
+  boardCamera.setZoomFactor(factor);
+  app.dataset.cameraZoomFactor = boardCamera.zoomFactor.toFixed(4);
+  boardCamera.apply(scene.camera.aspect);
 }
 
 function touchDistance(): number | null {
@@ -99,16 +64,15 @@ function touchDistance(): number | null {
 }
 
 function restartPinchBaseline(): void {
-  const distance = touchDistance();
-  pinchStartDistance = distance;
-  pinchStartZoomFactor = cameraController.zoomFactor;
+  pinchStartDistance = touchDistance();
+  pinchStartZoomFactor = boardCamera.zoomFactor;
 }
 
 function handleCameraWheel(event: WheelEvent): void {
   if (controller.screen !== 'game') return;
   event.preventDefault();
   const multiplier = Math.exp(event.deltaY * CAMERA_WHEEL_SENSITIVITY);
-  setCameraZoomFactor(cameraController.zoomFactor * multiplier);
+  setCameraZoomFactor(boardCamera.zoomFactor * multiplier);
 }
 
 function handleCameraPointerDown(event: PointerEvent): void {
@@ -136,31 +100,9 @@ function handleCameraPointerEnd(event: PointerEvent): void {
   else pinchStartDistance = null;
 }
 
-const keyboard = new KeyboardInput({
-  onTurnIntent: (intent) => {
-    const run = controller.currentRun;
-    if (run && run.phase === 'playing') queueTurn(run, intent);
-  },
-  onCameraToggle: toggleCamera
-});
-
-const joystickShell = document.createElement('div');
-joystickShell.className = 'joystick-shell';
-joystickShell.dataset.joystick = '';
-joystickShell.setAttribute('aria-label', 'Steering joystick');
-const joystickKnob = document.createElement('div');
-joystickKnob.className = 'joystick-knob';
-joystickShell.append(joystickKnob);
-app.append(joystickShell);
-
-const cameraToggle = document.createElement('button');
-cameraToggle.type = 'button';
-cameraToggle.className = 'camera-toggle';
-cameraToggle.dataset.cameraToggle = '';
-cameraToggle.textContent = 'X CAMERA';
-cameraToggle.setAttribute('aria-label', 'Change camera');
-cameraToggle.addEventListener('click', toggleCamera);
-app.append(cameraToggle);
+const keyboard = new KeyboardInput({ onDirection: submitDirection });
+const directionPad = createDirectionPad(submitDirection);
+app.append(directionPad);
 
 const runtimeError = document.createElement('div');
 runtimeError.className = 'runtime-error';
@@ -169,12 +111,12 @@ runtimeError.hidden = true;
 app.append(runtimeError);
 
 const detachKeyboard = keyboard.attach(window);
-const detachJoystick = joystick.attach(joystickShell, window);
 controller.mount();
 
 function resize(): void {
   const rect = canvas.getBoundingClientRect();
   scene.resize(rect.width, rect.height);
+  boardCamera.apply(scene.camera.aspect);
 }
 
 function showRuntimeError(message: string): void {
@@ -186,20 +128,16 @@ function showRuntimeError(message: string): void {
 const lifecycle = new RuntimeLifecycle(fixedClock, {
   resize,
   resetTouch: () => {
-    joystick.reset();
     cameraTouchPoints.clear();
     pinchStartDistance = null;
   },
   showError: showRuntimeError
 });
 
-function updateJoystickVisual(): void {
-  const vector = joystick.visualVector;
-  joystickKnob.style.transform = `translate(${vector.x * 28}px, ${-vector.y * 28}px)`;
-  app.dataset.joystickSector = joystick.sector;
-}
-
-function exposeFoodPickupTelemetry(run: RunState, food: Readonly<{ x: number; y: number; z: number }>): void {
+function exposeFoodPickupTelemetry(
+  run: RunState,
+  food: Readonly<{ x: number; y: number; z: number }>
+): void {
   const head = run.snake.segments[0];
   if (!head) return;
   const foodWorld = cellToWorld(food, run.config);
@@ -214,17 +152,18 @@ function exposeLogicalTelemetry(run: RunState): void {
   const head = run.snake.segments[0];
   if (!head) return;
   app.dataset.headCell = `${head.cell.x},${head.cell.y},${head.cell.z}`;
-  app.dataset.headDirection = run.frame.forward;
-  app.dataset.headUp = run.frame.up;
-  app.dataset.pendingTurn = run.pendingTurn;
+  app.dataset.headDirection = run.heading;
+  app.dataset.pendingDirection = run.pendingDirection ?? 'none';
+  delete app.dataset.headUp;
+  delete app.dataset.pendingTurn;
+  delete app.dataset.joystickSector;
   const headWorld = cellToWorld(head.cell, run.config);
   app.dataset.headRenderWorld = `${headWorld.x},${headWorld.y},${headWorld.z}`;
 }
 
 function initializeRun(run: RunState): void {
   fixedClock.reset();
-  cameraController.reset();
-  setCameraMode('chase');
+  boardCamera.apply(scene.camera.aspect);
   exposeLogicalTelemetry(run);
 }
 
@@ -326,8 +265,6 @@ if (e2eMode) {
 }
 
 function frame(timestamp: number): void {
-  updateJoystickVisual();
-
   const run = controller.currentRun;
   if (run !== activeRun) {
     activeRun = run;
@@ -348,10 +285,6 @@ function frame(timestamp: number): void {
     exposeLogicalTelemetry(run);
     snakeRenderer.render(buildPixelSnakeRenderSnapshot(run));
     foodRenderer.render(run.food ? cellToWorld(run.food, run.config) : null);
-
-    if (cameraMode === 'chase') {
-      updateChaseCamera(run, frameDeltaSeconds);
-    }
   }
 
   if (!rendererFailed) {
@@ -373,12 +306,10 @@ function handleVisibilityChange(): void {
 
 function handleResize(): void {
   lifecycle.handleResize();
-  if (cameraMode === 'overview') applyCurrentOverviewCamera();
 }
 
 function handleOrientationChange(): void {
   lifecycle.handleOrientationChange();
-  if (cameraMode === 'overview') applyCurrentOverviewCamera();
 }
 
 canvas.addEventListener('wheel', handleCameraWheel, { passive: false });
@@ -402,8 +333,7 @@ frameId = requestAnimationFrame(frame);
 window.addEventListener('pagehide', () => {
   cancelAnimationFrame(frameId);
   detachKeyboard();
-  detachJoystick();
-  cameraToggle.removeEventListener('click', toggleCamera);
+  directionPad.remove();
   canvas.removeEventListener('wheel', handleCameraWheel);
   canvas.removeEventListener('pointerdown', handleCameraPointerDown);
   canvas.removeEventListener('pointermove', handleCameraPointerMove);
