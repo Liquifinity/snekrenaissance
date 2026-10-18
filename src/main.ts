@@ -15,10 +15,6 @@ import { JoystickInput } from './input/joystick';
 import { KeyboardInput } from './input/keyboard';
 import { ChaseCameraController } from './render/chase-camera';
 import { FoodRenderer } from './render/food-renderer';
-import {
-  interpolateFlightPresentation,
-  type FlightPresentation
-} from './render/flight-presentation';
 import { applyOverviewCamera } from './render/overview-camera';
 import { buildPixelChaseCameraSnapshot } from './render/pixel-camera-presentation';
 import { buildPixelSnakeRenderSnapshot } from './render/pixel-snake-presentation';
@@ -51,22 +47,8 @@ type CameraMode = 'chase' | 'overview';
 let cameraMode: CameraMode = 'chase';
 app.dataset.cameraMode = cameraMode;
 
-function buildPresentation(run: RunState): FlightPresentation {
-  return interpolateFlightPresentation(
-    run.previousFlight,
-    run.flight,
-    fixedClock.alpha,
-    run.config
-  );
-}
-
-function updateChaseCamera(
-  run: RunState,
-  presentation: FlightPresentation,
-  dtSeconds: number
-): void {
-  const snapshot = buildPixelChaseCameraSnapshot(run, presentation);
-  cameraController.update(snapshot, dtSeconds);
+function updateChaseCamera(run: RunState, dtSeconds: number): void {
+  cameraController.update(buildPixelChaseCameraSnapshot(run), dtSeconds);
 }
 
 function setCameraMode(mode: CameraMode): void {
@@ -80,7 +62,7 @@ function setCameraMode(mode: CameraMode): void {
   }
 
   cameraController.reset();
-  if (run) updateChaseCamera(run, buildPresentation(run), 0);
+  if (run) updateChaseCamera(run, 0);
 }
 
 function toggleCamera(): void {
@@ -205,11 +187,9 @@ function exposeLogicalTelemetry(run: RunState): void {
   const head = run.snake.segments[0];
   if (!head) return;
   app.dataset.headCell = `${head.cell.x},${head.cell.y},${head.cell.z}`;
-  app.dataset.headYaw = String(run.flight.orientation.yaw);
-  app.dataset.headPitch = String(run.flight.orientation.pitch);
-  const point = run.flight.wrappedPosition;
-  app.dataset.headPoint = `${point.x},${point.y},${point.z}`;
-  app.dataset.headDirection = run.visibleDirection;
+  app.dataset.headDirection = run.frame.forward;
+  app.dataset.headUp = run.frame.up;
+  app.dataset.pendingTurn = run.pendingTurn;
   const headWorld = cellToWorld(head.cell, run.config);
   app.dataset.headRenderWorld = `${headWorld.x},${headWorld.y},${headWorld.z}`;
 }
@@ -218,7 +198,6 @@ function initializeRun(run: RunState): void {
   fixedClock.reset();
   cameraController.reset();
   setCameraMode('chase');
-  updateChaseCamera(run, buildPresentation(run), 0);
   exposeLogicalTelemetry(run);
 }
 
@@ -266,12 +245,11 @@ function frame(timestamp: number): void {
 
   if (run) {
     exposeLogicalTelemetry(run);
-    const presentation = buildPresentation(run);
     snakeRenderer.render(buildPixelSnakeRenderSnapshot(run));
     foodRenderer.render(run.food ? cellToWorld(run.food, run.config) : null);
 
     if (cameraMode === 'chase') {
-      updateChaseCamera(run, presentation, frameDeltaSeconds);
+      updateChaseCamera(run, frameDeltaSeconds);
     }
   }
 
