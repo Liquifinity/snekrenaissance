@@ -1,75 +1,51 @@
 import { describe, expect, it } from 'vitest';
+import type { GridDirection } from '../../src/game/grid-types';
 import { KeyboardInput } from '../../src/input/keyboard';
 
-describe('KeyboardInput V3 edge-triggered turn events', () => {
+describe('KeyboardInput V4 edge-triggered world directions', () => {
   it.each([
-    ['ArrowRight', 'right'],
-    ['d', 'right'],
-    ['ArrowLeft', 'left'],
-    ['a', 'left'],
-    ['ArrowUp', 'up'],
-    ['w', 'up'],
-    ['ArrowDown', 'down'],
-    ['s', 'down']
-  ] as const)('maps %s to one %s intent per press edge', (key, expected) => {
-    const intents: string[] = [];
-    const input = new KeyboardInput({ onTurnIntent: (intent) => intents.push(intent) });
+    ['ArrowUp', '+Y'], ['w', '+Y'],
+    ['ArrowDown', '-Y'], ['s', '-Y'],
+    ['ArrowLeft', '-X'], ['a', '-X'],
+    ['ArrowRight', '+X'], ['d', '+X'],
+    ['q', '+Z'], ['e', '-Z']
+  ] as const)('maps %s to one %s direction per press edge', (key, expected) => {
+    const directions: GridDirection[] = [];
+    const input = new KeyboardInput({ onDirection: (direction: GridDirection) => directions.push(direction) });
 
     input.handleKeyDown(key);
     input.handleKeyDown(key);
     input.handleKeyDown(key);
-    expect(intents).toEqual([expected]);
+    expect(directions).toEqual([expected]);
 
     input.handleKeyUp(key);
     input.handleKeyDown(key);
-    expect(intents).toEqual([expected, expected]);
+    expect(directions).toEqual([expected, expected]);
   });
 
-  it('allows a newer different key to emit before earlier keys are released', () => {
-    const intents: string[] = [];
-    const input = new KeyboardInput({ onTurnIntent: (intent) => intents.push(intent) });
-
+  it('allows a newer different world direction before earlier keys are released', () => {
+    const directions: GridDirection[] = [];
+    const input = new KeyboardInput({ onDirection: (direction) => directions.push(direction) });
     input.handleKeyDown('d');
     input.handleKeyDown('w');
-    input.handleKeyDown('a');
-
-    expect(intents).toEqual(['right', 'up', 'left']);
+    input.handleKeyDown('q');
+    expect(directions).toEqual(['+X', '+Y', '+Z']);
   });
 
   it('blur clears pressed edges so the same physical key can emit again', () => {
-    const intents: string[] = [];
-    const input = new KeyboardInput({ onTurnIntent: (intent) => intents.push(intent) });
-
+    const directions: GridDirection[] = [];
+    const input = new KeyboardInput({ onDirection: (direction) => directions.push(direction) });
     input.handleKeyDown('d');
     input.handleBlur();
     input.handleKeyDown('d');
-
-    expect(intents).toEqual(['right', 'right']);
+    expect(directions).toEqual(['+X', '+X']);
   });
 
-  it('toggles camera once per X press without emitting a turn', () => {
-    let toggles = 0;
-    const intents: string[] = [];
-    const input = new KeyboardInput({
-      onTurnIntent: (intent) => intents.push(intent),
-      onCameraToggle: () => { toggles += 1; }
-    });
-
+  it('ignores X and unrelated keys instead of toggling camera', () => {
+    const directions: GridDirection[] = [];
+    const input = new KeyboardInput({ onDirection: (direction) => directions.push(direction) });
     input.handleKeyDown('x');
-    input.handleKeyDown('x');
-    expect(toggles).toBe(1);
-    expect(intents).toEqual([]);
-
-    input.handleKeyUp('x');
-    input.handleKeyDown('x');
-    expect(toggles).toBe(2);
-    expect(intents).toEqual([]);
-  });
-
-  it('ignores unrelated keys', () => {
-    const intents: string[] = [];
-    const input = new KeyboardInput({ onTurnIntent: (intent) => intents.push(intent) });
-    input.handleKeyDown('q');
-    expect(intents).toEqual([]);
+    input.handleKeyDown('r');
+    expect(directions).toEqual([]);
   });
 });

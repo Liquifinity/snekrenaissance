@@ -5,9 +5,9 @@ import {
   createGridConfig
 } from '../../src/game/grid-config';
 
-describe('SNEK CORE V3 config', () => {
+describe('SNEK CORE V4 config', () => {
   it('derives the approved baseline configuration', () => {
-    expect(RULESET_ID).toBe('snek-core-v3');
+    expect(RULESET_ID).toBe('snek-core-v4');
     expect(GRID_CONFIG.resolution).toBe(9);
     expect(GRID_CONFIG.cellSize).toBe(0.4);
     expect(GRID_CONFIG.worldSize).toBeCloseTo(3.6, 10);
@@ -25,7 +25,6 @@ describe('SNEK CORE V3 config', () => {
       initialLength: 7,
       growthPerFood: 3
     });
-
     expect(config.worldSize).toBe(2.5);
     expect(config.totalCells).toBe(1000);
   });
