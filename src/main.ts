@@ -2,6 +2,7 @@ import './styles.css';
 import { AppController } from './app/app-controller';
 import { createSessionGateway } from './app/gateway-selection';
 import { RuntimeLifecycle } from './app/runtime-lifecycle';
+import { GRID_CONFIG } from './game/grid-config';
 import { cellToWorld } from './game/grid-topology';
 import {
   queueTurn,
@@ -10,7 +11,6 @@ import {
   type RunState
 } from './game/run-state';
 import { FixedStepClock } from './game/simulation';
-import type { InputState } from './input/input-state';
 import { JoystickInput } from './input/joystick';
 import { KeyboardInput } from './input/keyboard';
 import { ChaseCameraController } from './render/chase-camera';
@@ -39,7 +39,7 @@ const foodRenderer = new FoodRenderer(scene.scene);
 const cameraController = new ChaseCameraController(scene.camera);
 const sessionGateway = createSessionGateway(import.meta.env.VITE_RANKING_API_BASE);
 const controller = new AppController({ root: app, gateway: sessionGateway });
-const fixedClock = new FixedStepClock();
+const fixedClock = new FixedStepClock(1 / GRID_CONFIG.stepsPerSecond);
 const joystick = new JoystickInput();
 
 type CameraMode = 'chase' | 'overview';
@@ -180,16 +180,6 @@ const lifecycle = new RuntimeLifecycle(fixedClock, {
   showError: showRuntimeError
 });
 
-function readSteeringInput(): InputState {
-  return joystick.state;
-}
-
-function exposeSteeringInput(input: InputState): void {
-  app.dataset.inputYaw = String(input.yaw);
-  app.dataset.inputPitch = String(input.pitch);
-  joystickKnob.style.transform = `translate(${input.yaw * 28}px, ${-input.pitch * 28}px)`;
-}
-
 function exposeFoodPickupTelemetry(run: RunState, food: Readonly<{ x: number; y: number; z: number }>): void {
   const head = run.snake.segments[0];
   if (!head) return;
@@ -228,9 +218,6 @@ let frameId = 0;
 let rendererFailed = false;
 
 function frame(timestamp: number): void {
-  const steering = readSteeringInput();
-  exposeSteeringInput(steering);
-
   const run = controller.currentRun;
   if (run !== activeRun) {
     activeRun = run;
