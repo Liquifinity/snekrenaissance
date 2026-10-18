@@ -13,7 +13,7 @@ import { snakeHead } from '../../src/game/snake';
 const stableRng = () => 0.75;
 const neutral = { yaw: 0, pitch: 0 } as const;
 
-describe('Pixel Flight Grid V2.1 RunState', () => {
+describe('Pixel Flight Grid V2.2 RunState', () => {
   it('initializes flight at the strategic head center with +Z visible direction and no discrete movement authority', () => {
     const run = createRun(stableRng);
     expect(run.phase).toBe('ready');
@@ -110,7 +110,7 @@ describe('Pixel Flight Grid V2.1 RunState', () => {
     expect(run.snake.segments).toEqual(before);
     expect(run.visibleDirection).toBe('+Z');
     expect(run.result).toMatchObject({
-      rulesetId: 'pixel-flight-grid-v2-1',
+      rulesetId: 'pixel-flight-grid-v2-2',
       score: 0,
       foodsCollected: 0,
       length: 6,
@@ -142,7 +142,7 @@ describe('Pixel Flight Grid V2.1 RunState', () => {
     expect(run.snake.segments.some((segment) => segment.cell.z === 7 && segment.cell.x === 4)).toBe(false);
   });
 
-  it('preserves the 300-food completion contract with the V2.1 ruleset', () => {
+  it('preserves the 300-food completion contract with the V2.2 ruleset', () => {
     const run = startRun(createRun(stableRng));
     run.foodsCollected = COMPLETION_FOOD_TARGET - 1;
     run.score = COMPLETION_FOOD_TARGET - 1;
@@ -152,7 +152,7 @@ describe('Pixel Flight Grid V2.1 RunState', () => {
     expect(run.phase).toBe('completed');
     expect(run.score).toBe(COMPLETION_FOOD_TARGET);
     expect(run.result).toMatchObject({
-      rulesetId: 'pixel-flight-grid-v2-1',
+      rulesetId: 'pixel-flight-grid-v2-2',
       score: COMPLETION_FOOD_TARGET,
       foodsCollected: COMPLETION_FOOD_TARGET
     });
