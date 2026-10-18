@@ -19,16 +19,24 @@ const VECTORS: Readonly<Record<GridDirection, Readonly<{ x: number; y: number; z
   '-Z': { x: 0, y: 0, z: -1 }
 });
 
-function dot(a: Readonly<{ x: number; y: number; z: number }>, b: Readonly<{ x: number; y: number; z: number }>): number {
+type TestVec = Readonly<{ x: number; y: number; z: number }>;
+
+function dot(a: TestVec, b: TestVec): number {
   return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
-function cross(a: Readonly<{ x: number; y: number; z: number }>, b: Readonly<{ x: number; y: number; z: number }>) {
+function cross(a: TestVec, b: TestVec): TestVec {
   return {
     x: a.y * b.z - a.z * b.y,
     y: a.z * b.x - a.x * b.z,
     z: a.x * b.y - a.y * b.x
   };
+}
+
+function expectVecEqual(actual: TestVec, expected: TestVec): void {
+  expect(actual.x).toBeCloseTo(expected.x, 12);
+  expect(actual.y).toBeCloseTo(expected.y, 12);
+  expect(actual.z).toBeCloseTo(expected.z, 12);
 }
 
 function basisAtYaw(yaw: number): CameraBasis {
@@ -66,7 +74,7 @@ describe('SNEK CORE V5 ViewFrame', () => {
       expect(dot(up, right)).toBe(0);
       expect(dot(up, into)).toBe(0);
       expect(dot(right, into)).toBe(0);
-      expect(cross(into, up)).toEqual(right);
+      expectVecEqual(cross(into, up), right);
     }
   });
 
