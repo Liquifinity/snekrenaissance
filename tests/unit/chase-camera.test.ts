@@ -56,21 +56,24 @@ describe('SNEK CORE V3 chase camera', () => {
     expect(finitePose(pose)).toBe(true);
   });
 
-  it('preserves full vertical-frame up instead of assuming world +Y', () => {
-    const plusZUp = new ChaseCameraController().update(snapshot(
-      { x: 0, y: 1, z: 0 },
-      { x: 0, y: 0, z: 1 }
+  it('keeps the same world-space camera offsets when the snake frame rotates', () => {
+    const baseline = new ChaseCameraController().update(snapshot(
+      { x: 0, y: 0, z: 1 },
+      { x: 0, y: 1, z: 0 }
     ), 0);
-    const minusZUp = new ChaseCameraController().update(snapshot(
+    const vertical = new ChaseCameraController().update(snapshot(
       { x: 0, y: 1, z: 0 },
       { x: 0, y: 0, z: -1 }
     ), 0);
+    const sideways = new ChaseCameraController().update(snapshot(
+      { x: 1, y: 0, z: 0 },
+      { x: 0, y: 1, z: 0 }
+    ), 0);
 
-    expect(plusZUp.position.y).toBeCloseTo(-CAMERA_DISTANCE_CELLS * GRID_CONFIG.cellSize, 8);
-    expect(plusZUp.position.z).toBeGreaterThan(0);
-    expect(minusZUp.position.z).toBeLessThan(0);
-    expect(plusZUp.target.y).toBeGreaterThan(0);
-    expect(minusZUp.target.y).toBeGreaterThan(0);
+    expect(vertical.position).toEqual(baseline.position);
+    expect(vertical.target).toEqual(baseline.target);
+    expect(sideways.position).toEqual(baseline.position);
+    expect(sideways.target).toEqual(baseline.target);
   });
 
   it('smoothly converges toward an ordinary adjacent snapped head without overshooting', () => {
