@@ -12,3 +12,5 @@ Pre-flight: Tasks 8–9 consume dependency/reference audit results; Worker/ranki
 
 Task 1 RED: `31e6443` — CI run 39174003851; 292 existing tests passed, `tests/unit/pwa-config.test.ts` failed exactly because `../../pwa.config` does not exist.
 Task 1: Ruling: no local npm execution is available, so generate the exact npm lockfile in an ephemeral GitHub Actions job and consume its artifact before production config is committed — preserves `npm install --save-dev --save-exact vite-plugin-pwa@2.0.0` semantics — cost if wrong: lockfile drift; mitigated by subsequent `npm ci` CI gate.
+Task 1 debug: CI run 39174231100 proved runtime tests green but typecheck failed because `PWA_OPTIONS.manifest` is typed `false | Partial<ManifestOptions>`; production config was valid. Fixed only test narrowing by requiring an enabled manifest before reading `icons`.
+Task 1 GREEN: `52b1f6ae41b18aa3b05c8c3a59ee1ddc1aaa1a52` — CI run 39174358862 completed success: npm ci, production audit, 293 frontend tests, 28 worker tests, typecheck, Worker config/dry-run, Worker build, PWA-enabled frontend build, Chromium install and full E2E all passed.
