@@ -11,12 +11,13 @@ export const OVERVIEW_CAMERA_POSITION = {
 
 export function applyOverviewCamera(
   camera: PerspectiveCamera,
-  config: GridConfig = GRID_CONFIG
+  config: GridConfig = GRID_CONFIG,
+  zoomFactor = 1
 ): void {
   camera.position.set(
     0,
     0,
-    -config.worldSize * OVERVIEW_CAMERA_DISTANCE_MULTIPLIER
+    -config.worldSize * OVERVIEW_CAMERA_DISTANCE_MULTIPLIER * zoomFactor
   );
   camera.lookAt(0, 0, 0);
 }
