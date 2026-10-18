@@ -7,7 +7,9 @@ import {
   type SteeringInput
 } from './flight';
 import { GRID_CONFIG, RULESET_ID, type GridConfig } from './grid-config';
+import { quantizeForwardToGridDirection } from './grid-direction';
 import { traverseGridSegment, type GridCellEntry } from './grid-traversal';
+import type { GridDirection } from './grid-types';
 import { COMPLETION_FOOD_TARGET } from './progress';
 import {
   addGrowth,
@@ -36,6 +38,7 @@ export type RunState = {
   snake: GridSnakeState;
   flight: FlightPose;
   previousFlight: FlightPose;
+  visibleDirection: GridDirection;
   food: import('./grid-types').GridCell | null;
   foodsCollected: number;
   score: number;
@@ -78,6 +81,7 @@ export function createRun(
     snake,
     flight,
     previousFlight: flight,
+    visibleDirection: '+Z',
     food: spawn.ok ? spawn.cell : null,
     foodsCollected: 0,
     score: 0,
@@ -97,6 +101,7 @@ export function startRun(state: RunState): RunState {
 export function processGridEntries(
   state: RunState,
   entries: readonly GridCellEntry[],
+  visibleDirection: GridDirection,
   rng: () => number
 ): void {
   for (const entry of entries) {
@@ -109,6 +114,7 @@ export function processGridEntries(
     }
 
     commitSnakeStep(state.snake, entry.cell);
+    state.visibleDirection = visibleDirection;
     state.maxLength = Math.max(state.maxLength, state.snake.segments.length);
 
     if (state.food && isGridFoodCollected(entry.cell, state.food)) {
@@ -156,9 +162,10 @@ export function stepRun(
     nextFlight.unwrappedPosition,
     config
   );
+  const entryDirection = quantizeForwardToGridDirection(nextFlight.forward);
 
   state.previousFlight = previousFlight;
-  processGridEntries(state, entries, rng);
+  processGridEntries(state, entries, entryDirection, rng);
 
   const resultingPhase = state.phase as RunPhase;
   if (resultingPhase !== 'game-over') {
