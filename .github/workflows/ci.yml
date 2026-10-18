@@ -28,6 +28,13 @@ jobs:
           npm run render:wrangler:production
           npx wrangler deploy --dry-run --config .wrangler.production.jsonc
       - run: npm run worker:build
-      - run: npm run build
+      - name: Verify canonical PWA build
+        run: |
+          npm run build -- --base=/snekrenaissance/
+          npm run verify:pwa -- --base=/snekrenaissance/
+      - name: Verify synthetic fork PWA build
+        run: |
+          npm run build -- --base=/snek-experiment/
+          npm run verify:pwa -- --base=/snek-experiment/
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
