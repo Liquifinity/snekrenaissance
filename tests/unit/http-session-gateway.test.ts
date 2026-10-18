@@ -23,10 +23,10 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 describe('HttpSessionGateway', () => {
-  test('explicitly reports SNEK CORE V4 as unsupported without issuing a request', () => {
+  test('explicitly reports SNEK CORE V5 as unsupported without issuing a request', () => {
     const fetchMock = vi.fn<typeof fetch>();
     const gateway = new HttpSessionGateway('/rank', fetchMock);
-    expect(RULESET_ID).toBe('snek-core-v4');
+    expect(RULESET_ID).toBe('snek-core-v5');
     expect(gateway.supportsRuleset(RULESET_ID)).toBe(false);
     expect(fetchMock).not.toHaveBeenCalled();
   });
