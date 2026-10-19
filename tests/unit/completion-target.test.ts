@@ -20,7 +20,7 @@ describe('33-food completion contract', () => {
     expect(completionProgressLabel(33)).toBe('100.0%');
   });
 
-  it('completes the run on the 33rd collected food', () => {
+  it('completes the run on the 33rd collected food without retired backend aliases', () => {
     const run = startRun(createRun(() => 0.5));
     run.snake.segments = [{ id: 0, cell: { x: 4, y: 4, z: 4 } }];
     run.snake.pendingGrowth = 0;
@@ -29,20 +29,17 @@ describe('33-food completion contract', () => {
     run.pendingDirection = null;
     run.foodsCollected = 32;
     run.score = 32;
-    run.foodEaten = 32;
     run.food = { x: 4, y: 4, z: 5 };
 
     stepRun(run, () => 0.5);
 
     expect(run.foodsCollected).toBe(33);
     expect(run.score).toBe(33);
-    expect(run.foodEaten).toBe(33);
+    expect(run).not.toHaveProperty('foodEaten');
     expect(run.phase).toBe('completed');
     expect(run.food).toBeNull();
-    expect(run.result).toMatchObject({
-      foodsCollected: 33,
-      score: 33,
-      foodEaten: 33
-    });
+    expect(run.result).toMatchObject({ foodsCollected: 33, score: 33 });
+    expect(run.result).not.toHaveProperty('foodEaten');
+    expect(run.result).not.toHaveProperty('rulesetId');
   });
 });

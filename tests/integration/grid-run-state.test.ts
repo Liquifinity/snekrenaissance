@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GRID_CONFIG, RULESET_ID } from '../../src/game/grid-config';
+import { GRID_CONFIG } from '../../src/game/grid-config';
 import { COMPLETION_FOOD_TARGET } from '../../src/game/progress';
 import { createRun, queueDirection, startRun, stepRun } from '../../src/game/run-state';
 import { snakeHead } from '../../src/game/snake';
@@ -10,7 +10,7 @@ function cells(run: ReturnType<typeof createRun>) {
   return run.snake.segments.map((segment) => ({ id: segment.id, cell: { ...segment.cell } }));
 }
 
-describe('SNEK CORE V4 RunState', () => {
+describe('current grid RunState', () => {
   it('initializes only board-space strategic grid authority', () => {
     const run = createRun(stableRng);
     expect(run.phase).toBe('ready');
@@ -20,6 +20,7 @@ describe('SNEK CORE V4 RunState', () => {
     expect(run.pendingDirection).toBeNull();
     expect(run).not.toHaveProperty('frame');
     expect(run).not.toHaveProperty('pendingTurn');
+    expect(run).not.toHaveProperty('foodEaten');
   });
 
   it('stores exactly one valid pending world direction and newest input wins', () => {
@@ -73,7 +74,8 @@ describe('SNEK CORE V4 RunState', () => {
     expect(run.snake.segments).toEqual(before);
     expect(run.heading).toBe('+Z');
     expect(run.pendingDirection).toBeNull();
-    expect(run.result).toMatchObject({ rulesetId: RULESET_ID, score: 0, foodsCollected: 0, length: 6, maxLength: 6 });
+    expect(run.result).toMatchObject({ score: 0, foodsCollected: 0, length: 6, maxLength: 6 });
+    expect(run.result).not.toHaveProperty('rulesetId');
   });
 
   it('collects food only on the committed destination and preserves +2 growth', () => {
@@ -91,14 +93,15 @@ describe('SNEK CORE V4 RunState', () => {
     expect(run.snake.segments).toHaveLength(GRID_CONFIG.initialLength + GRID_CONFIG.growthPerFood);
   });
 
-  it('preserves the completion target under the active ruleset', () => {
+  it('preserves the 33-food completion target', () => {
     const run = startRun(createRun(stableRng));
     run.foodsCollected = COMPLETION_FOOD_TARGET - 1;
     run.score = COMPLETION_FOOD_TARGET - 1;
     run.food = { x: 4, y: 4, z: 5 };
     stepRun(run, stableRng);
     expect(run.phase).toBe('completed');
-    expect(run.result).toMatchObject({ rulesetId: RULESET_ID, score: COMPLETION_FOOD_TARGET, foodsCollected: COMPLETION_FOOD_TARGET });
+    expect(run.result).toMatchObject({ score: COMPLETION_FOOD_TARGET, foodsCollected: COMPLETION_FOOD_TARGET });
+    expect(run.result).not.toHaveProperty('rulesetId');
   });
 
   it('rejects changing GridConfig after run creation', () => {

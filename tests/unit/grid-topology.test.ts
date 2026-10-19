@@ -11,7 +11,7 @@ import {
   wrapCellAxis
 } from '../../src/game/grid-topology';
 
-describe('Pixel Flight Grid V2 topology', () => {
+describe('current grid topology', () => {
   it('encodes every baseline cell with a unique key', () => {
     const keys = new Set<number>();
 

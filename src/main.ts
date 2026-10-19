@@ -1,6 +1,5 @@
 import './styles.css';
 import { AppController } from './app/app-controller';
-import { createSessionGateway } from './app/gateway-selection';
 import { RuntimeLifecycle } from './app/runtime-lifecycle';
 import { GRID_CONFIG } from './game/grid-config';
 import { cellToWorld } from './game/grid-topology';
@@ -39,8 +38,7 @@ const scene = createScene(canvas);
 const snakeRenderer = new SnakeRenderer(scene.scene);
 const foodRenderer = new FoodRenderer(scene.scene);
 const boardCamera = new BoardCameraController(scene.camera);
-const sessionGateway = createSessionGateway(import.meta.env.VITE_RANKING_API_BASE);
-const controller = new AppController({ root: app, gateway: sessionGateway });
+const controller = new AppController({ root: app });
 const fixedClock = new FixedStepClock(1 / GRID_CONFIG.stepsPerSecond);
 
 const CAMERA_WHEEL_SENSITIVITY = 0.001;
@@ -173,7 +171,7 @@ function consumeStrategicFrame(run: RunState, frameDeltaSeconds: number): number
 }
 
 type TestFoodCell = Readonly<{ x: number; y: number; z: number }>;
-const e2eMode = import.meta.env.MODE === 'e2e' || import.meta.env.MODE === 'e2e-ranked';
+const e2eMode = import.meta.env.MODE === 'e2e';
 let manualClock = e2eMode;
 let activeRun: RunState | null = null;
 let lastTimestamp: number | null = null;
@@ -183,8 +181,6 @@ let rendererFailed = false;
 if (e2eMode) {
   const testWindow = window as typeof window & {
     __SNEK_TEST__?: {
-      apiBase: string;
-      gatewayKind: string;
       setManualClock: (enabled: boolean) => void;
       consumeFrame: (frameDeltaSeconds: number) => number;
       setFoodCell: (cell: TestFoodCell) => void;
@@ -195,8 +191,6 @@ if (e2eMode) {
   };
 
   testWindow.__SNEK_TEST__ = {
-    apiBase: import.meta.env.VITE_RANKING_API_BASE ?? '',
-    gatewayKind: sessionGateway.constructor.name,
     setManualClock: (enabled) => {
       manualClock = enabled;
       fixedClock.reset();

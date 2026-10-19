@@ -29,7 +29,7 @@ function createStraightToroidalRun() {
   run.heading = '+Z';
   run.pendingDirection = null;
   run.food = { x: 0, y: 0, z: 0 };
-  run.foodsCollected = 0; run.score = 0; run.foodEaten = 0; run.maxLength = 6; run.elapsedMs = 0; run.result = null;
+  run.foodsCollected = 0; run.score = 0; run.maxLength = 6; run.elapsedMs = 0; run.result = null;
   return run;
 }
 
@@ -102,14 +102,13 @@ function runWithOptionalCameraOperations(useCamera: boolean) {
     food: run.food ? cloneCell(run.food) : null,
     score: run.score,
     foodsCollected: run.foodsCollected,
-    foodEaten: run.foodEaten,
     maxLength: run.maxLength,
     elapsedMs: run.elapsedMs,
     result: run.result
   };
 }
 
-describe('SNEK CORE V5 deterministic strategic runtime', () => {
+describe('current deterministic strategic runtime', () => {
   it('replays at least 1,000 strategic steps identically with face-adjacent commits only', () => {
     const first = deterministicRun();
     const second = deterministicRun();

@@ -17,7 +17,7 @@ async function loadBoardCamera(): Promise<BoardCameraModule | null> {
   }
 }
 
-describe('SNEK CORE V4 board camera zoom', () => {
+describe('current board camera zoom', () => {
   it('applies one shared 0.65..5 zoom factor to distance from cube center', async () => {
     const module = await loadBoardCamera();
     expect(module).not.toBeNull();

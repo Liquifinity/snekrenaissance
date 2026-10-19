@@ -1,13 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   GRID_CONFIG,
-  RULESET_ID,
   createGridConfig
 } from '../../src/game/grid-config';
 
-describe('SNEK CORE V5 config', () => {
+describe('current grid config', () => {
   it('derives the approved baseline configuration', () => {
-    expect(RULESET_ID).toBe('snek-core-v5');
     expect(GRID_CONFIG.resolution).toBe(9);
     expect(GRID_CONFIG.cellSize).toBe(0.4);
     expect(GRID_CONFIG.worldSize).toBeCloseTo(3.6, 10);

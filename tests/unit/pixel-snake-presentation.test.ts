@@ -29,7 +29,7 @@ function expectVector(actual: Vector3, expected: Vector3): void {
   expect(actual.z).toBeCloseTo(expected.z, 10);
 }
 
-describe('SNEK CORE V4 pixel snake presentation', () => {
+describe('current pixel snake presentation', () => {
   it('derives head and body positions exactly from strategic GridCell centers with stable ids', () => {
     const run = createRun(stableRng);
     const snapshot = presentation.buildPixelSnakeRenderSnapshot(run as never);
