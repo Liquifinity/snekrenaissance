@@ -26,7 +26,8 @@ const retiredPaths = [
   'src/shared/ranking-api.ts',
   'docs/security/2026-10-15-dependency-audit.md',
   'docs/superpowers',
-  'docs/readme/snek-renaissance-hero.jpg'
+  'docs/readme/snek-renaissance-hero.jpg',
+  'docs/readme/one-last-tweak.webp'
 ];
 
 function findGitKeeps(root: string): string[] {
@@ -45,10 +46,9 @@ describe('public repository purity', () => {
     for (const path of retiredPaths) expect(existsSync(path), path).toBe(false);
   });
 
-  it('publishes only current contributor-facing architecture documents and artwork', () => {
+  it('publishes only current contributor-facing architecture documents', () => {
     expect(existsSync('ARCHITECTURE.md')).toBe(true);
     expect(existsSync('CONTRIBUTING.md')).toBe(true);
-    expect(existsSync('docs/readme/one-last-tweak.webp')).toBe(true);
   });
 
   it('contains no obsolete gitkeep placeholders', () => {

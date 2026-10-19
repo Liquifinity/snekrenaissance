@@ -1,9 +1,5 @@
 # SNEK RENAISSANCE
 
-<p align="center">
-  <img src="docs/readme/one-last-tweak.webp" alt="One last tweak — SNEK RENAISSANCE board" width="100%" />
-</p>
-
 <p align="center"><strong>conquer the space</strong></p>
 
 <p align="center">
