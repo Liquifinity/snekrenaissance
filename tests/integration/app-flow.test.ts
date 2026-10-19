@@ -149,19 +149,19 @@ describe('meme-first application flow', () => {
     expect(root.textContent).not.toContain('WORLD');
     expect(root.textContent).not.toContain('UNRANKED');
     expect(root.querySelector('[data-action="replay"]')).not.toBeNull();
-    expect(root.querySelector('[data-action="rank"]')).not.toBeNull();
+    expect(root.querySelector('[data-action="best"]')).not.toBeNull();
   });
 
-  it('shows the local V5 score record without public leaderboard language', () => {
+  it('shows the local V5 personal best without public ranking language', () => {
     const { root, controller } = setup();
     enterUsernameAndPlay(root, 'ren');
     finishRun(controller, 24);
-    click('[data-action="rank"]', root);
-    expect(controller.screen).toBe('rank');
+    click('[data-action="best"]', root);
+    expect(controller.screen).toBe('best');
     expect(root.textContent).toContain('PERSONAL BEST');
     expect(root.textContent).toContain('24');
-    expect(root.textContent).not.toContain('UNRANKED');
-    expect(root.textContent).not.toContain('public leaderboard');
+    expect(root.textContent).not.toContain('WORLD');
+    expect(root.textContent).not.toContain('RANK');
   });
 
   it('restores the username after a reload', () => {
