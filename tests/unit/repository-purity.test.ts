@@ -25,7 +25,8 @@ const retiredPaths = [
   'tests/metrics/grid-tuning.test.ts',
   'src/shared/ranking-api.ts',
   'docs/security/2026-10-15-dependency-audit.md',
-  'docs/superpowers'
+  'docs/superpowers',
+  'docs/readme/snek-renaissance-hero.jpg'
 ];
 
 function findGitKeeps(root: string): string[] {
@@ -40,14 +41,14 @@ function findGitKeeps(root: string): string[] {
 }
 
 describe('public repository purity', () => {
-  it('contains no retired backend, process or dated audit artifacts', () => {
+  it('contains no retired backend, process, dated audit or superseded README artifacts', () => {
     for (const path of retiredPaths) expect(existsSync(path), path).toBe(false);
   });
 
-  it('publishes only current contributor-facing architecture documents', () => {
+  it('publishes only current contributor-facing architecture documents and artwork', () => {
     expect(existsSync('ARCHITECTURE.md')).toBe(true);
     expect(existsSync('CONTRIBUTING.md')).toBe(true);
-    expect(existsSync('docs/readme/snek-renaissance-hero.jpg')).toBe(true);
+    expect(existsSync('docs/readme/one-last-tweak.webp')).toBe(true);
   });
 
   it('contains no obsolete gitkeep placeholders', () => {
