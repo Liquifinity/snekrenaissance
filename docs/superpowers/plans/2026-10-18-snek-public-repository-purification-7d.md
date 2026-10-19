@@ -4,7 +4,7 @@
 
 **Goal:** Convert SNEK RENAISSANCE into a purist, public, local-only TypeScript browser/PWA repository with no ranking/backend/Cloudflare residue, while preserving current gameplay, player-local state, PWA behavior, forkability and GitHub Pages deployment.
 
-**Architecture:** Keep the existing single-package domain boundaries (`app`, `game`, `input`, `render`, `ui`) and remove the remote-session vertical slice rather than replacing it with another abstraction. The final runtime is browser/PWA only: `src/main.ts` composes local application state, deterministic game state, input, Three.js rendering and DOM UI; GitHub Pages is the only deployment path.
+**Architecture:** Keep the existing single-package domain boundaries (`app`, `game`, `input`, `render`, `ui`) and delete the remote-session vertical slice instead of replacing it with another abstraction. The final runtime is browser/PWA only: `src/main.ts` composes local application state, deterministic game state, input, Three.js rendering and DOM UI; GitHub Pages is the only deployment path.
 
 **Tech Stack:** TypeScript, Three.js, Vite, vite-plugin-pwa, Vitest, jsdom, Playwright, GitHub Actions, GitHub Pages.
 
@@ -12,34 +12,29 @@
 
 ## Global Constraints
 
-- TypeScript remains the canonical application language.
-- English is the canonical public language for source naming, comments, errors and public documentation.
-- Canonical product is local browser/PWA only; no backend, remote ranking, Worker, D1, Cloudflare Pages or Wrangler remains.
-- Keep Three.js + Vite + PWA; do not introduce React, another framework, another application language, a monorepo or npm-package publishing.
-- Preserve current gameplay, camera feel, controls and 33-food completion target.
+- TypeScript remains the canonical application language; public source/docs are English-first.
+- Canonical product is local browser/PWA only: no backend, remote ranking, Worker, D1, Cloudflare Pages or Wrangler remains.
+- Preserve Three.js, Vite and the existing PWA; do not add React, another framework/language, a monorepo or npm-package publishing.
+- Preserve current gameplay, camera feel, controls and the 33-food completion target.
 - Preserve keyboard contract: W/A/S/D + arrows work, E is into-screen, Q is unbound, editable fields do not trigger movement.
-- Preserve current local username UX.
-- Preserve existing player best data under `snek.localBest.coreV5`; do not migrate or erase it merely to remove the version suffix.
-- Preserve PWA prompt/waiting update semantics and offline relaunch contract.
-- Preserve canonical `/snekrenaissance/` and synthetic fork-path PWA builds.
+- Preserve current username UX and existing player data under `snek.username` and `snek.localBest.coreV5`.
+- Preserve PWA prompt/waiting update semantics, offline relaunch, canonical `/snekrenaissance/` build and arbitrary fork-path build.
 - GitHub Pages is the sole deployment workflow.
-- `main` stays canonical and protected; implementation occurs on an isolated branch.
-- Final public tree must not retain internal Superpowers specs/plans; Git history is the historical archive.
-- For every `VERIFY` source artifact, prove import/reference status before deletion; unexpected live consumers stop that deletion and require plan revision.
+- `main` stays canonical/protected; implementation occurs on an isolated branch and reaches `main` only through the approved integration gate.
+- Final public tree must not retain internal Superpowers specs/plans or dated internal audits; Git history is the historical archive.
+- Every `VERIFY` deletion requires reference proof. A live current-product consumer stops that deletion and requires plan revision.
 
 ## Review Focus
 
-1. Existing users with `snek.username` and `snek.localBest.coreV5` must keep both values after the refactor; Task 2 adds explicit persistence coverage.
-2. Removing session/ranking orchestration must not reintroduce the username/WASD keyboard bug or bind Q; Task 2 reruns the keyboard regression suite and E2E flow.
-3. Removing backend compatibility fields must not alter the 33rd-food completion transition or completion image flow; Task 3 pins the result shape and completion behavior.
-4. Removing Wrangler/ranked Vite modes must not break PWA/offline behavior or arbitrary GitHub fork base paths; Task 4 keeps canonical + synthetic fork verification and PWA E2E.
-5. Dead-code deletion must not remove an indirectly consumed grid/render utility; Task 5 requires `rg` proof plus typecheck/tests before each VERIFY-group deletion commit.
+1. Existing `snek.username` and `snek.localBest.coreV5` values survive the refactor; Task 2 tests this directly.
+2. Local-only orchestration must not regress username typing/WASD or bind Q; Task 2 reruns keyboard and app-flow regressions.
+3. Removing backend compatibility fields must not alter the 33rd-food completion transition or completion image flow; Task 3 pins both.
+4. Removing ranked/Cloudflare configuration must not break PWA/offline behavior or fork-safe paths; Task 4 retains both build-path checks and PWA E2E.
+5. Dead-code pruning must not remove indirectly consumed grid/render utilities; Task 5 requires reference proof plus green typecheck/tests before commit.
 
 ---
 
-## Target File Structure
-
-Final current tree is expected to contain these product/public areas only:
+## Target Public Tree
 
 ```text
 .github/workflows/
@@ -78,27 +73,25 @@ vite.config.ts
 vitest.config.ts
 ```
 
-`ARCHITECTURE.md` and `CONTRIBUTING.md` are included because they have direct public value: one explains current ownership/runtime boundaries; the other gives the exact clone/test/PR path. `SECURITY.md` is not added because no real reporting policy has been established.
+`ARCHITECTURE.md` and `CONTRIBUTING.md` stay because they directly reduce contributor ambiguity. `SECURITY.md` is not added without a real reporting policy.
 
 ---
 
-### Task 1: Establish a fresh baseline and add local-only RED contracts
+### Task 1: Establish baseline and RED local-only contracts
 
 **Files:**
 - Create: `tests/unit/local-only-app-contract.test.ts`
 - Modify: `tests/integration/app-flow.test.ts`
 
 **Interfaces:**
-- Consumes: current `AppController`, current app state, current UI and localStorage behavior.
-- Produces: failing tests that define the absence of remote-session/ranking state and the local `PERSONAL BEST` navigation contract.
+- Consumes current app/controller/UI behavior.
+- Produces a failing architecture contract for “no remote session/ranking boundary” and a failing behavior contract for local personal-best navigation.
 
-- [ ] **Step 1: Create an isolated implementation branch from the planning branch**
+- [ ] **Step 1: Create implementation branch**
 
-Use branch name `refactor/public-repo-purification-7d`, starting from the commit containing this plan so the spec and plan travel with execution until the final cleanup task.
+Create `refactor/public-repo-purification-7d` from the planning branch commit containing this plan/spec so both remain available during execution and are removed only in Task 6.
 
-- [ ] **Step 2: Establish the pre-change green baseline**
-
-Run:
+- [ ] **Step 2: Establish a fresh green baseline**
 
 ```bash
 npm ci
@@ -113,11 +106,11 @@ npx playwright install --with-deps chromium
 npm run test:e2e
 ```
 
-Expected: all current canonical gates pass. Record any pre-existing failure by exact command/test name and stop before refactoring if the baseline is not green.
+Expected: all current gates pass. If not, stop and report exact pre-existing failures before changing code.
 
-- [ ] **Step 3: Write `local-only-app-contract.test.ts` as a failing architecture contract**
+- [ ] **Step 3: Add RED architecture test**
 
-The test reads `src/app/app-controller.ts`, `src/app/app-state.ts` and `src/main.ts` as UTF-8 source and asserts the combined text does **not** contain these retired concepts:
+`tests/unit/local-only-app-contract.test.ts` reads `src/app/app-controller.ts`, `src/app/app-state.ts` and `src/main.ts` and has one test named `canonical runtime has no remote ranking/session boundary` asserting the combined source does not contain:
 
 ```text
 SessionGateway
@@ -131,11 +124,9 @@ VITE_RANKING_API_BASE
 e2e-ranked
 ```
 
-Name the test `canonical runtime has no remote ranking/session boundary`.
+- [ ] **Step 4: Change app-flow expectation from RANK to BEST**
 
-- [ ] **Step 4: Change the local personal-best flow expectation in `app-flow.test.ts`**
-
-Replace the current rank-navigation assertions with the target local semantics:
+Target assertions:
 
 ```ts
 expect(root.querySelector('[data-action="best"]')).not.toBeNull();
@@ -147,17 +138,15 @@ expect(root.textContent).not.toContain('WORLD');
 expect(root.textContent).not.toContain('RANK');
 ```
 
-- [ ] **Step 5: Run the new/changed tests and verify RED**
-
-Run:
+- [ ] **Step 5: Verify RED**
 
 ```bash
 npx vitest run tests/unit/local-only-app-contract.test.ts tests/integration/app-flow.test.ts
 ```
 
-Expected: FAIL because the current app still contains gateway/ranking state and exposes `data-action="rank"` / `screen === 'rank'`.
+Expected: FAIL because remote/session concepts and `rank` UI/state still exist.
 
-- [ ] **Step 6: Commit only the RED tests**
+- [ ] **Step 6: Commit RED tests**
 
 ```bash
 git add tests/unit/local-only-app-contract.test.ts tests/integration/app-flow.test.ts
@@ -166,7 +155,7 @@ git commit -m "test: define local-only application boundary"
 
 ---
 
-### Task 2: Collapse application state, UI and persistence to local-only
+### Task 2: Collapse app, UI and persistence to local-only
 
 **Files:**
 - Create: `src/app/persistence.ts`
@@ -175,10 +164,11 @@ git commit -m "test: define local-only application boundary"
 - Modify: `src/app/app-controller.ts`
 - Modify: `src/app/app-state.ts`
 - Modify: `src/main.ts`
+- Modify: `src/styles.css`
 - Modify: `src/ui/username-view.ts`
 - Modify: `src/ui/game-over-view.ts`
 - Modify: `tests/integration/app-flow.test.ts`
-- Modify: any current E2E fixtures that refer to ranked/session-only test hooks
+- Modify: any current E2E fixture that references ranked/session-only test hooks
 - Delete: `src/app/identity.ts`
 - Delete: `src/app/gateway-selection.ts`
 - Delete: `src/app/http-session-gateway.ts`
@@ -190,12 +180,18 @@ git commit -m "test: define local-only application boundary"
 - Delete: `tests/unit/gateway-selection.test.ts`
 - Delete: `tests/unit/http-session-gateway.test.ts`
 - Delete: `tests/unit/session-gateway-capability.test.ts`
+- Delete: `tests/unit/identity.test.ts`
+- Delete: `tests/unit/v5-persistence.test.ts`
+- Delete: `tests/unit/historical-v3-persistence.test.ts`
+- Delete: `tests/unit/historical-v4-persistence.test.ts`
+- Delete: `tests/unit/v22-persistence.test.ts`
+- Delete: `tests/unit/task11-v2-boundary.test.ts`
 
 **Interfaces:**
-- Produces `AppControllerOptions = { root: HTMLElement; storage?: StorageLike }`.
-- Produces `AppScreen = 'intro' | 'username' | 'game' | 'game-over' | 'complete' | 'best'`.
-- Produces `AppState = { screen; username; localBest; run }` with no remote/session/submission fields.
-- Produces persistence API:
+- `AppControllerOptions = { root: HTMLElement; storage?: StorageLike }`.
+- `AppScreen = 'intro' | 'username' | 'game' | 'game-over' | 'complete' | 'best'`.
+- `AppState = { screen: AppScreen; username: string; localBest: number; run: RunState | null }`.
+- Persistence API:
   - `StorageLike = Pick<Storage, 'getItem' | 'setItem'>`
   - `USERNAME_KEY = 'snek.username'`
   - `LOCAL_BEST_KEY = 'snek.localBest.coreV5'`
@@ -203,13 +199,13 @@ git commit -m "test: define local-only application boundary"
   - `saveUsername(storage: StorageLike, username: string): void`
   - `loadLocalBest(storage: StorageLike): number`
   - `saveLocalBest(storage: StorageLike, score: number): number`
-- Produces `renderUsernameView(container, initialUsername, onPlay)` with no session-status model.
-- Produces `renderGameOverView(container, { score, best }, onReplay, onBest)` with no world/submission state.
-- Produces `renderPersonalBestView(container, best, onBack)` using `data-view="best"`.
+- `renderUsernameView(container, initialUsername, onPlay)` has no session-status model.
+- `renderGameOverView(container, { score, best }, onReplay, onBest)` has no world/submission model.
+- `renderPersonalBestView(container, best, onBack)` uses `data-view="best"`.
 
-- [ ] **Step 1: Write `local-persistence.test.ts` RED tests**
+- [ ] **Step 1: Write RED persistence tests**
 
-Use an in-memory `StorageLike` and assert:
+`tests/unit/local-persistence.test.ts` uses in-memory `StorageLike` and asserts:
 
 ```ts
 expect(LOCAL_BEST_KEY).toBe('snek.localBest.coreV5');
@@ -223,60 +219,69 @@ expect(loadUsername(storage)).toBe('ren');
 
 Expected initial failure: `src/app/persistence.ts` does not exist.
 
-- [ ] **Step 2: Run persistence + Task 1 RED tests**
-
-Run:
+- [ ] **Step 2: Verify RED**
 
 ```bash
 npx vitest run tests/unit/local-persistence.test.ts tests/unit/local-only-app-contract.test.ts tests/integration/app-flow.test.ts
 ```
 
-Expected: FAIL for the new local persistence module and existing remote/rank concepts.
+- [ ] **Step 3: Implement `src/app/persistence.ts` only for current local state**
 
-- [ ] **Step 3: Implement `src/app/persistence.ts` with only username + current local best**
+Use the exact API above. Do not expose player IDs or V1/V2/V2.1/V2.2/V3/V4 persistence helpers. Preserve the V5 key exactly.
 
-Use the signatures above. Keep the existing storage key exactly `snek.localBest.coreV5`. Do not read, migrate, write or expose V1/V2/V2.1/V2.2/V3/V4 keys.
+- [ ] **Step 4: Simplify `app-state.ts`**
 
-- [ ] **Step 4: Simplify `src/app/app-state.ts`**
+Remove remote identity/session/ranking/submission fields and types; rename local personal-best screen from `rank` to `best`.
 
-Remove `playerId`, `worldRank`, `ranked`, `activeSessionId`, `SessionStatus`, `SubmissionStatus`, submission errors and remote lifecycle fields. Rename the local personal-best screen from `rank` to `best`.
+- [ ] **Step 5: Simplify username and game-over views**
 
-- [ ] **Step 5: Simplify `src/ui/username-view.ts`**
+`username-view.ts`: remove `UsernameViewModel`, STARTING/RETRY session states and remote-session disablement; keep blank validation, trim, maxLength and focus.
 
-Remove `UsernameViewModel`, `sessionStatus`, `STARTING…`, remote retry state and disablement tied to session creation. Keep blank-username validation, max length, autofocus and trimmed submission.
-
-- [ ] **Step 6: Simplify `src/ui/game-over-view.ts` and add `personal-best-view.ts`**
-
-Target game-over model:
+`game-over-view.ts` target model:
 
 ```ts
-export type GameOverViewModel = {
-  score: number;
-  best: number;
-};
+export type GameOverViewModel = { score: number; best: number };
 ```
 
-Target actions: `PLAY AGAIN` (`data-action="replay"`) and `BEST` (`data-action="best"`). No `WORLD`, `PENDING`, submission status/error or retry-rank UI.
+Target actions: `PLAY AGAIN` (`data-action="replay"`) and `BEST` (`data-action="best"`). Remove world rank, pending/submission status, errors and retry-rank action.
 
-`renderPersonalBestView()` renders `PERSONAL BEST`, the numeric best and `BACK`; use `data-view="best"`.
+- [ ] **Step 6: Add `personal-best-view.ts` and update styles**
 
-- [ ] **Step 7: Simplify `AppController` to direct local orchestration**
+Render `PERSONAL BEST`, numeric best and `BACK`, using `section.className = 'screen personal-best'` and `data-view="best"`.
 
-Constructor accepts only `{ root, storage = localStorage }`. Load/save username and best through `persistence.ts`. A valid username starts gameplay immediately. On game over, save the best and render the local game-over view. `BEST` opens the personal-best screen; back returns to game over when a finished run exists, otherwise intro. Remove all Promise-based gateway calls and identity/session helpers.
+Rename/remove CSS selectors that exist only for `.local-rank`, `.rank-status`, `.rank-best`; retain equivalent styling under current semantic names such as `.personal-best` and `.best-value` only when still used.
 
-- [ ] **Step 8: Simplify `src/main.ts` composition and E2E hook**
+- [ ] **Step 7: Simplify `AppController`**
 
-Remove gateway creation and `VITE_RANKING_API_BASE`. Construct `new AppController({ root: app })`. `e2eMode` becomes `import.meta.env.MODE === 'e2e'`. Remove `apiBase` and `gatewayKind` from `window.__SNEK_TEST__`; keep deterministic gameplay/camera hooks still consumed by current E2E tests.
+Constructor accepts only `{ root, storage = localStorage }`. Valid username starts gameplay immediately. Game over saves current best, renders local metrics, `BEST` opens personal-best, and back returns to game-over when a finished run exists or intro otherwise. Remove all Promise/gateway/identity/session/ranking code.
 
-- [ ] **Step 9: Delete remote-only runtime/UI/tests listed in this task**
+- [ ] **Step 8: Simplify `main.ts`**
 
-No replacement gateway abstraction is created.
+Remove gateway creation and `VITE_RANKING_API_BASE`; instantiate `new AppController({ root: app })`. `e2eMode` becomes `import.meta.env.MODE === 'e2e'`. Remove `apiBase` and `gatewayKind` from `window.__SNEK_TEST__`; retain deterministic gameplay/camera hooks still used by current E2E.
 
-- [ ] **Step 10: Update `app-flow.test.ts` fixtures to current local APIs while preserving behavior**
+- [ ] **Step 9: Update/delete every import of retired app modules before deleting them**
 
-Keep tests for intro, username, blank rejection, gameplay start, progress, completion image, game over, personal best, username reload, local-best persistence and replay. Replace historical-key preservation assertions with the current continuity assertion: pre-seed `snek.localBest.coreV5`, verify a lower score does not overwrite it and a higher score does.
+Run:
 
-- [ ] **Step 11: Run targeted GREEN tests**
+```bash
+rg -n "app/identity|gateway-selection|http-session-gateway|session-gateway|leaderboard-view|local-rank-view" src tests
+```
+
+Update current-product consumers; delete the explicitly historical/ranking tests listed in this task. The command must return no live references before source deletion.
+
+- [ ] **Step 10: Update `app-flow.test.ts` for current persistence only**
+
+Keep intro, username, blank rejection, gameplay start, progress, completion, game-over, personal-best, username reload and replay tests. Replace the old multi-generation storage test with:
+
+```ts
+localStorage.setItem('snek.localBest.coreV5', '24');
+// finish a lower-scoring run -> best remains 24
+// finish a higher-scoring run -> best becomes higher score
+```
+
+No historical key contract remains.
+
+- [ ] **Step 11: Targeted GREEN**
 
 ```bash
 npx vitest run tests/unit/local-persistence.test.ts tests/unit/local-only-app-contract.test.ts tests/integration/app-flow.test.ts tests/unit/keyboard.test.ts
@@ -284,43 +289,43 @@ npx vitest run tests/unit/local-persistence.test.ts tests/unit/local-only-app-co
 
 Expected: PASS.
 
-- [ ] **Step 12: Run the whole frontend suite and typecheck**
+- [ ] **Step 12: Whole-suite GREEN before commit**
 
 ```bash
 npm test
 npm run typecheck
 ```
 
-Expected: PASS except tests intentionally assigned to later tasks because they still encode backend/result compatibility; record those exact files before proceeding.
+Expected: PASS. Do not commit this task with known failing frontend tests.
 
-- [ ] **Step 13: Commit the local-only application slice**
+- [ ] **Step 13: Commit**
 
 ```bash
-git add src tests
+git add -A
 git commit -m "refactor: make application state local only"
 ```
 
 ---
 
-### Task 3: Remove backend compatibility from the game result model
+### Task 3: Remove retired backend compatibility from game state/results
 
 **Files:**
 - Modify: `src/game/run-state.ts`
 - Modify: `src/game/grid-config.ts`
 - Modify: `tests/unit/completion-target.test.ts`
 - Modify: `tests/integration/app-flow.test.ts`
-- Modify: current run-state/integration/E2E fixtures that construct `RunResult` or mutate `foodEaten`
-- Modify/Delete: tests whose only assertion is historical `RULESET_ID` compatibility
+- Modify: all current run-state/integration/E2E fixtures that construct `RunResult` or mutate `foodEaten`
+- Modify/Delete: tests whose only purpose is historical `RULESET_ID` compatibility
 
 **Interfaces:**
-- `RunState` no longer exposes `foodEaten`.
-- `RunResult` no longer exposes `foodEaten` or `rulesetId`.
-- `GridConfig` remains unchanged; `RULESET_ID` is removed if no current non-backend consumer remains.
-- Completion/score authority remains `foodsCollected` + `score`; completion target remains 33.
+- `RunState` has no `foodEaten`.
+- `RunResult` has no `foodEaten` or `rulesetId`.
+- `RULESET_ID` is removed if reference proof shows no current non-backend consumer.
+- `score`, `foodsCollected`, `length`, `maxLength`, `durationMs`, phase transitions and 33-food completion semantics remain.
 
-- [ ] **Step 1: Change `completion-target.test.ts` to the target result shape and verify RED**
+- [ ] **Step 1: Change completion contract and verify RED**
 
-After the 33rd food, assert:
+After the 33rd food:
 
 ```ts
 expect(run.foodsCollected).toBe(33);
@@ -332,33 +337,25 @@ expect(run.result).not.toHaveProperty('foodEaten');
 expect(run.result).not.toHaveProperty('rulesetId');
 ```
 
-Run:
+Run `npx vitest run tests/unit/completion-target.test.ts`; expected FAIL on current compatibility fields.
 
-```bash
-npx vitest run tests/unit/completion-target.test.ts
-```
+- [ ] **Step 2: Remove compatibility fields from `run-state.ts`**
 
-Expected: FAIL because current state/result still exposes backend compatibility properties.
+Delete `foodEaten` and `rulesetId` declarations/assignments. Do not alter movement, collision, growth, score or completion algorithms.
 
-- [ ] **Step 2: Remove `foodEaten` and `rulesetId` from `run-state.ts`**
-
-Delete the compatibility properties and assignments. Keep `score`, `foodsCollected`, `length`, `maxLength`, `durationMs`, phase transitions and completion behavior unchanged.
-
-- [ ] **Step 3: Remove `RULESET_ID` from `grid-config.ts` if reference proof shows no current product consumer**
-
-Before deletion run:
+- [ ] **Step 3: Prove and remove `RULESET_ID` if now backend-only**
 
 ```bash
 rg -n "RULESET_ID|snek-core-v5" src tests --glob '!docs/**'
 ```
 
-Expected after Task 2: remaining hits are test/result compatibility only. Remove or rewrite those assertions to current product behavior; if a live current-product consumer remains, stop and revise this task rather than deleting the symbol blindly.
+Expected after Task 2: only historical/result-compatibility hits. Remove/rewrite those. If a live current-product consumer remains, stop this deletion and revise the plan.
 
-- [ ] **Step 4: Update all current test fixtures to use only canonical result/state fields**
+- [ ] **Step 4: Update all current fixtures to canonical fields only**
 
-Remove manual `foodEaten` mutations and `rulesetId` fixture properties. Do not weaken gameplay assertions.
+Remove manual `foodEaten` mutations and `rulesetId` fixture values without weakening behavior assertions.
 
-- [ ] **Step 5: Run targeted + full GREEN verification**
+- [ ] **Step 5: GREEN**
 
 ```bash
 npx vitest run tests/unit/completion-target.test.ts tests/integration/app-flow.test.ts tests/integration/grid-run-state.test.ts tests/integration/v5-determinism.test.ts
@@ -371,13 +368,13 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/game tests
+git add -A
 git commit -m "refactor: remove retired ranking result compatibility"
 ```
 
 ---
 
-### Task 4: Remove Cloudflare/ranked toolchain and reduce CI to the canonical PWA
+### Task 4: Remove Cloudflare/ranked toolchain and reduce CI to canonical PWA
 
 **Files:**
 - Create: `tests/unit/repository-purity.test.ts`
@@ -399,59 +396,48 @@ git commit -m "refactor: remove retired ranking result compatibility"
 - Delete: `tests/unit/deploy-production.test.ts`
 - Delete: `tests/unit/production-config.test.ts`
 - Delete: `tests/unit/production-smoke.test.ts`
+- Delete: `tests/metrics/grid-tuning.test.ts`
 
 **Interfaces:**
 - Final package scripts: `dev`, `build`, `verify:pwa`, `test`, `typecheck`, `test:e2e`.
-- Final direct runtime dependency remains `three`.
-- Final dev dependencies retain only current frontend/PWA/test/tooling consumers; `wrangler` is removed.
-- `vite.config.ts` has no ranked mode proxy.
-- `playwright.config.ts` starts only the canonical Vite preview and keeps desktop/mobile current-product projects; no ranked project/server.
-- CI keeps install, production audit, frontend tests, typecheck, canonical PWA build, synthetic fork PWA build and E2E.
+- Runtime direct dependency remains `three`.
+- Dev dependencies retain only current frontend/PWA/test/tool consumers; `wrangler` is absent.
+- Vite has no ranked proxy/mode.
+- Playwright starts only canonical Vite preview and keeps current desktop/mobile projects.
+- CI job remains named/id `test` and validates only canonical local/PWA product.
 
-- [ ] **Step 1: Add `repository-purity.test.ts` and verify RED**
+- [ ] **Step 1: Add RED repository-purity test**
 
-The test uses `existsSync`/`readFileSync` from the repository root and asserts:
+Assert these paths are absent:
 
 ```text
-worker/ absent
-migrations/ absent
-wrangler.jsonc absent
-vitest.worker.config.ts absent
-.env.e2e-ranked absent
-.github/workflows/deploy-production.yml absent
+worker/
+migrations/
+wrangler.jsonc
+vitest.worker.config.ts
+.env.e2e-ranked
+.github/workflows/deploy-production.yml
 ```
 
-Parse `package.json` and assert:
-- no `wrangler` dependency/devDependency;
-- no script key starts with `worker:`;
-- no `render:wrangler:production`;
-- no `test:worker`;
-- no historical `test:tuning`;
-- no duplicate `e2e` alias when `test:e2e` is retained.
+Parse `package.json` and assert no `wrangler`, `worker:*`, `render:wrangler:production`, `test:worker`, historical `test:tuning`, or duplicate `e2e` alias when `test:e2e` is retained.
 
-Read `vite.config.ts`, `playwright.config.ts` and `.github/workflows/ci.yml`; assert none contains `e2e-ranked`, `wrangler`, `test:worker`, `worker:build`, `render:wrangler:production` or Cloudflare deployment language.
+Read `vite.config.ts`, `playwright.config.ts`, `.github/workflows/ci.yml`; assert none contains `e2e-ranked`, `wrangler`, `test:worker`, `worker:build` or `render:wrangler:production`.
 
-Run:
+Run `npx vitest run tests/unit/repository-purity.test.ts`; expected FAIL.
 
-```bash
-npx vitest run tests/unit/repository-purity.test.ts
-```
+- [ ] **Step 2: Simplify package manifest and regenerate lockfile**
 
-Expected: FAIL on the current infrastructure.
+Remove Wrangler and retired scripts. Preserve `"private": true`. Regenerate lockfile and verify `npm ci` from it.
 
-- [ ] **Step 2: Simplify `package.json` and regenerate the lockfile**
+- [ ] **Step 3: Simplify Vite/Playwright configs**
 
-Remove `wrangler` and retired scripts. Run `npm install --package-lock-only` (or `npm install` if required by the installed npm version) and verify `npm ci` succeeds from the regenerated lockfile.
+`vite.config.ts`: retain base path, PWA plugin, sourcemap; remove ranked proxy.
 
-- [ ] **Step 3: Simplify Vite and Playwright configs**
-
-`vite.config.ts`: remove mode-dependent `/rank` proxy; retain `base`, PWA plugin and sourcemap.
-
-`playwright.config.ts`: one canonical Vite build/preview web server at port 4173; retain desktop Chrome, Pixel 7 portrait and Pixel 7 landscape projects; remove ranked ignore/match rules and ranked server/project.
+`playwright.config.ts`: one Vite build/preview server on 4173; retain desktop Chrome, Pixel 7 portrait and Pixel 7 landscape; remove ranked server/project and rank-specific match/ignore rules.
 
 - [ ] **Step 4: Simplify `ci.yml`**
 
-Remove Worker tests, Wrangler rendered-config verification and Worker dry-run. Preserve:
+Keep exactly the obligations:
 
 ```text
 npm ci
@@ -464,15 +450,15 @@ Playwright Chromium install
 npm run test:e2e
 ```
 
-Keep the job id/name stable as `test` so it can become the required ruleset status check.
+Keep CI job id/name `test` for later ruleset enforcement.
 
-- [ ] **Step 5: Delete retired infrastructure/config/scripts/tests**
+- [ ] **Step 5: Delete retired infrastructure/scripts/tests/metrics**
 
-Delete all files/directories listed in this task. Keep `.github/workflows/deploy-pages.yml` and `scripts/verify-pwa-build.mjs` unchanged unless a current test proves an adjustment is necessary.
+Delete all paths listed in this task. Keep `.github/workflows/deploy-pages.yml` and `scripts/verify-pwa-build.mjs` unless a current test proves a required adjustment.
 
 - [ ] **Step 6: Simplify `.gitignore`**
 
-Final entries should cover current generated artifacts only:
+Final current-product entries:
 
 ```text
 node_modules/
@@ -481,9 +467,7 @@ playwright-report/
 test-results/
 ```
 
-Remove `.wrangler.production.jsonc` and Superpowers-local artifact patterns from the public product ignore file.
-
-- [ ] **Step 7: Run repository purity + canonical toolchain GREEN**
+- [ ] **Step 7: GREEN**
 
 ```bash
 npm ci
@@ -509,15 +493,10 @@ git commit -m "refactor: remove retired backend toolchain"
 
 ---
 
-### Task 5: Prove and remove historical/dead source and tests
+### Task 5: Prove and remove dead current-tree source/tests
 
-**Files — DELETE without further product justification:**
-- `tests/metrics/grid-tuning.test.ts`
-- `tests/unit/historical-v3-persistence.test.ts`
-- `tests/unit/historical-v4-persistence.test.ts`
-- `tests/unit/v22-persistence.test.ts`
-- `tests/unit/task11-v2-boundary.test.ts`
-- all `.gitkeep` files inside directories that are non-empty after purification
+**Files — DELETE:**
+- all `.gitkeep` inside directories that remain non-empty after purification
 
 **Files — VERIFY before delete:**
 - `src/game/flight.ts`
@@ -527,51 +506,52 @@ git commit -m "refactor: remove retired backend toolchain"
 - `src/game/types.ts`
 - `src/render/flight-presentation.ts`
 - `src/render/pixel-resolution.ts`
-- their dedicated tests when the source is proven non-current
+- dedicated tests whose only subject is a source proven dead
 
 **Interfaces:**
-- Produces a source/test graph where every surviving TypeScript module has at least one current runtime/build/test justification.
-- Does not alter active game mechanics to make deletion possible.
+- Every surviving TypeScript module has a current runtime/build/test justification.
+- No gameplay refactor is performed merely to reduce file count.
 
-- [ ] **Step 1: Delete explicitly historical-only tests and obsolete `.gitkeep` files**
+- [ ] **Step 1: Remove obsolete `.gitkeep` files**
 
-These artifacts preserve history rather than a current contract. Git history already retains them.
+Delete `.gitkeep` only where the directory still contains real tracked files.
 
-- [ ] **Step 2: Prove references for each VERIFY candidate with `rg`**
+- [ ] **Step 2: Prove references for each VERIFY candidate**
 
-Run from repository root:
+Use exact import/path searches plus symbol searches. Minimum command:
 
 ```bash
-for symbol in \
-  "game/flight" \
-  "game/grid-traversal" \
-  "game/torus" \
-  "game/constants" \
-  "game/types" \
-  "render/flight-presentation" \
-  "render/pixel-resolution"; do
-  echo "=== $symbol ==="
-  rg -n "$symbol|$(basename "$symbol")" src tests --glob '*.ts'
+for path in \
+  src/game/flight.ts \
+  src/game/grid-traversal.ts \
+  src/game/torus.ts \
+  src/game/constants.ts \
+  src/game/types.ts \
+  src/render/flight-presentation.ts \
+  src/render/pixel-resolution.ts; do
+  echo "=== $path ==="
+  stem="$(basename "$path" .ts)"
+  rg -n "$stem" src tests --glob '*.ts'
 done
 ```
 
-Then inspect each hit, distinguishing production/runtime consumers from dedicated tests. Also use direct filename/import searches where basename matching is ambiguous.
+Inspect every hit and distinguish production consumers from dedicated tests.
 
-- [ ] **Step 3: Delete only candidates with zero current production consumers**
+- [ ] **Step 3: Delete only zero-production-consumer candidates**
 
-For each proven-dead source, delete the source and tests whose only subject is that source. Expected likely removals from the current map are `flight.ts`, `torus.ts`, `flight-presentation.ts` and their dedicated tests; `grid-traversal.ts`, `constants.ts`, `types.ts` and `pixel-resolution.ts` remain evidence-gated.
+Expected likely removals from the current map: `flight.ts`, `torus.ts`, `flight-presentation.ts` and their dedicated tests. `grid-traversal.ts`, `constants.ts`, `types.ts`, `pixel-resolution.ts` remain evidence-gated.
 
-If any candidate has a live current-product consumer, keep it and record the consumer in the implementation report; do not refactor gameplay merely to satisfy a smaller file count.
+If a candidate has a live current-product consumer, keep it and record that consumer; do not change gameplay solely to enable deletion.
 
-- [ ] **Step 4: Run dead-reference search after deletions**
+- [ ] **Step 4: Search for retired-generation residue**
 
 ```bash
 rg -n "Pixel Flight|V2\.1|V2\.2|SNEK CORE V3|SNEK CORE V4|historical|flight-presentation|torus" src tests package.json .github scripts --glob '!docs/**'
 ```
 
-Expected: no retired-version/history-only references, except a current term whose semantic meaning is still genuinely part of the game and is explicitly justified.
+Expected: no history-only references. Review any genuine current semantic match explicitly.
 
-- [ ] **Step 5: Run GREEN verification**
+- [ ] **Step 5: GREEN**
 
 ```bash
 npm test
@@ -587,45 +567,35 @@ Expected: PASS.
 
 ```bash
 git add -A
-git commit -m "refactor: remove historical and dead code"
+git commit -m "refactor: remove dead current-tree code"
 ```
 
 ---
 
-### Task 6: Publish concise current architecture/contribution docs and purge internal process artifacts
+### Task 6: Publish concise public docs and purge internal process artifacts
 
 **Files:**
 - Create: `ARCHITECTURE.md`
 - Create: `CONTRIBUTING.md`
-- Keep: `README.md`
+- Modify: `tests/unit/repository-purity.test.ts`
+- Modify: `tests/unit/repository-presentation.test.ts`
+- Modify: `README.md` only if stale retired-platform text is found
 - Keep: `docs/readme/snek-renaissance-hero.jpg`
 - Delete: `docs/security/2026-10-15-dependency-audit.md`
-- Delete: `docs/superpowers/**` including this spec and implementation plan
-- Modify: `tests/unit/repository-purity.test.ts`
+- Delete: `docs/superpowers/**` including this spec and plan
 
 **Interfaces:**
-- `ARCHITECTURE.md` documents only the current browser/PWA structure and ownership boundaries.
-- `CONTRIBUTING.md` documents exact install/dev/test/build/PR workflow.
-- README remains brand-first and concise; do not re-expand it into an architecture manual.
+- `ARCHITECTURE.md`: only current runtime, directory ownership, local state, PWA/build, deployment and quality gates.
+- `CONTRIBUTING.md`: exact clone/install/dev/test/build/PR flow.
+- README remains brand-first and concise.
 
 - [ ] **Step 1: Write `ARCHITECTURE.md`**
 
-Keep it concise. Required sections:
-
-```text
-Runtime
-Directory ownership
-State and persistence
-PWA/build
-Deployment
-Quality gates
-```
-
-State explicitly: local-only, no backend; `src/game` owns gameplay authority; `src/main.ts` composes; GitHub Pages is deployment; localStorage contains username + current best.
+Required concise sections: `Runtime`, `Directory ownership`, `State and persistence`, `PWA/build`, `Deployment`, `Quality gates`. State local-only/no backend, `src/game` gameplay authority, `src/main.ts` composition, localStorage username/current best, GitHub Pages sole deploy.
 
 - [ ] **Step 2: Write `CONTRIBUTING.md`**
 
-Include only actionable commands and contribution rules:
+Include only actionable commands/rules:
 
 ```bash
 npm ci
@@ -636,28 +606,25 @@ npm run build
 npm run test:e2e
 ```
 
-Require short-lived branch -> tests -> PR -> green CI. State English-first source/docs and no backend/framework expansion without an explicit product decision.
+Document short-lived branch -> tests -> PR -> green CI; English-first source/docs; no backend/framework expansion without explicit product decision.
 
-- [ ] **Step 3: Extend `repository-purity.test.ts` for final-tree documentation purity**
+- [ ] **Step 3: Convert repository presentation/purity tests to the final documentation contract and verify RED**
 
-Assert:
-- `ARCHITECTURE.md` exists;
-- `CONTRIBUTING.md` exists;
-- `docs/security/2026-10-15-dependency-audit.md` absent;
-- `docs/superpowers` absent;
-- no populated-directory `.gitkeep` remains.
+`repository-presentation.test.ts`: replace the old assertion that specific Superpowers PWA spec/plan files remain with assertions that the current README still exposes `PLAY · INSTALL · FORK`, PWA/install/fork/build/license, while internal process docs are absent.
 
-Because this step creates a failing assertion while the internal docs still exist, run it now and verify RED before deletion.
+`repository-purity.test.ts`: assert `ARCHITECTURE.md` and `CONTRIBUTING.md` exist; `docs/security/2026-10-15-dependency-audit.md` and `docs/superpowers` do not; no obsolete `.gitkeep` remains.
 
-- [ ] **Step 4: Delete dated/internal process documentation**
+Run these tests before deletion and verify they fail on the still-present internal docs.
 
-Delete `docs/security/2026-10-15-dependency-audit.md` and the full `docs/superpowers/**` tree. The plan/spec remain accessible from Git history after this commit.
+- [ ] **Step 4: Delete internal/dated documentation**
 
-- [ ] **Step 5: Review README for stale retired-platform language only**
+Delete `docs/security/2026-10-15-dependency-audit.md` and all `docs/superpowers/**`. History preserves the spec/plan.
 
-Do not redesign the approved brand/storytelling. Change README only if it still mentions ranking, Worker, Cloudflare, D1 or retired commands. Preserve `PLAY · INSTALL · FORK`, hero image, PWA install, fork instructions, build/test essentials and MIT.
+- [ ] **Step 5: Review README only for stale retired-platform text**
 
-- [ ] **Step 6: Run documentation/repository GREEN tests**
+Do not redesign approved storytelling. Change only if ranking/Worker/Cloudflare/D1/retired commands remain. Preserve hero, `PLAY · INSTALL · FORK`, install, fork, build/test essentials and MIT.
+
+- [ ] **Step 6: GREEN**
 
 ```bash
 npx vitest run tests/unit/repository-purity.test.ts tests/unit/repository-presentation.test.ts
@@ -676,19 +643,17 @@ git commit -m "docs: publish current repository architecture"
 
 ---
 
-### Task 7: Full 7D verification, PR gate and main governance
+### Task 7: Final 7D verification, PR gate and main governance
 
 **Files:**
-- No product files should change unless verification discovers a concrete defect.
-- External repository setting: GitHub ruleset `Protect Main`.
+- No product file should change unless verification discovers a concrete defect.
+- External setting: repository ruleset `Protect Main`.
 
 **Interfaces:**
-- Produces a releasable branch with a current-only public tree.
-- Produces governance target: deletion blocked, non-fast-forward blocked, PR required, `test` status required, bypass list empty.
+- Releasable branch with current-only public tree.
+- Governance target: deletion blocked, non-fast-forward blocked, PR required, CI `test` required, bypass list empty.
 
-- [ ] **Step 1: Run final retired-concept search**
-
-Run:
+- [ ] **Step 1: Search final tree for retired concepts**
 
 ```bash
 rg -n "Cloudflare|Wrangler|D1|VITE_RANKING_API_BASE|SessionGateway|HttpSessionGateway|LocalSessionGateway|worldRank|activeSessionId|submissionStatus|e2e-ranked|leaderboard|ranked" \
@@ -700,9 +665,9 @@ rg -n "Cloudflare|Wrangler|D1|VITE_RANKING_API_BASE|SessionGateway|HttpSessionGa
   --glob '!.git/**'
 ```
 
-Expected: zero stale implementation/config/test/documentation hits. Any surviving occurrence must be current intentional prose and be reviewed explicitly rather than ignored.
+Expected: zero stale implementation/config/test/doc hits. Any surviving intentional prose must be explicitly reviewed.
 
-- [ ] **Step 2: Run the complete fresh verification gate**
+- [ ] **Step 2: Run fresh completion gate**
 
 ```bash
 rm -rf node_modules dist playwright-report test-results
@@ -718,71 +683,54 @@ npx playwright install --with-deps chromium
 npm run test:e2e
 ```
 
-Expected: every command succeeds with no hidden skipped retired backend suite.
+Expected: all succeed.
 
-- [ ] **Step 3: Review branch scope against the pre-purification main**
-
-Use:
+- [ ] **Step 3: Review scope against pre-purification `main`**
 
 ```bash
 git diff --stat main...HEAD
 git diff --name-status main...HEAD
 ```
 
-Confirm changes are restricted to repository purification: local-state simplification, backend/tool removal, dead/history removal, CI/PWA config simplification and public documentation. No camera/gameplay/control redesign is allowed.
+Allow only local-state simplification, backend/tool removal, dead/history removal, CI/PWA config simplification and public documentation. No camera/gameplay/control redesign.
 
-- [ ] **Step 4: Open a PR to `main` and require branch CI to pass**
+- [ ] **Step 4: Open PR**
 
-PR title: `refactor: purify public local PWA repository`
+Title: `refactor: purify public local PWA repository`
 
-PR body must summarize the 7D result, explicitly state that ranking/Cloudflare were intentionally retired, list preserved invariants and include the final verification commands/results.
+Body: summarize 7D result, intentional retirement of ranking/Cloudflare, preserved invariants and final verification evidence.
 
-- [ ] **Step 5: Verify PR CI job `test` succeeds**
+- [ ] **Step 5: Require PR CI `test` to succeed**
 
-Do not merge on partial status. Inspect the job steps; all retained canonical gates must be green.
+Inspect the job steps; do not merge on partial/pending status.
 
-- [ ] **Step 6: Extend `Protect Main` ruleset after the stable `test` check exists**
+- [ ] **Step 6: Extend repository ruleset `Protect Main` after stable `test` check exists**
 
-Retain existing rules:
+Retain:
 - deletion restricted;
 - non-fast-forward blocked;
 - bypass actors empty.
 
 Add:
-- pull request required for `~DEFAULT_BRANCH`;
-- required status check: `test`;
-- require branch to be up to date before merge if supported by the ruleset UI/API;
-- zero mandatory approving reviews unless/until another human maintainer is intentionally part of governance.
+- pull request required for default branch;
+- required status check `test`;
+- branch up-to-date requirement when supported;
+- zero mandatory approving reviews until another human maintainer is intentionally added.
 
-Do not add signed-commit, merge-queue or deployment-success requirements as part of this purification.
+Do not add signed-commit, merge-queue or deployment-success requirements in this purification.
 
-This is a repository-administration action, not a source commit. The currently available GitHub connector can read rulesets but does not expose a ruleset-write action; perform this step in GitHub settings and then verify the ruleset through the API/read connector.
+The available GitHub connector can read but not write rulesets, so this is an explicit repository-administration step in GitHub Settings; verify the resulting ruleset through the connector afterward.
 
-- [ ] **Step 7: Merge only through the protected PR flow after explicit human authorization**
+- [ ] **Step 7: Merge only after explicit human authorization through protected PR flow**
 
-No force-push/direct-main bypass. Prefer squash or rebase if linear history is later enforced; otherwise use the repository's allowed merge strategy.
+No direct-main bypass or force push.
 
-- [ ] **Step 8: Verify integrated `main` and Pages deployment**
+- [ ] **Step 8: Verify integrated `main` and Pages**
 
-After merge, confirm:
-- `main` points to the integrated purification commit;
-- post-main CI succeeds;
-- GitHub Pages workflow succeeds;
-- published game loads;
-- PWA remains installable;
-- no backend/ranking failure state appears;
-- repository current tree contains only current-use artifacts.
+Confirm post-merge `main` SHA, post-main CI success, Pages deployment success, live game load/PWA installability and absence of backend/ranking failure UI.
 
-- [ ] **Step 9: Final completion report**
+- [ ] **Step 9: Final report**
 
-Report:
-- final main SHA;
-- PR number;
-- CI run id/status;
-- Pages run id/status;
-- exact files/directories deleted;
-- VERIFY candidates kept, if any, with their live consumers;
-- final direct dependency list;
-- confirmed `Protect Main` rule set.
+Report final main SHA, PR number, CI/Page run IDs/statuses, deleted files/directories, any VERIFY candidates retained with live consumers, final direct dependency list and confirmed `Protect Main` rules.
 
-Do not claim completion without fresh evidence from Step 2 and post-integration Step 8.
+Do not claim completion without fresh Task 7 Step 2 evidence and post-integration Step 8 evidence.
