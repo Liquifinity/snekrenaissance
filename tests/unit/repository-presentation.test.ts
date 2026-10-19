@@ -7,8 +7,9 @@ describe('repository presentation', () => {
   it('presents the current SNEK as play, install and fork first', () => {
     expect(readme).toContain('# SNEK RENAISSANCE');
     expect(readme).toContain('conquer the space');
-    expect(readme).toMatch(/PLAY\s*[·|/]\s*INSTALL\s*[·|/]\s*FORK/i);
-    expect(readme).toContain('https://liquifinity.github.io/snekrenaissance/');
+    expect(readme).toContain('<a href="https://liquifinity.github.io/snekrenaissance/"><strong>PLAY</strong></a>');
+    expect(readme).toContain('<a href="https://liquifinity.github.io/snekrenaissance/?install=1"><strong>INSTALL</strong></a>');
+    expect(readme).toContain('<a href="https://github.com/Liquifinity/snekrenaissance/fork"><strong>FORK</strong></a>');
     expect(readme).toMatch(/PWA|Progressive Web App/i);
     expect(readme).toMatch(/install/i);
     expect(readme).toMatch(/fork/i);
