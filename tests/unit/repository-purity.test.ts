@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const packageJson = readFileSync('package.json', 'utf8');
+const packageLock = readFileSync('package-lock.json', 'utf8');
 const viteConfig = readFileSync('vite.config.ts', 'utf8');
 const playwrightConfig = readFileSync('playwright.config.ts', 'utf8');
 const ciWorkflow = readFileSync('.github/workflows/ci.yml', 'utf8');
@@ -45,6 +46,13 @@ describe('public repository purity', () => {
     expect(manifest.dependencies).toEqual({ three: expect.any(String) });
     expect(manifest.devDependencies).not.toHaveProperty('wrangler');
     expect(packageJson).not.toMatch(/worker|wrangler|ranked/i);
+  });
+
+  it('lockfile has no retired direct dependency', () => {
+    const lock = JSON.parse(packageLock) as {
+      packages?: Record<string, { devDependencies?: Record<string, string> }>;
+    };
+    expect(lock.packages?.['']?.devDependencies).not.toHaveProperty('wrangler');
   });
 
   it('Vite, Playwright and CI have no ranked or Worker execution path', () => {
