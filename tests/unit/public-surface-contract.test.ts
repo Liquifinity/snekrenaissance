@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const readme = readFileSync('README.md', 'utf8');
@@ -9,18 +9,13 @@ function readIfPresent(path: string): string {
 }
 
 describe('public repository surface contract', () => {
-  it('uses the canonical One last tweak artwork and removes the retired hero', () => {
-    const artworkPath = 'docs/readme/one-last-tweak.webp';
-
-    expect(existsSync(artworkPath)).toBe(true);
-    if (existsSync(artworkPath)) {
-      expect(statSync(artworkPath).size).toBeGreaterThan(10_000);
-    }
-
-    expect(readme).toContain('<img src="docs/readme/one-last-tweak.webp"');
+  it('keeps the README image-free and removes retired artwork assets', () => {
+    expect(readme).not.toMatch(/<img\b/i);
+    expect(readme).not.toContain('docs/readme/one-last-tweak.webp');
     expect(readme).not.toContain('docs/readme/snek-renaissance-hero.jpg');
     expect(readme).not.toContain('Hey, CHAT — where is my image?');
     expect(readme).not.toContain('I guess you can load your image there.');
+    expect(existsSync('docs/readme/one-last-tweak.webp')).toBe(false);
     expect(existsSync('docs/readme/snek-renaissance-hero.jpg')).toBe(false);
   });
 
