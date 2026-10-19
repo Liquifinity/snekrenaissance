@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 const packageJson = readFileSync('package.json', 'utf8');
 const packageLock = readFileSync('package-lock.json', 'utf8');
 const viteConfig = readFileSync('vite.config.ts', 'utf8');
+const viteEnv = readFileSync('src/vite-env.d.ts', 'utf8');
 const playwrightConfig = readFileSync('playwright.config.ts', 'utf8');
 const ciWorkflow = readFileSync('.github/workflows/ci.yml', 'utf8');
 
@@ -81,7 +82,7 @@ describe('public repository purity', () => {
   });
 
   it('Vite, Playwright and CI have no ranked or Worker execution path', () => {
-    for (const source of [viteConfig, playwrightConfig, ciWorkflow]) {
+    for (const source of [viteConfig, viteEnv, playwrightConfig, ciWorkflow]) {
       expect(source).not.toMatch(/e2e-ranked|worker:|wrangler|VITE_RANKING|\/rank\b|cloudflare/i);
     }
     expect(playwrightConfig).not.toMatch(/8787|4174|ranked\.spec/i);
