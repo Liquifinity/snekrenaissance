@@ -1,21 +1,13 @@
-export type UsernameViewModel = {
-  sessionStatus?: 'idle' | 'starting' | 'failed';
-  error?: string | null;
-};
-
 export function renderUsernameView(
   container: HTMLElement,
   initialUsername: string,
-  onPlay: (username: string) => void,
-  model: UsernameViewModel = {}
+  onPlay: (username: string) => void
 ): void {
   container.replaceChildren();
 
-  const status = model.sessionStatus ?? 'idle';
   const section = document.createElement('section');
   section.className = 'screen screen-username';
   section.dataset.view = 'username';
-  section.dataset.sessionStatus = status;
 
   const form = document.createElement('form');
   form.className = 'username-form';
@@ -31,22 +23,19 @@ export function renderUsernameView(
   input.autocomplete = 'username';
   input.maxLength = 24;
   input.value = initialUsername;
-  input.disabled = status === 'starting';
 
   const error = document.createElement('p');
   error.className = 'form-error';
   error.setAttribute('role', 'alert');
-  error.textContent = model.error ?? '';
+  error.textContent = '';
 
   const play = document.createElement('button');
   play.type = 'submit';
   play.dataset.action = 'play';
-  play.disabled = status === 'starting';
-  play.textContent = status === 'starting' ? 'STARTING…' : status === 'failed' ? 'RETRY' : 'PLAY';
+  play.textContent = 'PLAY';
 
   form.addEventListener('submit', (event) => {
     event.preventDefault();
-    if (status === 'starting') return;
     const username = input.value.trim();
     if (!username) {
       error.textContent = 'enter a username.';
@@ -60,5 +49,5 @@ export function renderUsernameView(
   form.append(label, input, error, play);
   section.append(form);
   container.append(section);
-  if (!input.disabled) input.focus();
+  input.focus();
 }

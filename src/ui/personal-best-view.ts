@@ -1,4 +1,4 @@
-export function renderLocalRankView(
+export function renderPersonalBestView(
   container: HTMLElement,
   best: number,
   onBack: () => void
@@ -6,14 +6,14 @@ export function renderLocalRankView(
   container.replaceChildren();
 
   const section = document.createElement('section');
-  section.className = 'screen local-rank';
-  section.dataset.view = 'rank';
+  section.className = 'screen personal-best';
+  section.dataset.view = 'best';
 
   const title = document.createElement('h1');
   title.textContent = 'PERSONAL BEST';
 
   const bestLine = document.createElement('p');
-  bestLine.className = 'rank-best';
+  bestLine.className = 'best-value';
   bestLine.textContent = String(best);
 
   const back = document.createElement('button');

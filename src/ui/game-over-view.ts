@@ -1,27 +1,19 @@
 export type GameOverViewModel = {
   score: number;
-  length: number;
   best: number;
-  worldRank: number | null;
-  ranked: boolean;
-  submissionStatus?: 'idle' | 'submitting' | 'accepted' | 'failed';
-  submissionError?: string | null;
 };
 
 export function renderGameOverView(
   container: HTMLElement,
   model: GameOverViewModel,
   onReplay: () => void,
-  onRank: () => void,
-  onRetryRank?: () => void
+  onBest: () => void
 ): void {
   container.replaceChildren();
 
-  const submissionStatus = model.submissionStatus ?? 'idle';
   const section = document.createElement('section');
   section.className = 'screen game-over';
   section.dataset.view = 'game-over';
-  section.dataset.submissionStatus = submissionStatus;
 
   const title = document.createElement('h1');
   title.textContent = 'GAME OVER';
@@ -29,19 +21,10 @@ export function renderGameOverView(
   const metrics = document.createElement('div');
   metrics.className = 'result-metrics';
 
-  const metricRows: Array<[string, string]> = model.ranked
-    ? [
-        ['SCORE', String(model.score)],
-        ['LENGTH', String(model.length)],
-        ['BEST', String(model.best)],
-        ['WORLD', model.worldRank !== null ? `#${model.worldRank}` : 'PENDING']
-      ]
-    : [
-        ['SCORE', String(model.score)],
-        ['PERSONAL BEST', String(model.best)]
-      ];
-
-  for (const [label, value] of metricRows) {
+  for (const [label, value] of [
+    ['SCORE', String(model.score)],
+    ['PERSONAL BEST', String(model.best)]
+  ] as const) {
     const row = document.createElement('p');
     const name = document.createElement('span');
     const strong = document.createElement('strong');
@@ -49,16 +32,6 @@ export function renderGameOverView(
     strong.textContent = value;
     row.append(name, strong);
     metrics.append(row);
-  }
-
-  if (model.submissionError) {
-    const error = document.createElement('p');
-    error.className = 'form-error';
-    error.setAttribute('role', 'alert');
-    error.textContent = model.submissionError;
-    section.append(title, metrics, error);
-  } else {
-    section.append(title, metrics);
   }
 
   const actions = document.createElement('div');
@@ -70,23 +43,13 @@ export function renderGameOverView(
   replay.textContent = 'PLAY AGAIN';
   replay.addEventListener('click', onReplay);
 
-  const rank = document.createElement('button');
-  rank.type = 'button';
-  rank.dataset.action = 'rank';
-  rank.textContent = 'RANK';
-  rank.addEventListener('click', onRank);
+  const best = document.createElement('button');
+  best.type = 'button';
+  best.dataset.action = 'best';
+  best.textContent = 'BEST';
+  best.addEventListener('click', onBest);
 
-  actions.append(replay, rank);
-
-  if (submissionStatus === 'failed' && onRetryRank) {
-    const retry = document.createElement('button');
-    retry.type = 'button';
-    retry.dataset.action = 'retry-rank';
-    retry.textContent = 'RETRY RANK';
-    retry.addEventListener('click', onRetryRank);
-    actions.append(retry);
-  }
-
-  section.append(actions);
+  actions.append(replay, best);
+  section.append(title, metrics, actions);
   container.append(section);
 }
