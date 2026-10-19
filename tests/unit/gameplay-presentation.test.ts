@@ -11,7 +11,7 @@ import {
   SNAKE_VOXEL_SIZE
 } from '../../src/render/snake-renderer';
 
-describe('Pixel Flight Grid V2 presentation contract', () => {
+describe('current gameplay presentation contract', () => {
   it('derives aligned voxel footprints directly from GridConfig cell size', () => {
     expect(SNAKE_VOXEL_FILL).toBe(0.8);
     expect(FOOD_VOXEL_FILL).toBe(0.8);

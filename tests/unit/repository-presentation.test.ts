@@ -22,11 +22,11 @@ describe('repository presentation', () => {
     expect(readme).toMatch(/repository name|repository-name|automatically/i);
   });
 
-  it('does not present obsolete game generations as the current product', () => {
-    expect(readme).not.toContain('SNEK CORE V3 candidate');
+  it('does not present retired development generations as the current product', () => {
+    expect(readme).not.toMatch(/candidate/i);
     expect(readme).not.toContain('300 foods = 100%');
-    expect(readme).not.toMatch(/Historical V2\.1\/V2\.2 flight\/DDA modules/);
-    expect(readme).not.toMatch(/Earlier V1\/V2\/V2\.1\/V2\.2 specifications/);
+    expect(readme).not.toMatch(/earlier .* specifications/i);
+    expect(readme).not.toMatch(/development history/i);
   });
 
   it('publishes MIT only after the asset-rights gate has passed', () => {
