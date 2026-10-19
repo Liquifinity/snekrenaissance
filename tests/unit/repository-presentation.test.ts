@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const readme = readFileSync('README.md', 'utf8');
@@ -22,35 +22,20 @@ describe('repository presentation', () => {
     expect(readme).toMatch(/repository name|repository-name|automatically/i);
   });
 
-  it('does not present retired development generations as the current product', () => {
-    expect(readme).not.toMatch(/candidate/i);
-    expect(readme).not.toContain('300 foods = 100%');
-    expect(readme).not.toMatch(/earlier .* specifications/i);
-    expect(readme).not.toMatch(/development history/i);
+  it('publishes the approved brand story without retired platform language', () => {
+    expect(readme).toContain('A NEW EXPERIMENT WITH AN ANCIENT SPIRIT');
+    expect(readme).not.toMatch(/Cloudflare|Wrangler|D1|leaderboard|ranked/i);
   });
 
-  it('publishes MIT only after the asset-rights gate has passed', () => {
+  it('publishes MIT and keeps internal process documentation out of the public tree', () => {
     expect(existsSync('LICENSE')).toBe(true);
-    if (!existsSync('LICENSE')) return;
-
     const license = readFileSync('LICENSE', 'utf8');
     expect(license).toContain('MIT License');
     expect(license).toContain('Copyright (c) 2026 SNEK RENAISSANCE contributors');
-    expect(license).toContain('Permission is hereby granted, free of charge');
-
     expect(readme).toMatch(/## License/i);
     expect(readme).toMatch(/MIT/i);
-    expect(readme).not.toMatch(/asset provenance|asset rights|license review|pending/i);
-  });
-
-  it('keeps only the current PWA design and R2 plan in the public documentation tree', () => {
     expect(existsSync('.superpowers')).toBe(false);
-    expect(existsSync('docs/superpowers/execution')).toBe(false);
-    expect(readdirSync('docs/superpowers/specs').sort()).toEqual([
-      '2026-10-18-snek-pwa-fork-first-design.md'
-    ]);
-    expect(readdirSync('docs/superpowers/plans').sort()).toEqual([
-      '2026-10-18-snek-pwa-fork-first-r2.md'
-    ]);
+    expect(existsSync('docs/superpowers')).toBe(false);
+    expect(existsSync('docs/security/2026-10-15-dependency-audit.md')).toBe(false);
   });
 });

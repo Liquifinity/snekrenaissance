@@ -1,4 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const packageJson = readFileSync('package.json', 'utf8');
@@ -20,12 +21,36 @@ const retiredPaths = [
   'tests/unit/deploy-production.test.ts',
   'tests/unit/production-config.test.ts',
   'tests/unit/production-smoke.test.ts',
-  'tests/metrics/grid-tuning.test.ts'
+  'tests/metrics/grid-tuning.test.ts',
+  'src/shared/ranking-api.ts',
+  'docs/security/2026-10-15-dependency-audit.md',
+  'docs/superpowers'
 ];
 
+function findGitKeeps(root: string): string[] {
+  if (!existsSync(root)) return [];
+  const matches: string[] = [];
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    const path = join(root, entry.name);
+    if (entry.isDirectory()) matches.push(...findGitKeeps(path));
+    else if (entry.name === '.gitkeep') matches.push(path);
+  }
+  return matches;
+}
+
 describe('public repository purity', () => {
-  it('contains no retired backend or Cloudflare artifacts', () => {
+  it('contains no retired backend, process or dated audit artifacts', () => {
     for (const path of retiredPaths) expect(existsSync(path), path).toBe(false);
+  });
+
+  it('publishes only current contributor-facing architecture documents', () => {
+    expect(existsSync('ARCHITECTURE.md')).toBe(true);
+    expect(existsSync('CONTRIBUTING.md')).toBe(true);
+    expect(existsSync('docs/readme/snek-renaissance-hero.jpg')).toBe(true);
+  });
+
+  it('contains no obsolete gitkeep placeholders', () => {
+    expect([...findGitKeeps('src'), ...findGitKeeps('tests')]).toEqual([]);
   });
 
   it('package scripts and direct dependencies describe only the browser PWA product', () => {
