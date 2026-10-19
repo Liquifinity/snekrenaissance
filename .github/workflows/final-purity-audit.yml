@@ -1,0 +1,26 @@
+name: final purity audit
+
+on:
+  push:
+    branches:
+      - 'refactor/public-repo-purification-7d'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit retired concepts
+        run: |
+          PATTERN='Cloudflare|Wrangler|D1|VITE_RANKING_API_BASE|SessionGateway|HttpSessionGateway|LocalSessionGateway|worldRank|activeSessionId|submissionStatus|e2e-ranked|leaderboard|ranked'
+          echo '=== implementation and configuration ==='
+          grep -RInE "$PATTERN" src scripts package.json package-lock.json vite.config.ts playwright.config.ts pwa.config.ts .github/workflows --exclude='final-purity-audit.yml' || true
+          echo '=== tests ==='
+          grep -RInE "$PATTERN" tests --include='*.ts' || true
+          echo '=== markdown documentation ==='
+          grep -InE "$PATTERN" README.md ARCHITECTURE.md CONTRIBUTING.md || true
+          echo '=== public tree ==='
+          find . -maxdepth 3 -type f -not -path './.git/*' -not -path './node_modules/*' | sort
