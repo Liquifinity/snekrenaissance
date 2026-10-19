@@ -8,15 +8,7 @@
     "build": "tsc -b && vite build",
     "verify:pwa": "node scripts/verify-pwa-build.mjs",
     "test": "vitest run",
-    "test:tuning": "vitest run tests/metrics/grid-tuning.test.ts --reporter=verbose",
-    "test:worker": "vitest run --config vitest.worker.config.ts",
     "typecheck": "tsc -b --pretty false",
-    "worker:dev": "wrangler dev",
-    "worker:types": "wrangler types",
-    "worker:build": "wrangler deploy --dry-run",
-    "worker:migrate": "wrangler d1 migrations apply snekrenaissance-leaderboard --local",
-    "render:wrangler:production": "node scripts/render-production-wrangler.mjs",
-    "e2e": "playwright test",
     "test:e2e": "playwright test"
   },
   "dependencies": {
@@ -30,7 +22,6 @@
     "typescript": "^5.8.3",
     "vite": "^7.1.0",
     "vite-plugin-pwa": "2.0.0",
-    "vitest": "^3.2.4",
-    "wrangler": "4.150.0"
+    "vitest": "^3.2.4"
   }
 }
