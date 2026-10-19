@@ -16,6 +16,6 @@ jobs:
       - name: Candidate references
         run: |
           echo '=== candidate imports/references ==='
-          rg -n "flight|grid-traversal|torus|game/types|flight-presentation|pixel-resolution|constants" src tests --glob '*.ts' || true
+          grep -RInE "flight|grid-traversal|torus|game/types|flight-presentation|pixel-resolution|constants" src tests --include='*.ts' || true
           echo '=== retired-generation residue ==='
-          rg -n "Pixel Flight|V2\.1|V2\.2|SNEK CORE V3|SNEK CORE V4|historical|flight-presentation|torus" src tests package.json .github scripts --glob '!docs/**' || true
+          grep -RInE "Pixel Flight|V2\.1|V2\.2|SNEK CORE V3|SNEK CORE V4|historical|flight-presentation|torus" src tests package.json .github scripts --exclude-dir=docs || true
