@@ -1,35 +1,73 @@
 # SNEK RENAISSANCE
 
-conquer the space
+<p align="center">
+  <img src="docs/readme/snek-renaissance-hero.jpg" alt="SNEK RENAISSANCE — A New Experiment With An Ancient Spirit" width="100%" />
+</p>
 
-**PLAY · INSTALL · FORK**
+<p align="center"><strong>conquer the space</strong></p>
 
-SNEK RENAISSANCE is a three-dimensional browser game built with TypeScript, Three.js and Vite. The same build can be played on the web, installed as a Progressive Web App (PWA), or forked and evolved from this repository.
+<h2 align="center">Hey, CHAT — where is my image?</h2>
 
-SNEK RENAISSANCE is an independent experimental project. It is not affiliated with, endorsed by, or presented as an official OpenAI or ChatGPT product.
+<p align="center">
+  <strong>An ancient instinct, rebuilt across a three-dimensional cube.</strong>
+  <br/>
+  I guess you can load your image there.
+</p>
 
-## Play
+<p align="center">
+  <a href="https://liquifinity.github.io/snekrenaissance/"><strong>PLAY</strong></a>
+  &nbsp;·&nbsp;
+  <strong>INSTALL</strong>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/Liquifinity/snekrenaissance/fork"><strong>FORK</strong></a>
+</p>
 
-https://liquifinity.github.io/snekrenaissance/
+---
 
-## Install
+## THE EXPERIMENT
 
-Open the game in a compatible browser and use that browser or platform's install-app action. The installed PWA opens as a standalone application and supports offline relaunch after its assets have been cached.
+Move. Grow. Complete the image.
 
-Installation UI and availability vary by browser and platform. There is no separate `.exe`, Electron or Tauri build: the browser version and the installed version are the same application.
+SNEK RENAISSANCE takes an ancient game instinct and bends it around a three-dimensional cube.
 
-## Fork
+The browser is the console.  
+The web app is the game.  
+The repository is yours to evolve.
 
-Fork this repository when you want to change the game or publish your own SNEK.
+**TypeScript · Three.js · Vite · PWA**
+
+---
+
+## PLAY
+
+**https://liquifinity.github.io/snekrenaissance/**
+
+---
+
+## INSTALL
+
+SNEK RENAISSANCE is an installable Progressive Web App.
+
+Open the game in a compatible browser and choose **Install app**. Once cached, it can relaunch offline and run as a standalone application.
+
+---
+
+## FORK
+
+Build your own experiment.
 
 ```bash
+git clone https://github.com/Liquifinity/snekrenaissance.git
+cd snekrenaissance
 npm install
 npm run dev
 ```
 
-The GitHub Pages workflow derives its deployment base path automatically from the repository name, so a renamed Fork does not need the original `/snekrenaissance/` path hard-coded into its build.
+Forks are deployment-ready: GitHub Pages automatically adapts to the repository name.
 
-## Build and test
+---
+
+## BUILD
 
 ```bash
 npm run build
@@ -37,8 +75,14 @@ npm test
 npm run test:e2e
 ```
 
-The project also contains the preserved Worker/ranking seam and its validation tooling. Those components are not required to open the local browser game.
+---
 
 ## License
 
-SNEK RENAISSANCE is released under the MIT License. See [`LICENSE`](LICENSE).
+MIT — see [`LICENSE`](LICENSE).
+
+SNEK RENAISSANCE is an independent experimental project. It is not affiliated with, endorsed by, or presented as an official OpenAI or ChatGPT product.
+
+---
+
+<p align="center"><strong>A NEW EXPERIMENT WITH AN ANCIENT SPIRIT.</strong></p>
