@@ -2,7 +2,6 @@
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import { AppController } from '../../src/app/app-controller';
-import { RULESET_ID } from '../../src/game/grid-config';
 
 function setup(options: { clearStorage?: boolean } = {}): { root: HTMLElement; controller: AppController } {
   document.body.innerHTML = '<main id="app"><canvas id="game-canvas"></canvas></main>';
@@ -34,17 +33,14 @@ function finishRun(controller: AppController, score: number): void {
   const length = run.snake.segments.length;
   run.phase = 'game-over';
   run.result = {
-    rulesetId: RULESET_ID,
     score,
     foodsCollected: score,
     length,
     maxLength: Math.max(run.maxLength, length),
-    foodEaten: score,
     durationMs: 1000
   };
   run.foodsCollected = score;
   run.score = score;
-  run.foodEaten = score;
   controller.handleRunState(run);
 }
 
@@ -100,12 +96,10 @@ describe('meme-first application flow', () => {
     if (!run) throw new Error('missing run');
     run.foodsCollected = 1;
     run.score = 1;
-    run.foodEaten = 1;
     controller.handleRunState(run);
     expect(root.querySelector('[data-progress-label]')?.textContent).toBe('3.0%');
     run.foodsCollected = 32;
     run.score = 32;
-    run.foodEaten = 32;
     controller.handleRunState(run);
     expect(root.querySelector('[data-progress-label]')?.textContent).toBe('97.0%');
     expect(root.querySelector('[data-hud-score]')?.textContent).toBe('SCORE 32');
@@ -119,14 +113,11 @@ describe('meme-first application flow', () => {
     run.phase = 'completed';
     run.foodsCollected = 33;
     run.score = 33;
-    run.foodEaten = 33;
     run.result = {
-      rulesetId: RULESET_ID,
       score: 33,
       foodsCollected: 33,
       length: run.snake.segments.length,
       maxLength: run.maxLength,
-      foodEaten: 33,
       durationMs: 1000
     };
     controller.handleRunState(run);

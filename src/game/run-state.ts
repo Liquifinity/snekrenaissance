@@ -1,6 +1,6 @@
 import { wouldSelfCollide } from './collision';
 import { isGridFoodCollected, spawnGridFood } from './food';
-import { GRID_CONFIG, RULESET_ID, type GridConfig } from './grid-config';
+import { GRID_CONFIG, type GridConfig } from './grid-config';
 import { isOppositeGridDirection } from './grid-direction';
 import { advanceGridStep } from './grid-topology';
 import type { GridCell, GridDirection } from './grid-types';
@@ -16,14 +16,11 @@ import {
 export type RunPhase = 'ready' | 'playing' | 'game-over' | 'completed';
 
 export type RunResult = Readonly<{
-  rulesetId: typeof RULESET_ID;
   score: number;
   foodsCollected: number;
   length: number;
   maxLength: number;
   durationMs: number;
-  /** Preserved legacy HTTP payload alias; score authority is foodsCollected. */
-  foodEaten: number;
 }>;
 
 export type RunState = {
@@ -35,8 +32,6 @@ export type RunState = {
   food: GridCell | null;
   foodsCollected: number;
   score: number;
-  /** Preserved UI/backend compatibility alias; gameplay authority is foodsCollected. */
-  foodEaten: number;
   maxLength: number;
   elapsedMs: number;
   result: RunResult | null;
@@ -45,13 +40,11 @@ export type RunState = {
 function buildResult(state: RunState): RunResult {
   const length = state.snake.segments.length;
   return Object.freeze({
-    rulesetId: RULESET_ID,
     score: state.score,
     foodsCollected: state.foodsCollected,
     length,
     maxLength: state.maxLength,
-    durationMs: Math.round(state.elapsedMs),
-    foodEaten: state.foodsCollected
+    durationMs: Math.round(state.elapsedMs)
   });
 }
 
@@ -76,7 +69,6 @@ export function createRun(
     food: spawn.ok ? spawn.cell : null,
     foodsCollected: 0,
     score: 0,
-    foodEaten: 0,
     maxLength: snake.segments.length,
     elapsedMs: 0,
     result: null
@@ -132,7 +124,6 @@ export function stepRun(
   if (state.food && isGridFoodCollected(movement.to, state.food)) {
     state.foodsCollected += 1;
     state.score = state.foodsCollected;
-    state.foodEaten = state.foodsCollected;
     addGrowth(state.snake, state.config.growthPerFood);
 
     if (state.foodsCollected >= COMPLETION_FOOD_TARGET) {
