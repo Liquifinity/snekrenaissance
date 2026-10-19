@@ -14,6 +14,8 @@
   I guess you can load your image there.
 </p>
 
+<p align="center"><strong>PLAY · INSTALL · FORK</strong></p>
+
 <p align="center">
   <a href="https://liquifinity.github.io/snekrenaissance/"><strong>PLAY</strong></a>
   &nbsp;·&nbsp;
